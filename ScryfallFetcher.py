@@ -3,13 +3,13 @@ from datetime import timedelta,datetime
 
 # Global headers for Scryfall API compliance
 headers = {'User-Agent': 'Mozilla/5.0 (MTG-Collection-Tracker/1.0)'}
-
+IMAGE_PATH = os.environ.get('IMAGE_PATH')
 class ScryfallFetcher:
     def __init__(self, db_manager):
         self.db = db_manager
         self.base_url = "https://api.scryfall.com/cards"
-        self.image_dir = f"static/img/cards"
-        self.icon_dir = "static/img/icons"
+        self.image_dir = f"{IMAGE_PATH}/img/cards"
+        self.icon_dir = f"{IMAGE_PATH}/img/icons"
         
         # Ensure directories exist
         for directory in [self.image_dir, self.icon_dir]:
@@ -46,7 +46,7 @@ class ScryfallFetcher:
         # 4. Handle Icon Download (Common for both skipped and synced sets)
         icon_url = set_data.get('icon_svg_uri')
         local_icon_path = f"img/icons/{set_code}.svg"
-        full_fs_path = os.path.join('static', local_icon_path)
+        full_fs_path = os.path.join(IMAGE_PATH, local_icon_path)
         
         if icon_url and not os.path.exists(full_fs_path):
             os.makedirs(os.path.dirname(full_fs_path), exist_ok=True)
@@ -82,11 +82,14 @@ class ScryfallFetcher:
             for card in cards_data.get('data', []):
                 scryfall_id = card.get('id')
                 oracle_id = card.get('oracle_id')
-                image_url = card.get('image_uris', {}).get('normal', '')
-                
+                if 'image_uris' in card:
+                    image_url = card.get('image_uris', {}).get('normal', '')
+                elif 'card_faces' in card:
+                    # Gets the image of the front face (Peter Parker)
+                    image_url = card['card_faces'][0]['image_uris']['normal']
                 # Setup Paths
                 local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
-                full_fs_path = os.path.join('static', local_img_path)
+                full_fs_path = os.path.join(IMAGE_PATH, local_img_path)
 
                 # 1. Download Image locally if it doesn't exist
                 if image_url and not os.path.exists(full_fs_path):
@@ -148,7 +151,7 @@ class ScryfallFetcher:
         # 2. Local Image Download (Specific to the version being added)
         img_url = data.get('image_uris', {}).get('normal')
         local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
-        full_img_fs_path = os.path.join('static', local_img_path)
+        full_img_fs_path = os.path.join(IMAGE_PATH, local_img_path)
         
         if img_url and not os.path.exists(full_img_fs_path):
             os.makedirs(os.path.dirname(full_img_fs_path), exist_ok=True)

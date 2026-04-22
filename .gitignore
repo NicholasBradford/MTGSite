@@ -6,3 +6,7 @@ reboot_table.py
 *.pyc
 /static/img
 /var
+db/mtg_inventory.db
+logs/app.log
+/logs
+*.log
