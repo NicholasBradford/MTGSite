@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Set Gallery{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    .set-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+        padding: 20px;
+    }
+
+    /* The Divider Logic */
+    .format-divider {
+        grid-column: 1 / -1; /* Forces the divider to span the full width of the grid */
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 40px 0 20px 0;
+        color: #ffca28;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        opacity: 0.9;
+    }
+
+    .format-divider::before, .format-divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 2px solid #444;
+    }
+
+    .format-divider:not(:empty)::before { margin-right: 1.5em; }
+    .format-divider:not(:empty)::after { margin-left: 1.5em; }
+
+    .set-card-link {
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.2s;
+    }
+
+    .set-card-link:hover {
+        transform: scale(1.05);
+    }
+
+    /* Legacy specific styling */
+    .legacy-card {
+        opacity: 0.7;
+        filter: grayscale(0.4);
+    }
+    
+    .legacy-card:hover {
+        opacity: 1;
+        filter: grayscale(0);
+    }
+
+    .set-display-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        height: 100%;
+        text-align: center;
+    }
+
+    .set-symbol-container {
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 15px;
+    }
+
+    .set-symbol {
+        max-width: 100%;
+        max-height: 100%;
+        filter: brightness(0) invert(1);
+    }
+
+    .set-label-code {
+        font-weight: bold;
+        font-size: 1.2em;
+        margin: 5px 0;
+        color: #ffca28;
+    }
+
+    .set-label-name {
+        font-size: 0.9em;
+        opacity: 0.8;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="set-grid">
+    {# Namespace allows us to modify the variable inside the loop scope #}
+    {% set legacy_flag = namespace(found=false) %}
+    <div class="format-divider">Standard</div>
+    {% for set in sets %}
+        
+        {# The divider drops the moment we hit the first non-standard set in the ordered list #}
+        {% if not set.standard_legal and not legacy_flag.found %}
+            <div class="format-divider">Commander Legal</div>
+            {% set legacy_flag.found = true %}
+        {% endif %}
+
+        <a href="{{ url_for('sets.set_detail', set_code=set.set_code) }}" 
+           class="set-card-link {{ 'legacy-card' if not set.standard_legal }}">
+            
+            <div class="set-display-card login-card">
+                <div class="set-symbol-container">
+                    {# Path construction using your existing logic #}
+                    <img src="{{ url_for('serve_card_image', filename='img/icons/' ~ set.set_code|lower ~ '.svg') }}" 
+                         class="set-symbol" 
+                         alt="{{ set.set_name }} symbol">
+                </div>
+                
+                <div class="set-label-code">{{ set.set_code|upper }}</div>
+                <div class="set-label-name">{{ set.set_name }}
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <p class="set-value">
+                        Current Value:
+                            {% if set.set_value %}
+                                ${{ "{:,.2f}".format(set.set_value) }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                    </p>
+                {% endif %}
+                </div>
+            </div>
+        </a>
+    {% endfor %}
+</div>
+{% endblock %}

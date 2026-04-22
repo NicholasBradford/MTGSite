@@ -1,0 +1,8 @@
+.env
+/venv
+reboot_table.py
+/helper
+/TODO.md
+*.pyc
+/static/img
+/var

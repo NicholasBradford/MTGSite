@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block style %}
+    /* Hero & Spotlight Section */
+    .hero-spotlight { 
+        background: #1a1a1a; 
+        padding: 40px; 
+        border-radius: 15px; 
+        margin-bottom: 30px; 
+        color: white; 
+    }
+    .spotlight-card { 
+        display: flex; 
+        align-items: center; 
+        gap: 40px; 
+        flex-wrap: wrap; 
+    }
+    .featured-img { 
+        max-width: 300px; 
+        border-radius: 15px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+    }
+
+    /* Stats Dashboard */
+    .stats-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+        gap: 20px; 
+        margin-bottom: 40px; 
+    }
+    .stat-item { 
+        background: #f8f9fa; 
+        padding: 20px; 
+        border-radius: 10px; 
+        text-align: center; 
+        border: 1px solid #dee2e6; 
+        color: #555; /* Darker gray for better contrast */
+        margin-bottom: 5px;
+    }
+    .stat-value { 
+        font-size: 2rem; 
+        font-weight: bold; 
+        color: #2c3e50; 
+        margin: 0;
+    }
+
+    .carousel-container {
+    overflow: hidden; /* Clips the duplicate set so it stays on one line */
+    width: 100%;
+}
+    /* Horizontal Scroller for Recent Cards */
+    .recent-scroll { 
+        display: flex; 
+        gap: 15px; 
+        overflow-x: hidden; 
+        padding: 10px 0;
+    }
+    .recent-scroll::-webkit-scrollbar {
+        display: none;
+    }
+    .recent-card {
+        flex: 0 0 auto;
+    }
+    .recent-card img { 
+        scroll-snap-align: start; /* Each card snaps to the left edge */
+        flex: 0 0 auto; /* Prevents the cards from shrinking */
+        height: 220px; 
+        border-radius: 10px; 
+        transition: transform 0.2s; 
+    }
+    .recent-card img:hover { 
+        transform: scale(1.05); 
+    }
+    .recent-scroll {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+
+
+
+{% endblock style %}
+{% block content %}
+<div class="home-container">
+    <section class="hero-spotlight">
+        {% if spotlight %}
+            <div class="spotlight-card">
+                <img src="{{ url_for('serve_card_image', filename = spotlight.image_url) }}" alt="{{ spotlight.name }}" class="featured-img">
+                <div class="spotlight-text">
+                    <h1>Featured Collection Piece</h1>
+                    <h2>{{ spotlight.name }}</h2>
+                    <p>{{ spotlight.set_name }} ({{ spotlight.set_code|upper }})</p>
+                    <a href="{{ url_for('sets.set_detail', set_code=spotlight.set_code) }}" class="btn">View Set</a>
+                </div>
+            </div>
+        {% else %}
+            <div class="hero-placeholder">
+                <h1>Welcome to my Collection!</h1>
+                <p>I haven't added any cards yet...</p>
+            </div>
+        {% endif %}
+    </section>
+    <section class="stats-grid">
+        <div class="stat-item">
+            <h3>Total Cards</h3>
+            <p class="stat-value">{{ stats.total_cards }}</p>
+        </div>
+        <div class="stat-item">
+            <h3>Unique Artworks</h3>
+            <p class="stat-value">{{ stats.unique_cards }}</p>
+        </div>
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <div class="stat-item">
+            <h3>Collection Value</h3>
+            <p class="stat-value">${{ "{:,.2f}".format(stats.total_value) }}</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="recent-additions">
+    <h2 style="border-bottom: 2px solid #eee; padding-bottom: 10px;">Recently Cracked</h2>
+    <div class="carousel-container">
+        <div class="recent-scroll" id="carousel">
+            {% for card in recent %}
+                <div class="recent-card">
+                    <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }}">
+                </div>
+            {% endfor %}
+            
+            {% for card in recent %}
+                <div class="recent-card">
+                    <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }}">
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+</div>
+
+<script>
+    const carousel = document.getElementById('carousel');
+    let speed = .5; // Adjust this number to change speed (1 is slow/smooth)
+    let scrollPos = 0;
+
+    function step() {
+        // Increment scroll position
+        carousel.scrollLeft += speed;
+
+        // If we've scrolled past the first half (the original cards), reset to start
+        // We divide by 2 because we duplicated the cards
+        if (carousel.scrollLeft >= (carousel.scrollWidth / 2)) {
+            carousel.scrollLeft = 0;
+        }
+
+        requestAnimationFrame(step); // Smoother than setInterval
+    }
+
+    // Start the animation
+    let animationId = requestAnimationFrame(step);
+
+    // Pause on Hover
+    carousel.addEventListener('mouseenter', () => cancelAnimationFrame(animationId));
+    carousel.addEventListener('mouseleave', () => animationId = requestAnimationFrame(step));
+</script>
+
+{% endblock %}

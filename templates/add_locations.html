@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Add Location{% endblock %}
+
+{% block content %}
+    {% if current_user.is_authenticated %}
+    <div class="login-card" style="margin-bottom: 20px; max-width: 300px;">
+        <h3>Add New Location</h3>
+        <form action="{{ url_for('admin.add_location') }}" method="POST">
+            <div class="form-group">
+                <input type="text" name="location_name" placeholder="e.g., Trade Binder 2" required class="form-input">
+            </div>
+            <button type="submit" class="login-btn">Add Location</button>
+        </form>
+    </div>
+    {% endif %}
+{% endblock %}

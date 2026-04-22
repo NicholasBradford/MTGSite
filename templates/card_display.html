@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{%block style %}
+        .rainbow_image {
+            position: relative;
+            display: inline-block;
+            border-radius: 4.75% / 3.5%; /* Matches standard MTG card corners */
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            line-height: 0;
+        }
+        .rainbow_image::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 998;
+            pointer-events: none; /* Allows clicks to pass through to the image */
+            background: repeating-linear-gradient(
+                115deg,
+                transparent 0%,
+                rgba(255, 0, 0, 0.4) 25%,
+                rgba(255, 255, 0, 0.4) 35%,
+                rgba(0, 255, 0, 0.4) 50%,
+                rgba(0, 255, 255, 0.4) 65%,
+                rgba(0, 0, 255, 0.4) 75%,
+                rgba(255, 0, 255, 0.4) 80%,
+                transparent 100%
+            );
+            
+            background-size: 300% -200%;
+            animation: foil-shimmer 8s ease infinite;
+            mix-blend-mode: color-dodge; 
+            opacity: 0.5;
+        }
+
+         @keyframes foil-shimmer {
+            0% { 
+                background-position: 0% 0%; 
+            }
+            100% { 
+                background-position: 100% 100%; 
+            }
+        }
+
+                .qty-badge {
+            background-color: #444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 5px;
+            vertical-align: middle;
+            border: 1px solid #666;
+        }
+    {%endblock%}
+{% block content %}
+    <div class="card-container">
+        {% for card in cards %}
+            <div class="card_class">
+                {% if card['image_url'] %}
+                    {# We check if we are in inventory AND logged in as admin #}
+                    {% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
+                    
+                    <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
+                        <img 
+                            src="{{ url_for('serve_card_image', filename=card['image_url']) }}" 
+                            alt="{{ card['name'] }}"
+                            
+                            {# Toggle functionality based on view_mode #}
+                            {% if is_admin_inventory %}
+                                onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
+                                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
+                                onmouseover="this.style.borderColor='#ffca28'"
+                                onmouseout="this.style.borderColor='transparent'"
+                            {% else %}
+                                onclick="showPopup('{{ card['name'] }}')"
+                            {% endif %}
+                        >
+                    </div>
+                {% else %}
+                    <div class="no-image">No Image Available</div>
+                {% endif %}
+
+                <div class="card-label">
+                    {{ card['name'] }} 
+                    {% if card['qty'] > 1 %}
+                        <span class="qty-badge">x{{ card['qty'] }}</span>
+                    {% endif %}
+                    {% if card['finish'] == 'foil' %}
+                        <span style="color: gold;">★</span>
+                    {% endif %}
+                    
+                    <br/>
+                    <span class="card-meta">
+                        ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
+                    </span>
+                </div> 
+            </div>
+        {% endfor %}
+    </div>
+{%endblock%}
+{% block extra_content%}
+{%endblock%}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block style %}
+    .set-checklist {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* Centers the whole grid */
+    gap: 25px;
+    padding: 20px;
+    }
+
+    /* Reusing your inventory's card style */
+    .card_item {
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Centers text and badge on the image axis */
+        width: 200px;
+        text-align: center;
+    }
+
+    .image_wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .card_img {
+        width: 100%;
+        border-radius: 4.75% / 3.5%;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .uncollected {
+        filter: grayscale(100%) brightness(0.5);
+    }
+
+    /* Centered Badge matching your screenshot */
+    .count_pill {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #121212;
+        color: #ffca28;
+        border: 1px solid #ffca28;
+        padding: 2px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: bold;
+        z-index: 2;
+    }
+
+    .card_label {
+        margin-top: 15px;
+        color: #eee;
+        font-size: 0.95em;
+    }
+{% endblock %}
+
+{% block title %}{{ set.set_name }}{% endblock %}
+
+{% block content %}
+<div class="set-checklist">
+    {% for card in cards %}
+    <div class="card_item">
+        <div class="image_wrapper">
+            {# If you own at least one, use your rainbow effect #}
+            <div class="{% if card.owned_count > 0 %}rainbow_image{% endif %}">
+                <img src="{{ url_for('serve_card_image', filename=card.image_url) }}" 
+                     class="card_img {% if card.owned_count == 0 %}uncollected{% endif %}" 
+                     alt="{{ card.name }}">
+            </div>
+            
+            <div class="count_pill">
+                {{ card.owned_count if card.owned_count < 4 else 4 }}/4
+            </div>
+        </div>
+        
+        <div class="card_label">
+            <strong>{{ card.name }}</strong><br>
+            <span style="opacity: 0.6;">#{{ card.collector_number }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

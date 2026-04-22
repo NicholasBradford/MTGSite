@@ -1,0 +1,14 @@
+{%extends "base.html"%}
+    {% block title %}Not Found{% endblock %}
+    {% block content %}
+    <div style = "max-width: fit-content; margin-left: auto; margin-right: auto;">
+    <h1 style = "text-align:center;">Oops! That's Not Right...</h1>
+    <p>{{ error_message }}</p>
+    <img src="https://cards.scryfall.io/normal/front/0/1/01d3e6ea-4791-4948-af22-c1bd04c34c1e.jpg?1712355420" alt="404 Image" style = "width: 50%;
+    height: 50%; display: block;
+  margin-left: auto;
+  margin-right: auto;;
+    border: 2px solid #333;"/>
+    <p>Looks like this page hasn't been added yet. We promise it's not lost forever!</p>
+    <p>Come back soon—maybe the mystery will be solved by then!</p>
+{%endblock%}

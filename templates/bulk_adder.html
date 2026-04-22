@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Bulk Import{% endblock %}
+{% block style %}
+.bulk-container {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.import-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.import-card {
+    background: #1f1f1f;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #333;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+input[type="file"], select {
+    padding: 10px;
+    background: #121212;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 4px;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background-color: #ff5252;
+    border: none;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .import-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+{% endblock style %}
+{% block content %}
+<div class="bulk-container">
+    <h2>Bulk Card Input</h2>
+    <p>Upload a CSV file to add multiple cards to your inventory at once.</p>
+
+    <div class="import-grid">
+        <div class="import-card instructions">
+            <h3>CSV Template Requirements</h3>
+            <ul>
+                <li><strong>name:</strong> Exact card name</li>
+                <li><strong>set:</strong> 3-letter set code (e.g., 'lea')</li>
+                <li><strong>cn:</strong> Collector Number</li>
+                <li><strong>qty:</strong> Number of copies</li>
+                <li><strong>finish:</strong> 'nonfoil' or 'foil'</li>
+            </ul>
+            <p>Download this file to ensure your headers are correct:</p>
+            <a href="{{ url_for('adder.download_template') }}" class="btn-secondary">
+                Download Template CSV
+            </a>
+        </div>
+
+        <div class="import-card upload-zone">
+            <form action="{{ url_for('adder.bulk_import_page') }}" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csv_file">Select CSV File:</label>
+                    <input type="file" name="file" id="csv_file" accept=".csv" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Default Location:</label>
+                    <select name="location_id">
+                        {% for loc in locations %}
+                            <option value="{{ loc.location_id }}">{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-primary">Process Import</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

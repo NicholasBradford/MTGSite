@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block style %}
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+    }
+
+    .login-card {
+        background-color: #1f1f1f;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid #333;
+    }
+
+    .login-card h2 {
+        text-align: center;
+        color: #ffffff;
+        margin-bottom: 25px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        color: #bbb;
+        margin-bottom: 5px;
+        font-size: 0.9em;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 12px;
+        background-color: #2a2a2a;
+        border: 1px solid #444;
+        color: white;
+        border-radius: 4px;
+        box-sizing: border-box; /* Ensures padding doesn't affect width */
+    }
+
+    .login-btn {
+        width: 100%;
+        padding: 12px;
+        background-color: #3d3d3d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background 0.3s;
+    }
+
+    .login-btn:hover {
+        background-color: #505050;
+    }
+
+    .create-account {
+        margin-top: 20px;
+        text-align: center;
+        font-size: 0.85em;
+        color: #888;
+        border-top: 1px solid #333;
+        padding-top: 20px;
+    }
+
+    .create-account a {
+        color: #ffca28; /* Gold accent similar to foil ★ */
+        text-decoration: none;
+    }
+
+    .create-account a:hover {
+        text-decoration: underline;
+    }
+
+    .flash-messages {
+        color: #ff5252;
+        text-align: center;
+        margin-bottom: 15px;
+        font-size: 0.9em;
+    }
+    /* Target only the checkbox group */
+    .remember-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    /* Override the display:block from your general label style */
+    .remember-group label {
+        display: flex !important;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 0;
+        cursor: pointer;
+        color: #bbb;
+    }
+
+    /* Make the checkbox a reasonable size */
+    .remember-group input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        cursor: pointer;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+    <div class="login-card">
+        <h2>Admin Access</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('authentication.login') }}" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group remember-group">
+                <label>
+                    <input type="checkbox" name="remember"> Stay logged in
+                </label>
+            </div>
+            <button type="submit" class="login-btn">Sign In</button>
+        </form>
+
+
+        <div class="create-account">
+            Don't have an account? <a href="/register">Create Account</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

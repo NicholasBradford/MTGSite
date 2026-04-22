@@ -1,0 +1,135 @@
+{% extends "card_display.html"%}
+    {% block title %}Collection{% endblock %}
+{% block style %}
+{{ super() }}
+/* The Modal (background) */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1000; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%;
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.8); /* Black w/ opacity */
+    backdrop-filter: blur(5px);
+}
+
+/* Modal Content Box */
+.modal-content {
+    background-color: #1f1f1f;
+    margin: 10% auto; 
+    padding: 30px;
+    border: 1px solid #333;
+    width: 80%;
+    max-width: 450px;
+    border-radius: 8px;
+    position: relative;
+}
+
+/* The Close Button */
+.close-btn {
+    position: absolute;
+    right: 20px;
+    top: 10px;
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: #ff5252;
+}
+{% endblock  %}
+{% block content %}
+    {{ super() }}
+
+    {% if current_user.is_authenticated %}
+    <div id="editModal" class="modal">
+        <div class="modal-content login-card" style="max-width: 500px;"> 
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Manage Copies</h2>
+            <hr style="border: 0; border-top: 1px solid #444; margin-bottom: 20px;">
+            
+            <div id="instance-settings-container">
+                <p style="text-align: center;">Loading copies...</p>
+            </div>
+
+            </div>
+    </div>
+
+
+    {% endif %}
+{% endblock %}
+{% block script %}
+    const allLocations = {{ locations|tojson }};
+    
+    // 1. THE NEW OPEN LOGIC: Fetches every copy of this card
+    function openEditModal(instanceId, locId, isTradeable, scryfallId, finish) {
+    document.getElementById('editModal').style.display = "block";
+    const container = document.getElementById('instance-settings-container');
+    container.innerHTML = "Loading copies...";
+
+    // 1. You MUST keep the fetch call
+    fetch(`/get_instances/${scryfallId}/${finish}`)
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = ""; 
+            data.instances.forEach(inst => {
+                const row = document.createElement('div');
+                row.className = "instance-row";
+                
+                // Build the dropdown HTML
+                let locationOptions = allLocations.map(loc => 
+                    `<option value="${loc.id}" ${loc.id == inst.location_id ? 'selected' : ''}>
+                        ${loc.name}
+                    </option>`
+                ).join('');
+
+                row.innerHTML = `
+                    <div style="flex: 1;">
+                        <small style="color: #aaa; font-size: 0.7rem;">Location</small><br>
+                        <select onchange="updateCard('${inst.instance_id}', this.value, null)" 
+                                style="background: #333; color: white; border: 1px solid #444; border-radius: 4px;">
+                            ${locationOptions}
+                        </select>
+                    </div>
+                    <div style="width: 80px; text-align: center;">
+                        <small style="color: #aaa; font-size: 0.7rem;">Tradeable</small><br>
+                        <input type="checkbox" ${inst.is_tradeable ? 'checked' : ''} 
+                               onchange="updateCard('${inst.instance_id}', null, this.checked)">
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        });
+}
+
+    // 2. THE BACKGROUND UPDATE: Saves changes instantly without a "Save" button
+    function updateCard(instanceId, newLocation, isTradeable) {
+        const formData = new FormData();
+        if (newLocation !== null) formData.append('location_id', newLocation);
+        if (isTradeable !== null) formData.append('is_tradeable', isTradeable ? '1' : '0');
+
+        fetch(`/edit_instance/${instanceId}`, {
+            method: 'POST',
+            body: formData
+        }).then(res => {
+            if (!res.ok) console.error("Update failed for ID:", instanceId);
+        });
+    }
+
+    // 3. KEEP THESE: They still handle closing the popup
+    function closeModal() {
+        document.getElementById('editModal').style.display = "none";
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('editModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+{% endblock %}

@@ -1,0 +1,104 @@
+/* Navbar Display */
+.container {
+    max-width: 1200px; /* Limits how wide your content can get */
+    margin: 0 auto;    /* Centers the container */
+    padding: 0 20px;   /* Creates a small inner "safety" gutter for mobile */
+}
+
+/* Optional: Make the body background slightly different from the container 
+   to create a "card" effect for the whole page */
+body {
+    background-color: #121212; /* Deep matte black */
+    color: #e0e0e0;           /* Light grey text for readability */
+    margin: 0;
+    font-family: sans-serif;
+}
+
+.nav-bar {
+  background-color: #1f1f1f; /* Slightly lighter black for the nav */
+  border-bottom: 1px solid #333;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: center; /* Horizontal centering */
+  align-items: center;     /* Vertical centering */
+}
+ul{
+    background-color: #1f1f1f; 
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    /* overflow: auto; */
+      border-bottom: 2px solid #848484;
+
+}
+
+ul li {
+  display: inline-block; /* Replaces float: left */
+
+}
+
+ul li a {
+  display: block;
+  color: rgb(255, 255, 255);
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+} 
+
+ul li a:hover {
+  background-color: #848484;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+  color: rgb(0, 0, 0);         /* Ensures the text is visible against the dark bar */
+  padding: 14px 16px;   /* Matches the link padding */
+  cursor: pointer;
+  z-index: 9999;
+}
+
+/* Fix the dropdown content positioning */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  left: 100%;              /* Aligns it to the left edge of 'Collections' */
+  top: 0;            /* Places it exactly below the nav bar */   
+  background-color: #f1f1f1;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;           /* Ensures it stays on top of card images */
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+.dropdown-content a{
+    color: rgb(0, 0, 0);
+}
+/* Card Display */
+.card-container {
+    display: grid;
+    /* This creates exactly 4 columns */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px; /* Space between the cards */
+    padding: 20px;
+    max-width: 1200px; /* Optional: keeps the grid from getting too wide on huge monitors */
+    margin: 0 auto;    /* Centers the whole grid on the page */
+}
+
+.card_class {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.card_class img {
+    width: 100%;       /* Makes the image fill the grid column width */
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
