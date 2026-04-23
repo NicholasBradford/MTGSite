@@ -102,3 +102,120 @@ ul li a:hover {
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
+
+/* Unified Command Bar Search */
+.search-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px 10px 40px 10px;
+}
+
+.advanced-search-form {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px; /* Smooth, modern pill shape */
+    padding: 5px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    transition: border-color 0.2s ease;
+}
+
+/* Make the whole bar glow slightly when interacting */
+.advanced-search-form:focus-within {
+    border-color: #555;
+    box-shadow: 0 4px 20px rgba(102, 178, 255, 0.15);
+}
+
+.search-inputs {
+    display: flex;
+    flex: 1;
+}
+
+.search-inputs input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #333; /* Subtle divider between fields */
+    color: #eee;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    min-width: 0; /* Prevents flexbox blowouts */
+}
+
+/* Remove the divider on the last input */
+.search-inputs input:last-child {
+    border-right: none;
+}
+
+/* Shrink columns that don't need much space */
+.short-input {
+    max-width: 80px;
+}
+
+.search-inputs input:focus {
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.03); /* Extremely subtle highlight */
+}
+
+.search-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+    gap: 5px;
+}
+
+/* Icon Button Styling */
+.btn-search, .btn-clear {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.btn-search {
+    color: #66b2ff;
+}
+
+.btn-clear {
+    color: #ff6b6b;
+    text-decoration: none;
+}
+
+.btn-search:hover {
+    background-color: rgba(102, 178, 255, 0.1);
+}
+
+.btn-clear:hover {
+    background-color: rgba(255, 107, 107, 0.1);
+}
+
+/* Mobile Responsiveness: Stack if the screen gets too tight */
+@media (max-width: 768px) {
+    .advanced-search-form, .search-inputs {
+        flex-direction: column;
+    }
+    .search-inputs input {
+        border-right: none;
+        border-bottom: 1px solid #333;
+        width: 100%;
+        max-width: none;
+    }
+    .search-inputs input:last-child {
+        border-bottom: none;
+    }
+    .search-actions {
+        width: 100%;
+        justify-content: flex-end;
+        padding: 10px;
+        border-top: 1px solid #333;
+    }
+}

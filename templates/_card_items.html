@@ -1,0 +1,35 @@
+{% for card in cards %}
+{% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
+    <div class="card_class" >
+        {% if card['image_url'] %}
+            <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
+                <img 
+                    <img src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
+                    alt="{{ card['name'] }}" 
+                    {% if is_admin_inventory %}
+                                onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
+                                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
+                                onmouseover="this.style.borderColor='#ffca28'"
+                                onmouseout="this.style.borderColor='transparent'"
+                    {% else %}
+                        onclick="showPopup('{{ card['name'] }}')"
+                    {% endif %}
+                >
+            </div>
+        {% else %}
+            <div class="no-image">No Image Available</div>
+        {% endif %}
+
+        <div class="card-label">
+            {{ card['name'] }} 
+            {% if card['qty'] > 1 %}
+                <span class="qty-badge">x{{ card['qty'] }}</span>
+            {% endif %}
+            {% if card['finish'] == 'foil' %}
+                <span style="color: gold;">★</span>
+            {% endif %}
+            <br/>
+            <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
+        </div> 
+    </div>
+{% endfor %}

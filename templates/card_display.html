@@ -52,50 +52,81 @@
         }
     {%endblock%}
 {% block content %}
-    <div class="card-container">
-        {% for card in cards %}
-            <div class="card_class">
-                {% if card['image_url'] %}
-                    {# We check if we are in inventory AND logged in as admin #}
-                    {% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
-                    
-                    <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
-                        <img 
-                            src="{{ url_for('serve_card_image', filename=card['image_url']) }}" 
-                            alt="{{ card['name'] }}"
-                            
-                            {# Toggle functionality based on view_mode #}
-                            {% if is_admin_inventory %}
-                                onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
-                                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
-                                onmouseover="this.style.borderColor='#ffca28'"
-                                onmouseout="this.style.borderColor='transparent'"
-                            {% else %}
-                                onclick="showPopup('{{ card['name'] }}')"
-                            {% endif %}
-                        >
-                    </div>
-                {% else %}
-                    <div class="no-image">No Image Available</div>
-                {% endif %}
-
-                <div class="card-label">
-                    {{ card['name'] }} 
-                    {% if card['qty'] > 1 %}
-                        <span class="qty-badge">x{{ card['qty'] }}</span>
-                    {% endif %}
-                    {% if card['finish'] == 'foil' %}
-                        <span style="color: gold;">★</span>
-                    {% endif %}
-                    
-                    <br/>
-                    <span class="card-meta">
-                        ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
-                    </span>
-                </div> 
+        <br />
+    <div class="search-container">
+        <form action="" method="GET" class="advanced-search-form">
+            <div class="search-inputs">
+                <input type="text" name="name" placeholder="Name" value="{{ request.args.get('name', '') }}">
+                <input type="text" name="set" placeholder="Set" value="{{ request.args.get('set', '') }}" class="short-input">
+                <input type="text" name="type" placeholder="Type" value="{{ request.args.get('type', '') }}">
+                <input type="text" name="color" placeholder="Color" value="{{ request.args.get('color', '') }}" class="short-input">
+                <input type="text" name="text" placeholder="Oracle Text" value="{{ request.args.get('text', '') }}">
             </div>
-        {% endfor %}
+            
+            <div class="search-actions">
+                <button type="submit" class="btn-search" title="Search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+                {% if request.args %}
+                    <a href="{{ request.path }}" class="btn-clear" title="Clear">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
-{%endblock%}
+    <div id="card-grid" class="card-container">
+        {% include '_card_items.html' %}
+    </div>
+
+    <div id="scroll-sentinel" style="height: 20px;"></div>
+    <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #aaa;">
+        <p>Fetching more cards...</p>
+    </div>
+
+    <script>
+        let page = {{ page | default(1) }};
+        const totalPages = {{ total_pages | default(1) }};
+        const searchQuery = "{{ search_query | default('') }}";
+        const viewMode = "{{ view_mode }}";
+        
+        const grid = document.getElementById('card-grid');
+        const sentinel = document.getElementById('scroll-sentinel');
+        const loader = document.getElementById('loading-indicator');
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && page < totalPages) {
+                loadMore();
+            }
+        }, { threshold: 0.1 });
+
+        observer.observe(sentinel);
+
+        function loadMore() {
+            page++;
+            loader.style.display = 'block';
+
+            const endpoint = window.location.pathname;
+            
+            // This grabs EVERYTHING after the '?' in your current URL 
+            // (e.g., name=Dragon&color=R)
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Update or add the current page number
+            urlParams.set('page', page);
+            
+            // Now we send the fully combined string to the server!
+            fetch(`${endpoint}?${urlParams.toString()}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.text())
+            .then(html => {
+                grid.insertAdjacentHTML('beforeend', html);
+                loader.style.display = 'none';
+                if (page >= totalPages) observer.unobserve(sentinel);
+            });
+        }
+    </script>
+{% endblock %}
 {% block extra_content%}
 {%endblock%}

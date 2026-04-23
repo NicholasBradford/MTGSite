@@ -60,25 +60,34 @@
 {% block content %}
 <div class="set-checklist">
     {% for card in cards %}
-    <div class="card_item">
-        <div class="image_wrapper">
-            {# If you own at least one, use your rainbow effect #}
-            <div class="{% if card.owned_count > 0 %}rainbow_image{% endif %}">
-                <img src="{{ url_for('serve_card_image', filename=card.image_url) }}" 
-                     class="card_img {% if card.owned_count == 0 %}uncollected{% endif %}" 
-                     alt="{{ card.name }}">
+        {% if set.standard_legal or ((not set.standard_legal) and card.owned_count > 0) %}
+        <div class="card_item">
+            <div class="image_wrapper">
+                {# If you own at least one, use your rainbow effect #}
+                
+                    <div class="{% if card.owned_count > 0 %}rainbow_image{% endif %}">
+                        <img src="{{ url_for('serve_card_image', filename=card.image_url) }}" 
+                            class="card_img {% if card.owned_count == 0 %}uncollected{% endif %}" 
+                            alt="{{ card.name }}">
+                    </div>
+                    {% if set.standard_legal %}
+                        <div class="count_pill">
+                            {{ card.owned_count if card.owned_count < 4 else 4 }}/4
+                        </div>
+                        {% else%}
+                        <div class="count_pill">
+                            {{ card.owned_count }}
+                        </div>
+                    {% endif %}
+                
             </div>
-            
-            <div class="count_pill">
-                {{ card.owned_count if card.owned_count < 4 else 4 }}/4
-            </div>
-        </div>
         
-        <div class="card_label">
-            <strong>{{ card.name }}</strong><br>
-            <span style="opacity: 0.6;">#{{ card.collector_number }}</span>
+            <div class="card_label">
+                <strong>{{ card.name }}</strong><br>
+                <span style="opacity: 0.6;">#{{ card.collector_number }}</span>
+            </div>
         </div>
-    </div>
+        {% endif %}
     {% endfor %}
 </div>
 {% endblock %}

@@ -73,7 +73,7 @@ def set_detail(set_code):
     """
 
     # Fetch the set info using .fetchone() to avoid the "set is undefined" list error
-    query_set_info = "SELECT set_code, set_name FROM sets WHERE set_code = ?"
+    query_set_info = "SELECT set_code, set_name, standard_legal FROM sets WHERE set_code = ?"
     cards = manager.cursor.execute(query, (set_code,)).fetchall()
     set_info = manager.cursor.execute(query_set_info, (set_code,)).fetchone()
     manager.close()

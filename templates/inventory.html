@@ -45,7 +45,7 @@
 {% endblock  %}
 {% block content %}
     {{ super() }}
-
+    
     {% if current_user.is_authenticated %}
     <div id="editModal" class="modal">
         <div class="modal-content login-card" style="max-width: 500px;"> 
