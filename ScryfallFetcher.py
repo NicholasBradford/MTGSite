@@ -150,7 +150,12 @@ class ScryfallFetcher:
         oracle_id = data.get('oracle_id')
         
         # 2. Local Image Download (Specific to the version being added)
-        img_url = data.get('image_uris', {}).get('normal')
+        if 'image_uris' in data:
+            img_url = data.get('image_uris', {}).get('normal', '')
+        elif 'card_faces' in data:
+            # Gets the image of the front face (Peter Parker)
+            img_url = data['card_faces'][0]['image_uris']['normal']
+            
         local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
         full_img_fs_path = os.path.join(IMAGE_PATH, local_img_path)
         
