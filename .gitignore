@@ -10,3 +10,4 @@ reboot_table.py
 db/mtg_inventory.db
 db/test_inventory.db
 /logs
+hotfix.py

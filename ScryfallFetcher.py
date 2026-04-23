@@ -83,6 +83,8 @@ class ScryfallFetcher:
             for card in cards_data.get('data', []):
                 scryfall_id = card.get('id')
                 oracle_id = card.get('oracle_id')
+                if not oracle_id and 'card_faces' in card and len(card['card_faces']) > 0:
+                    oracle_id = card['card_faces'][0].get('oracle_id')
                 if 'image_uris' in card:
                     image_url = card.get('image_uris', {}).get('normal', '')
                 elif 'card_faces' in card:
@@ -104,15 +106,41 @@ class ScryfallFetcher:
                     except Exception as e:
                         print(f"Error downloading {card.get('name')}: {e}")
 
-                # 2. A. Populate card_definitions
+                name = card.get('name')
+                cmc = card.get('cmc', 0.0)
+                color_identity = "".join(card.get('color_identity', []))
+                
+                # These often go missing on double-faced cards
+                mana_cost = card.get('mana_cost')
+                type_line = card.get('type_line')
+                oracle_text = card.get('oracle_text')
+
+                # 2. The DFC Fallback
+                if 'card_faces' in card and len(card['card_faces']) > 0:
+                    face = card['card_faces'][0] # Look at the front face
+                    
+                    # If the root was empty, grab it from the face
+                    if not mana_cost: 
+                        mana_cost = face.get('mana_cost')
+                    if not type_line: 
+                        type_line = face.get('type_line')
+                    if not oracle_text: 
+                        # Combine both faces of oracle text so your search finds everything!
+                        front_text = face.get('oracle_text', '')
+                        back_text = card['card_faces'][1].get('oracle_text', '') if len(card['card_faces']) > 1 else ''
+                        
+                        if back_text:
+                            oracle_text = f"{front_text} // {back_text}"
+                        else:
+                            oracle_text = front_text
+
+                # 3. The Clean Insert
                 self.db.cursor.execute("""
                     INSERT OR IGNORE INTO card_definitions 
                     (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    card.get('oracle_id'), card.get('name'), card.get('mana_cost'),
-                    card.get('cmc'), card.get('type_line'), card.get('oracle_text'),
-                    "".join(card.get('color_identity', []))
+                    oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity
                 ))
 
                 # 3. B. Populate card_printings with the LOCAL path
@@ -147,14 +175,16 @@ class ScryfallFetcher:
 
         data = response.json()
         scryfall_id = data.get('id')
-        oracle_id = data.get('oracle_id')
         
-        # 2. Local Image Download (Specific to the version being added)
+        oracle_id = data.get('oracle_id')
+        if not oracle_id and 'card_faces' in data and len(data['card_faces']) > 0:
+            oracle_id = data['card_faces'][0].get('oracle_id')
+        
+        img_url = "" 
         if 'image_uris' in data:
             img_url = data.get('image_uris', {}).get('normal', '')
-        elif 'card_faces' in data:
-            # Gets the image of the front face (Peter Parker)
-            img_url = data['card_faces'][0]['image_uris']['normal']
+        elif 'card_faces' in data and len(data['card_faces']) > 0:
+            img_url = data['card_faces'][0].get('image_uris', {}).get('normal', '')
             
         local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
         full_img_fs_path = os.path.join(IMAGE_PATH, local_img_path)
@@ -169,26 +199,45 @@ class ScryfallFetcher:
         prices = data.get('prices', {})        
         non_foil_price = prices.get("usd")
         foil_price = prices.get("usd_foil")
-
+        name = data.get('name')
+        cmc = data.get('cmc', 0.0)
+        color_identity = "".join(data.get('color_identity', []))
+        
+        # These often go missing on double-faced cards
+        mana_cost = data.get('mana_cost')
+        type_line = data.get('type_line')
+        oracle_text = data.get('oracle_text')
+        
         # 3. DB Transaction
         try:
-            # Update definitions just in case
-            self.db.cursor.execute('''
-                INSERT OR IGNORE INTO card_definitions (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity)
+            if 'card_faces' in data and len(data['card_faces']) > 0:
+                face = data['card_faces'][0] 
+                if not mana_cost: 
+                    mana_cost = face.get('mana_cost')
+                if not type_line: 
+                    type_line = face.get('type_line')
+                if not oracle_text: 
+                    front_text = face.get('oracle_text', '')
+                    back_text = data['card_faces'][1].get('oracle_text', '') if len(data['card_faces']) > 1 else ''
+                    
+                    if back_text:
+                        oracle_text = f"{front_text} // {back_text}"
+                    else:
+                        oracle_text = front_text
+
+            self.db.cursor.execute("""
+                INSERT OR IGNORE INTO card_definitions 
+                (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                oracle_id, data.get('name'), data.get('mana_cost'), 
-                data.get('cmc'), data.get('type_line'), data.get('oracle_text'),
-                "".join(data.get('color_identity', []))
+            """, (
+                oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity
             ))
             
-            # Ensure price history exists
             self.db.cursor.execute('''
                 INSERT INTO price_history (scryfall_id, price_usd, price_foil)
                 VALUES (?, ?, ?)
             ''', (scryfall_id, non_foil_price, foil_price))
 
-            # Ensure this printing is marked as the "local image" version
             self.db.cursor.execute('''
                 INSERT OR REPLACE INTO card_printings (scryfall_id, oracle_id, set_code, collector_number, rarity, image_url, flavor_text, current_price, current_price_foil)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

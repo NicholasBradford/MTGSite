@@ -136,7 +136,7 @@ def trade():
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
         GROUP BY i.scryfall_id, i.finish
-        ORDER BY cd.name ASC
+        ORDER BY cd.name, cp.set_code, cp.collector_number ASC
         LIMIT ? OFFSET ?
     '''
     
