@@ -33,7 +33,8 @@ class ScryfallFetcher:
         set_data = set_res.json()
         
         # 3. Determine eligibility
-        is_expansion = set_data.get('set_type') == 'expansion'
+        set_type = set_data.get('set_type')
+        is_expansion = set_type == 'expansion'
         release_date_str = set_data.get('released_at')
         is_recent = False
         
@@ -58,9 +59,9 @@ class ScryfallFetcher:
         # 5. Insert set into 'sets' table immediately 
         # This ensures we don't re-query Scryfall for metadata on skipped sets
         self.db.cursor.execute("""
-            INSERT OR REPLACE INTO sets (set_code, set_name, standard_legal, released_at, icon_svg_uri) 
-            VALUES (?, ?, ?, ?, ?)
-        """, (set_code, set_data['name'], is_standard_legal, set_data.get('released_at'), local_icon_path))
+            INSERT OR REPLACE INTO sets (set_code, set_name, set_type, standard_legal, released_at, icon_svg_uri) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (set_code, set_data['name'], set_type, is_standard_legal, set_data.get('released_at'), local_icon_path))
         self.db.commit()
 
         # 6. Exit early if it doesn't meet your "Bulk Download" criteria
