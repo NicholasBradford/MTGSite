@@ -7,6 +7,4 @@ reboot_table.py
 /static/img
 /var
 db/mtg_inventory.db
-logs/app.log
 /logs
-*.log

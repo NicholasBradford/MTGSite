@@ -19,6 +19,9 @@ from db.db_manager import CardDB
 from db.user_manager import User
 from dotenv import load_dotenv
 
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+
 app = Flask(__name__)
 
 # if os.path.exists('/var/data'):
