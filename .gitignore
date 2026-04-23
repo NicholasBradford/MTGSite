@@ -4,7 +4,9 @@ reboot_table.py
 /helper
 /TODO.md
 *.pyc
-/static/img
+/static/img/cards
+/static/img/icons
 /var
 db/mtg_inventory.db
+db/test_inventory.db
 /logs

@@ -138,28 +138,43 @@
 
 <script>
     const carousel = document.getElementById('carousel');
-    let speed = .5; // Adjust this number to change speed (1 is slow/smooth)
+    let speed = 0.5; 
     let scrollPos = 0;
+    let animationId; // Keep this accessible to all functions
 
     function step() {
-        // Increment scroll position
-        carousel.scrollLeft += speed;
+        // 1. Increment the tracking variable
+        scrollPos += speed;
+        
+        // 2. Apply the variable to the actual scroll property
+        carousel.scrollLeft = scrollPos;
 
-        // If we've scrolled past the first half (the original cards), reset to start
-        // We divide by 2 because we duplicated the cards
+        // 3. Reset logic: Check if we've scrolled past the duplicate set
+        // We use scrollWidth / 2 because you likely duplicated the card list for a seamless loop
         if (carousel.scrollLeft >= (carousel.scrollWidth / 2)) {
+            scrollPos = 0;
             carousel.scrollLeft = 0;
         }
 
-        requestAnimationFrame(step); // Smoother than setInterval
+        // Continue the loop
+        animationId = requestAnimationFrame(step);
     }
 
-    // Start the animation
-    let animationId = requestAnimationFrame(step);
+    // Start the initial animation
+    animationId = requestAnimationFrame(step);
 
     // Pause on Hover
-    carousel.addEventListener('mouseenter', () => cancelAnimationFrame(animationId));
-    carousel.addEventListener('mouseleave', () => animationId = requestAnimationFrame(step));
+    carousel.addEventListener('mouseenter', () => {
+        cancelAnimationFrame(animationId);
+    });
+
+    // Resume on Leave
+    carousel.addEventListener('mouseleave', () => {
+        // CRITICAL: Cancel any potential existing frames before starting a new one
+        // This prevents the "speed up" bug
+        cancelAnimationFrame(animationId); 
+        animationId = requestAnimationFrame(step);
+    });
 </script>
 
 {% endblock %}
