@@ -30,6 +30,19 @@
             {% endif %}
             <br/>
             <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
+            
+            {% if view_mode == 'trades'%}
+            <div class="trade-selector" 
+                data-scryfall-id="{{ card['scryfall_id'] }}" 
+                data-finish="{{ card['finish'] }}" 
+                data-name="{{ card['name'] }}"
+                data-max="{{ card['qty'] }}"
+                style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 8px;">
+                <button class="minus-btn" onclick="updateCart(this, -1)" style="cursor: pointer; padding: 2px 8px;">-</button>
+                <span class="qty-display">0</span>
+                <button class="plus-btn" onclick="updateCart(this, 1)" style="cursor: pointer; padding: 2px 8px;">+</button>
+            </div>
+            {% endif %}
         </div> 
     </div>
 {% endfor %}

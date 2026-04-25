@@ -4,10 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class CardDB:
-    def __init__(self, db_path=os.environ.get('DB_PATH')):
+    def __init__(self, db_path=None):
         if db_path is None:
             db_path = os.environ.get('DB_PATH')
-            print(f"db_path is:{db_path}")
+            # print(f"db_path is:{db_path}")
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
         self.cursor = self.conn.cursor()
@@ -157,6 +157,28 @@ class CardDB:
                 icon_svg_uri TEXT
             );
         ''')
+        
+        self.cursor.execute(''' 
+                CREATE TABLE IF NOT EXISTS trades (
+                    trade_id TEXT PRIMARY KEY,
+                    user_id INTEGER,
+                    status TEXT DEFAULT 'Pending',
+                    incoming TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                );
+                ''')
+        
+        self.cursor.execute(''' 
+                CREATE TABLE IF NOT EXISTS trade_outbound_items (
+                    item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trade_id TEXT,
+                    scryfall_id TEXT,
+                    finish TEXT,
+                    quantity INTEGER,
+                    FOREIGN KEY (trade_id) REFERENCES trades(trade_id)
+                );
+                ''')
         
         self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
         self.initialize_locations()              

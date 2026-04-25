@@ -1,2 +1,159 @@
 {% extends "card_display.html" %}
-    {% block title %}Trades{% endblock %}
+
+{% block title %}Trades{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    /* Floating Cart Overlay */
+    #trade-cart-overlay {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: #1e1e1e;
+        color: white;
+        border: 2px solid #ffca28; /* Matches your gold hover */
+        border-radius: 8px;
+        padding: 15px;
+        width: 300px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        z-index: 1000;
+        display: none; /* Hidden until an item is added */
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+    
+    .cart-item-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #444;
+        padding: 5px 0;
+        font-size: 0.9em;
+    }
+
+    #submit-trade-btn {
+        width: 100%;
+        margin-top: 15px;
+        padding: 10px;
+        background: #ffca28;
+        color: #000;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    #submit-trade-btn:hover { background: #e0b022; }
+{% endblock %}
+
+{% block content %}
+    {{ super() }}
+    
+    <div id="trade-cart-overlay">
+        <h3 style="margin-top: 0; color: #ffca28; border-bottom: 1px solid #ffca28; padding-bottom: 5px;">Your Trade Request</h3>
+        <div id="cart-items-container"></div>
+        <button id="submit-trade-btn" onclick="submitTradeRequest()">Submit Trade Request</button>
+    </div>
+
+    <script>
+        let tradeCart = JSON.parse(localStorage.getItem('mtgTradeCart')) || {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            syncUINumbers();
+            renderCartSummary();
+
+            // Watch for infinite scroll additions so we can sync new buttons!
+            const grid = document.getElementById('card-grid');
+            if (grid) {
+                const observer = new MutationObserver(syncUINumbers);
+                observer.observe(grid, { childList: true });
+            }
+        });
+
+        // Loops through visible cards and sets their counter to match the cart
+        function syncUINumbers() {
+            document.querySelectorAll('.trade-selector').forEach(selector => {
+                const key = `${selector.dataset.scryfallId}_${selector.dataset.finish}`;
+                const qtyDisplay = selector.querySelector('.qty-display');
+                if (tradeCart[key]) {
+                    qtyDisplay.innerText = tradeCart[key].qty;
+                } else {
+                    qtyDisplay.innerText = 0;
+                }
+            });
+        }
+
+        // Fired when + or - is clicked
+        function updateCart(btn, change) {
+            const selector = btn.parentElement;
+            const scryfallId = selector.dataset.scryfallId;
+            const finish = selector.dataset.finish;
+            const name = selector.dataset.name;
+            const maxQty = parseInt(selector.dataset.max);
+            
+            const cartKey = `${scryfallId}_${finish}`;
+            
+            if (!tradeCart[cartKey]) {
+                tradeCart[cartKey] = { scryfall_id: scryfallId, finish: finish, name: name, qty: 0 };
+            }
+            
+            let newQty = tradeCart[cartKey].qty + change;
+            
+            if (newQty < 0) newQty = 0;
+            if (newQty > maxQty) {
+                alert(`Only ${maxQty} copies available.`);
+                newQty = maxQty;
+            }
+            
+            if (newQty === 0) {
+                delete tradeCart[cartKey];
+            } else {
+                tradeCart[cartKey].qty = newQty;
+            }
+            
+            localStorage.setItem('mtgTradeCart', JSON.stringify(tradeCart));
+            selector.querySelector('.qty-display').innerText = newQty;
+            renderCartSummary();
+        }
+
+        function renderCartSummary() {
+            const container = document.getElementById('cart-items-container');
+            const overlay = document.getElementById('trade-cart-overlay');
+            container.innerHTML = '';
+            
+            let hasItems = false;
+            for (const key in tradeCart) {
+                hasItems = true;
+                const item = tradeCart[key];
+                container.innerHTML += `
+                    <div class="cart-item-row">
+                        <span>${item.qty}x ${item.name}</span>
+                        <span style="color: #aaa;">(${item.finish})</span>
+                    </div>
+                `;
+            }
+            
+            // Show cart if items exist, hide if empty
+            overlay.style.display = hasItems ? 'block' : 'none';
+        }
+
+        function submitTradeRequest() {
+            if (Object.keys(tradeCart).length === 0) return;
+
+            fetch('/api/submit_trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: Object.values(tradeCart) }) 
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Trade request submitted successfully!");
+                    localStorage.removeItem('mtgTradeCart');
+                    window.location.reload();
+                } else {
+                    alert("Error submitting trade.");
+                }
+            })
+            .catch(err => console.error("Trade Submission Error:", err));
+        }
+    </script>
+{% endblock %}

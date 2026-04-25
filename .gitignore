@@ -11,3 +11,4 @@ db/mtg_inventory.db
 db/test_inventory.db
 /logs
 hotfix.py
+report.txt

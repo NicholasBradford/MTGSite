@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Admin Trade Dashboard{% endblock %}
+
+{% block content %}
+<h2>Pending Trade Requests</h2>
+
+<div class="trade-dashboard">
+    {% if pending_trades %}
+        {% for trade in pending_trades %}
+        <div class="trade-card" style="border: 1px solid #ffca28; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+            <h3>Trade ID: {{ trade.trade_id }}</h3>
+            <p><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
+            <p><strong>Date:</strong> {{ trade.created_at }}</p>
+            
+            <hr style="border-color: #444;">
+            
+            <h4>Cards Requested from You:</h4>
+            <ul>
+                {% for item in trade.requested_cards%}
+                    <li>{{ item.quantity }}x {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em>{{ item.finish }}</em></li><br />
+                {% endfor %}
+            </ul>
+            
+            <hr style="border-color: #444;">
+            
+            <form action="{{ url_for('trade_binder.process_trade') }}" method="POST">
+                <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
+                
+                <label for="incoming_cards"><strong>Incoming Cards (Format: set-cn-finish, comma separated):</strong></label><br>
+                <textarea name="incoming_cards" rows="2" style="width: 100%; margin-top: 5px; background: #222; color: white; border: 1px solid #555;" placeholder="e.g. khm-14-foil, dmu-102-nonfoil"></textarea>
+                
+                <label for="trade_notes" style="margin-top: 15px; display: inline-block;"><strong>Trade Notes (Tracking #, usernames, condition notes, etc.):</strong></label><br>
+                <textarea name="trade_notes" rows="2" style="width: 100%; margin-top: 5px; background: #222; color: white; border: 1px solid #555;"></textarea>
+                
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button type="submit" name="action" value="accept" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Accept Trade</button>
+                    <button type="submit" name="action" value="deny" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Deny Trade</button>
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No pending trades right now. You're all caught up!</p>
+    {% endif %}
+</div>
+{% endblock %}

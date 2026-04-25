@@ -25,21 +25,27 @@
                     <li><a href="/inventory">Whole Collection</a></li>
                     <li><a href="/trade_binder">Trade Binder</a></li>
                     <li><a href="/sets">Set Collections</a></li>
+                    
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
                         <li><a href='/card_adder'>Add Cards</a></li>
                     {% endif %}
-            
-                    {% if current_user.is_authenticated %}
+
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                        <li>
+                            <a href="{{ url_for('admin.admin_dashboard') }}">
+                                {{ current_user.username }}
+                            </a>
+                        </li>
+                        <li><a href='/logout'>Logout</a></li>
+
+                    {% elif current_user.is_authenticated %}
+                    
                         <li><a href='\logout'>Logout ({{ current_user.username }})</a></li>
+
                     {% else %}
-                        <li><a href='\login'>Login</a></li>
+                        <li><a href='/login'>Login</a></li>
                     {% endif %}
-                    </li>
                 </ul>
-                </div> 
-                {# <div class="login-container">
-                    <a href="/login" class="login-btn">Login</a>
-                </div> #}
             </div>
         </nav>
         <main class="container">
