@@ -127,7 +127,7 @@ def inventory():
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
         GROUP BY i.scryfall_id, i.finish
-        ORDER BY cd.name, cp.set_code, cp.collector_number ASC
+        ORDER BY cd.name ASC, cp.set_code ASC, cp.collector_number ASC, i.finish DESC
         LIMIT ? OFFSET ?
     '''    
     # Add limit and offset to params list

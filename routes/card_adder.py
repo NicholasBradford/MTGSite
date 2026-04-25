@@ -187,6 +187,7 @@ def bulk_import_action():
                 cn = row.get('collector_number', '').strip()
                 qty = int(row.get('qty', 1))
                 finish = row.get('finish', 'nonfoil').lower()
+                tradeable = 1 if row.get('tradeable') == "yes" else 0
                 
                 # Check surplus status (Logic from your adder)
                 surplus_val = 0
@@ -218,7 +219,7 @@ def bulk_import_action():
                             "NM", # Defaulting to Near Mint for bulk
                             finish, 
                             0,    # Defaulting price to 0 for bulk
-                            1,    # Defaulting tradeable to 1
+                            tradeable,    # Defaulting tradeable to 1
                             datetime.datetime.now(), 
                             surplus_val
                         ))
