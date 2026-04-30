@@ -57,14 +57,14 @@ login_manager.login_view = 'authentication.login' # Redirects here if @login_req
 def load_user(user_id):
     """How Flask-Login finds a user in the DB by their ID."""
     manager = CardDB()
-    
-    user_data = manager.cursor.execute(
-        "SELECT user_id, username, role FROM users WHERE user_id = ?", (user_id,)
-    ).fetchone()
-    manager.close()
-    
-    if user_data:
-        return User(user_data['user_id'], user_data['username'], user_data['role'])
+    try:
+        user_data = manager.cursor.execute(
+            "SELECT user_id, username, role FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()       
+        if user_data:
+            return User(user_data['user_id'], user_data['username'], user_data['role'])
+    finally:
+        manager.close() 
     return None
 
 # 4. Blueprint Registration
