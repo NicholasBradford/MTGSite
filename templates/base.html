@@ -22,7 +22,7 @@
             <div class="nav-bar">
                 <ul>
                     <li><a href="/" class="dropbtn">Home</a></li>
-                    <li><a href="/inventory">Whole Collection</a></li>
+                    <li><a href="/inventory">View Collection</a></li>
                     <li><a href="/trade_binder">Trade Binder</a></li>
                     <li><a href="/sets">Set Collections</a></li>
                     
@@ -32,7 +32,7 @@
 
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
                         <li>
-                            <a href="{{ url_for('admin.admin_dashboard') }}">
+                            <a href="{{ url_for('admin.admin') }}">
                                 {{ current_user.username }}
                             </a>
                         </li>

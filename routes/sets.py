@@ -41,38 +41,31 @@ def set_gallery():
 @sets_bp.route('/set/<set_code>')
 def set_detail(set_code):
     manager = CardDB()
-    # 1. Get every card that exists in that set
-    # 2. Join with instances to count how many you have
-    # Use this query in your route
-    # The updated query for your set_detail route
+    
     query = """
         SELECT 
             cd.name, 
             cp.collector_number, 
             cp.image_url, 
             cp.scryfall_id,
-            -- Counts all versions of this card name within the specific set and its promo counterpart
             (SELECT COUNT(*) 
-            FROM inventory i 
-            JOIN card_printings cp2 ON i.scryfall_id = cp2.scryfall_id 
-            WHERE cp2.oracle_id = cp.oracle_id 
-            AND (cp2.set_code = cp.set_code OR cp2.set_code = 'p' || cp.set_code)
+             FROM inventory i 
+             JOIN card_printings cp2 ON i.scryfall_id = cp2.scryfall_id 
+             WHERE cp2.oracle_id = cp.oracle_id 
+             AND (cp2.set_code = cp.set_code OR cp2.set_code = 'p' || cp.set_code)
             ) as owned_count
         FROM card_printings cp
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         WHERE cp.set_code = ?
-        -- Logic to show only the primary version of the card in the list
         AND cp.collector_number = (
-            SELECT MIN(CAST(inner_cp.collector_number AS INTEGER))
+            SELECT MIN(inner_cp.collector_number)
             FROM card_printings inner_cp
             WHERE inner_cp.oracle_id = cp.oracle_id 
             AND inner_cp.set_code = cp.set_code
         )
         GROUP BY cd.name
-        ORDER BY CAST(cp.collector_number AS INTEGER) ASC
+        ORDER BY LENGTH(cp.collector_number) ASC, cp.collector_number ASC
     """
-
-    # Fetch the set info using .fetchone() to avoid the "set is undefined" list error
     query_set_info = "SELECT set_code, set_name, standard_legal FROM sets WHERE set_code = ?"
     cards = manager.cursor.execute(query, (set_code,)).fetchall()
     set_info = manager.cursor.execute(query_set_info, (set_code,)).fetchone()

@@ -1,8 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Admin Trade Dashboard{% endblock %}
+{% block title %}Admin Dashboard{% endblock %}
 
 {% block content %}
-<h2>Pending Trade Requests</h2>
+<div class="admin-header" style="margin-bottom: 30px;">
+    <h3>Dashboard</h3>
+    <p style="color: #bbb;">View collection statistics, active trade requests, and site health.</p>
+</div>
+
+<div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px;">
+    
+    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #ffd700; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+        <h4 style="color: #ffd700; margin-top: 0;">📊 Collection Statistics</h4>
+        <p><strong>Total Cards:</strong> {{ total_cards }}</p>
+        <p><strong>Unique Printings:</strong> {{ unique_cards }}</p>
+        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Updated: Real-time</div>
+    </div>
+
+    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #17a2b8; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+        <h4 style="color: #17a2b8; margin-top: 0;">🛠️ Data Integrity</h4>
+        <p><strong>Cards with $0.00 Value:</strong> <span style="color: {% if zero_value_count > 0 %}#ff4444{% else %}#28a745{% endif %};">{% if zero_value_count > 0 %}<a href="/inventory?drawer_state=closed&q=usd%3D0">{{zero_value_count}}</a>{% else %}0{% endif %}</span></p>
+        <p><strong>Unassigned Locations:</strong> <span style="color: {% if unassigned_cards > 0 %}#ffc107{% else %}#28a745{% endif %};">{{ unassigned_cards }}</span></p>
+        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Flags missing prices/locations</div>
+    </div>
+
+    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #28a745; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+        <h4 style="color: #28a745; margin-top: 0;">🖥️ Infrastructure Health</h4>
+        <p><strong>Database File Size:</strong> {{ db_size_mb }} MB</p>
+        <p><strong>Price Sync Status:</strong> Active 🟢</p>
+        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Monitor for Render limits</div>
+    </div>
+</div> 
 
 <div class="trade-dashboard">
     {% if pending_trades %}
@@ -23,7 +50,7 @@
             
             <hr style="border-color: #444;">
             
-            <form action="{{ url_for('trade_binder.process_trade') }}" method="POST">
+            <form action="{{ url_for('admin.process_trade') }}" method="POST">
                 <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
                 
                 <label for="incoming_cards"><strong>Incoming Cards (Format: set-cn-finish, comma separated):</strong></label><br>
@@ -40,7 +67,7 @@
         </div>
         {% endfor %}
     {% else %}
-        <p>No pending trades right now. You're all caught up!</p>
+        <p>No pending trade requests at this time.</p>
     {% endif %}
 </div>
 {% endblock %}

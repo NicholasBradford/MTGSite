@@ -124,12 +124,16 @@
     // 3. KEEP THESE: They still handle closing the popup
     function closeModal() {
         document.getElementById('editModal').style.display = "none";
+        
+        // Force a page refresh when closing the modal so the main inventory 
+        // updates its quantities and badges to reflect your background saves!
+        window.location.reload();
     }
 
     window.onclick = function(event) {
         const modal = document.getElementById('editModal');
         if (event.target == modal) {
-            closeModal();
+            closeModal(); // This now handles the refresh too
         }
     }
 {% endblock %}

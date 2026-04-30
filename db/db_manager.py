@@ -1,14 +1,19 @@
-import sqlite3, os 
+import sqlite3, os, random, traceback
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class CardDB:
     def __init__(self, db_path=None):
+        self.trace_id = random.randint(1000, 9999)
+        
+        # 2. Print exactly what function is opening it
+        # print(f"\n[+] OPENING connection {self.trace_id} from:")
+        # traceback.print_stack(limit=3)
         if db_path is None:
             db_path = os.environ.get('DB_PATH')
             # print(f"db_path is:{db_path}")
-        self.conn = sqlite3.connect(db_path)
+        self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
         self.cursor = self.conn.cursor()
     
@@ -39,6 +44,7 @@ class CardDB:
     def create_tables(self):
         # Enable foreign keys in SQLite
         self.cursor.execute("PRAGMA foreign_keys = ON;")
+        self.cursor.execute('PRAGMA journal_mode=WAL;')
 
         # 1. card_definitions (The "Library")
         self.cursor.execute('''
@@ -181,7 +187,10 @@ class CardDB:
                 ''')
         
         self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
-        self.initialize_locations()              
+        
+        if self.cursor.execute("SELECT * FROM locations").fetchone()[0] == 0:  
+            self.initialize_locations()       
+                   
         self.commit()
         
     def initialize_locations(self):
@@ -197,6 +206,7 @@ class CardDB:
     
     def close(self):
         """Close the connection so the file can be managed."""
+        # print(f"[-] CLOSING connection {self.trace_id}")
         if self.conn:
             self.conn.close()
             

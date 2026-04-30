@@ -171,7 +171,7 @@ def bulk_import_action():
     file = request.files['file']
     # Capture default location from the form if specific rows don't have one
     default_loc_id = request.form.get('location_id') if request.form.get('location_id') else 1
-    print(request.form.get('location_id'))
+    # print(request.form.get('location_id'))
 
     if file and file.filename.endswith('.csv'):
         csv_file = TextIOWrapper(file.stream, encoding='utf-8')
@@ -180,6 +180,22 @@ def bulk_import_action():
         manager = CardDB()
         fetcher = ScryfallFetcher.ScryfallFetcher(manager)
 
+        # Helper function to dynamically get or create locations
+        def get_loc(loc_name):
+            rec = manager.cursor.execute("SELECT location_id FROM locations WHERE name = ?", (loc_name,)).fetchone()              
+            if rec:
+                return rec['location_id']
+            
+            # 3. If it DOES NOT exist, fetch the 'Unsorted Box' instead
+            unsorted_rec = manager.cursor.execute("SELECT location_id FROM locations WHERE name = 'Unsorted Box'").fetchone()
+            
+            if unsorted_rec:
+                return unsorted_rec['location_id']
+                
+            # 4. Ultimate fallback: If even "Unsorted Box" doesn't exist in your DB yet, create it.
+            manager.cursor.execute("INSERT INTO locations (name) VALUES ('Unsorted Box')")
+            return manager.cursor.lastrowid
+
         try:
             for row in reader:
                 # Map CSV headers to your variables
@@ -187,6 +203,7 @@ def bulk_import_action():
                 cn = row.get('collector_number', '').strip()
                 qty = int(row.get('qty', 1))
                 finish = row.get('finish', 'nonfoil').lower()
+                raw_dest = row.get('location', 'Unsorted Box').strip().title()
                 tradeable = 1 if row.get('tradeable') == "yes" else 0
                 
                 # Check surplus status (Logic from your adder)
@@ -207,7 +224,86 @@ def bulk_import_action():
                 card_id = fetcher.fetch_and_add(sc, cn)
                 
                 if card_id:
+                    # Fetch the unified card name to ensure all arts/versions are counted toward the playset
+                    name_rec = manager.cursor.execute("""
+                        SELECT cd.name FROM card_definitions cd
+                        JOIN card_printings cp ON cd.oracle_id = cp.oracle_id
+                        WHERE cp.scryfall_id = ?
+                    """, (card_id,)).fetchone()
+                    card_name = name_rec['name'] if name_rec else ""
+
                     for _ in range(qty):
+                        # Start with the form's default location
+                        assigned_loc_id = default_loc_id
+
+                        # Apply Auto-Sorting & Playset Logic for THIS specific copy
+                        if raw_dest == "Master":
+                            target_binder_name = f"{sc.upper()} Master Set Binder"
+                            bulk_box_name = f"{sc.upper()} Bulk Box"
+                            
+                            binder_loc_id = get_loc(target_binder_name)
+                            bulk_loc_id = get_loc(bulk_box_name)
+                                
+                            # Query the database to count foils and nonfoils in the binder
+                            count_query = """
+                                SELECT 
+                                    SUM(CASE WHEN i.finish = 'foil' THEN 1 ELSE 0 END) as foil_count,
+                                    SUM(CASE WHEN i.finish = 'nonfoil' THEN 1 ELSE 0 END) as nonfoil_count
+                                FROM inventory i
+                                JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
+                                JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+                                WHERE cd.name = ? AND i.location_id = ?
+                            """
+                            counts = manager.cursor.execute(count_query, (card_name, binder_loc_id)).fetchone()
+                            
+                            foil_count = counts['foil_count'] if counts and counts['foil_count'] else 0
+                            nonfoil_count = counts['nonfoil_count'] if counts and counts['nonfoil_count'] else 0
+                            total_count = foil_count + nonfoil_count
+
+                            # THE FOIL UPGRADER LOGIC
+                            if finish == "nonfoil":
+                                if total_count >= 4:
+                                    tradeable = 1
+                                    assigned_loc_id = bulk_loc_id
+                                else:
+                                    assigned_loc_id = binder_loc_id
+                                    
+                            elif finish == "foil":
+                                if foil_count >= 4:
+                                    tradeable = 1
+                                    assigned_loc_id = bulk_loc_id
+                                elif total_count >= 4 and nonfoil_count > 0:
+                                    # Binder full, kick the most recently added nonfoil to bulk
+                                    kick_query = """
+                                        SELECT i.instance_id FROM inventory i
+                                        JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
+                                        JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+                                        WHERE cd.name = ? AND i.location_id = ? AND i.finish = 'nonfoil'
+                                        ORDER BY i.added DESC LIMIT 1
+                                    """
+                                    kick_target = manager.cursor.execute(kick_query, (card_name, binder_loc_id)).fetchone()
+                                    
+                                    if kick_target:
+                                        manager.cursor.execute(
+                                            "UPDATE inventory SET location_id = ? WHERE instance_id = ?",
+                                            (bulk_loc_id, kick_target['instance_id'])
+                                        )
+                                        # Save the kick immediately so the counts update correctly
+                                        manager.commit() 
+                                    
+                                    assigned_loc_id = binder_loc_id
+                                else:
+                                    assigned_loc_id = binder_loc_id
+                                    
+                        elif raw_dest == "Bulk":
+                            tradeable = 1
+                            assigned_loc_id = get_loc(f"{sc.upper()} Bulk Box")
+                            
+                        elif raw_dest == "Trade":
+                            tradeable = 1
+                            assigned_loc_id = get_loc("Trades")
+
+                        # Proceed with original insert logic using our dynamically calculated `assigned_loc_id`
                         manager.cursor.execute("""
                             INSERT INTO inventory (
                                 scryfall_id, location_id, condition, finish, 
@@ -215,7 +311,7 @@ def bulk_import_action():
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             card_id, 
-                            default_loc_id, 
+                            assigned_loc_id, 
                             "NM", # Defaulting to Near Mint for bulk
                             finish, 
                             0,    # Defaulting price to 0 for bulk
@@ -223,7 +319,9 @@ def bulk_import_action():
                             datetime.datetime.now(), 
                             surplus_val
                         ))
-            manager.commit()
+                        # We commit inside the loop so if qty=4, the queries correctly see the count go 1, 2, 3, 4!
+                        manager.commit()
+                        
         except Exception as e:
             print(f"Bulk Import Error: {e}")
         finally:
@@ -242,5 +340,5 @@ def download_template():
         static_dir, 
         'template.csv', 
         as_attachment=True,
-        download_name='mtg_bulk_import_template.csv' # Nicer name for the user
+        download_name='mtg_bulk_import_template.csv'
     )

@@ -35,7 +35,7 @@ def update_all_prices():
                 VALUES (?, ?, ?)
             ''', (sf_id, nonfoil, foil)
             )
-            print(f"updated {data["name"] }")
+            # print(f"updated {data['name']}")
     
     manager.commit()
     manager.close()

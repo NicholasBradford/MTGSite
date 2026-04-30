@@ -1,7 +1,27 @@
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import login_required
 from db.db_manager import CardDB
-import sqlite3, ScryfallFetcher, db.db_manager
+from search_function import search
+import sqlite3, ScryfallFetcher, db.db_manager, re
+
+sort_options = {
+        'name': """
+            LOWER(
+                REPLACE(
+                    CASE 
+                        WHEN cd.name LIKE 'The %' THEN SUBSTR(cd.name, 5)
+                        WHEN cd.name LIKE 'An %' THEN SUBSTR(cd.name, 4)
+                        WHEN cd.name LIKE 'A %' THEN SUBSTR(cd.name, 3)
+                        ELSE cd.name 
+                    END,
+                    ' ', ''
+                )
+            ) ASC
+        """,
+        'set': 'cp.set_code ASC, cd.name ASC',
+        'price': 'cp.current_price DESC',
+        'added': 'i.added DESC'
+    }
 
 def get_db_connection():
     # Points to your db folder
@@ -20,89 +40,16 @@ def inventory():
     
     manager = CardDB()
 
-    # 1. DYNAMIC SEARCH BUILDER
-    conditions = []
-    params = []
+    params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
+    sort_by = request.args.get('sort', 'name')
+    
+    if sort_by not in sort_options:
+        sort_by = 'name'
 
-    # Grab all possible search fields from the URL
-    s_name = request.args.get('name', '').strip()
-    s_set = request.args.get('set', '').strip()
-    s_type = request.args.get('type', '').strip()
-    s_color = request.args.get('color', '').strip()
-    s_text = request.args.get('text', '').strip()
+# 3. Extract the SPECIFIC SQL clause to use
+    active_sort = sort_options[sort_by]
 
-    # Append conditions only if the user typed something in that box
-    if s_name:
-        for term in s_name.split():
-            if term.startswith('-'):
-                conditions.append("cd.name NOT LIKE ?")
-                params.append(f'%{term[1:]}%') # The [1:] strips the '-' away
-            else:
-                conditions.append("cd.name LIKE ?")
-                params.append(f'%{term}%')
-
-    if s_type:
-        for term in s_type.split():
-            if term.startswith('-'):
-                conditions.append("cd.type_line NOT LIKE ?")
-                params.append(f'%{term[1:]}%')
-            else:
-                conditions.append("cd.type_line LIKE ?")
-                params.append(f'%{term}%')
-
-    if s_text:
-        for term in s_text.split():
-            if term.startswith('-'):
-                conditions.append("cd.oracle_text NOT LIKE ?")
-                params.append(f'%{term[1:]}%')
-            else:
-                conditions.append("cd.oracle_text LIKE ?")
-                params.append(f'%{term}%')
-
-    # --- SET ---
-    if s_set:
-        if s_set.startswith('-'):
-            conditions.append("cp.set_code != ?")
-            params.append(s_set[1:].lower())
-        else:
-            conditions.append("cp.set_code = ?")
-            params.append(s_set.lower())
-
-    # --- COLOR IDENTITY ---
-    if s_color:
-        for term in s_color.upper().split():
-            
-            if term in ['C', 'COLORLESS']:
-                # Exact Colorless
-                conditions.append("(cd.color_identity IS NULL OR cd.color_identity = '' OR cd.color_identity = '[]')")
-                
-            elif term.startswith('ID:'):
-                # COMMANDER IDENTITY MODE (e.g., id:WUB)
-                # This excludes any color NOT in your commander's identity
-                allowed_colors = term[3:] # Grabs the 'WUB' part
-                for c in 'WUBRG':
-                    if c not in allowed_colors:
-                        conditions.append("cd.color_identity NOT LIKE ?")
-                        params.append(f'%{c}%')
-                        
-            elif term.startswith('-'):
-                for char in term[1:]:
-                    if char in 'WUBRG':
-                        conditions.append("cd.color_identity NOT LIKE ?")
-                        params.append(f'%{char}%')
-                        
-            else:
-                for char in term:
-                    if char in 'WUBRG':
-                        conditions.append("cd.color_identity LIKE ?")
-                        params.append(f'%{char}%')
-
-    # Join them all together with " AND "
-    filter_sql = ""
-    if conditions:
-        filter_sql = "WHERE " + " AND ".join(conditions)
-
-    # 2. THE QUERIES (These remain mostly the same, just using the new filter_sql)
+    # 2. THE QUERIES
     count_query = f'''
         SELECT COUNT(*) FROM (
             SELECT i.scryfall_id 
@@ -111,11 +58,13 @@ def inventory():
             JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
             {filter_sql}
             GROUP BY i.scryfall_id, i.finish
+            {having_sql}
         )
     '''
-    # Notice we pass our dynamically built `params` list here!
-    total_items = manager.cursor.execute(count_query, params).fetchone()[0]
+    total_items = manager.cursor.execute(count_query, params + having_params).fetchone()[0]
     total_pages = (total_items + per_page - 1) // per_page
+    
+    
 
     main_query = f'''
         SELECT 
@@ -127,34 +76,31 @@ def inventory():
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
         GROUP BY i.scryfall_id, i.finish
-        ORDER BY cd.name ASC, cp.set_code ASC, cp.collector_number ASC, i.finish DESC
+        {having_sql}
+        ORDER BY {sort_sql}
         LIMIT ? OFFSET ?
     '''    
-    # Add limit and offset to params list
-    cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
-    
+
+    cards = manager.cursor.execute(main_query, params + having_params + [per_page, offset]).fetchall()
+
     query_locs = 'SELECT location_id as id, name FROM locations ORDER BY name'
     locs = manager.cursor.execute(query_locs).fetchall()
-    
+
     manager.close()
-    
-    # Safely convert tuples to dictionaries so Jinja doesn't crash
+
     card_list = [dict(row) for row in cards]
     loc_list = [dict(row) for row in locs]
-    
-    # THE MISSING AJAX CHECK: 
-    # If the request comes from our infinite scroll script, ONLY return the card snippets
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='inventory', locations = loc_list)
-    
-    # Otherwise, return the full page layout
+        return render_template('_card_items.html', cards=card_list, view_mode='inventory', locations=loc_list)
+
     return render_template('inventory.html', 
-                           cards=card_list, 
-                           locations=loc_list, 
-                           view_mode='inventory',
-                           page=page,
-                           total_pages=total_pages,
-                           search_query=search_query)
+                        cards=card_list, 
+                        locations=loc_list, 
+                        view_mode='inventory',
+                        page=page,
+                        total_pages=total_pages,
+                        search_query=search_query)
 
 @inventory_bp.route('/edit_instance/<int:instance_id>', methods=['POST'])
 @login_required

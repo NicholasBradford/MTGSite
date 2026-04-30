@@ -50,31 +50,116 @@
             vertical-align: middle;
             border: 1px solid #666;
         }
+
+    /* Keep your existing .advanced-search-form but ensure it allows stacking */
+        .advanced-search-form {
+            display: flex;
+            flex-direction: column; /* This makes the drawer go UNDER the bar */
+            gap: 10px;
+            width: 100%;
+        }
+
+        /* Fix the drawer so it doesn't squish everything into one line */
+        .extra-fields {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap; /* Allows inputs to wrap to new lines if they run out of space */
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            border-top: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        /* Ensure hidden still works */
+        .extra-fields.hidden {
+            display: none;
+        }
+
+        /* Make sure inputs in the drawer don't shrink to zero width */
+        .extra-fields input, 
+        .extra-fields select {
+            flex: 1 1 150px; /* Grow, shrink, but try to stay around 150px wide */
+            min-width: 120px;
+        }
+
+        /* Special sizing for short inputs */
+        .extra-fields .short-input {
+            flex: 0 1 100px;
+        }
+
+        /* Ensure the container holding the search bar and buttons can stretch */
+        .search-inputs {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 800px; /* Gives the whole bar plenty of room to stretch on desktop */
+            gap: 10px;
+        }
+
+        /* Target the main search bar directly */
+        input[name="q"] {
+            flex-grow: 1; /* The magic property: tells the bar to eat up all remaining horizontal space */
+            min-width: 250px; /* Prevents it from getting completely squished on mobile screens */
+            font-size: 1rem; /* 16px is the sweet spot. Readable, but doesn't hog space */
+            padding: 10px 15px; /* Gives the text breathing room away from the borders */
+            text-overflow: ellipsis; /* Adds a nice '...' if the text DOES eventually overflow */
+            white-space: nowrap;
+            overflow: hidden;
+        }
     {%endblock%}
 {% block content %}
         <br />
-    <div class="search-container">
-        <form action="" method="GET" class="advanced-search-form">
+        <div class="search-container">
+        <form action="" method="GET" class="advanced-search-form" id="searchForm">
+        <input type="hidden" name="drawer_state" id="drawer_state" value="{{ request.args.get('drawer_state', 'closed') }}">
+
             <div class="search-inputs">
+                <input type="text" name="q" placeholder="Search... (e.g. set:uma loc:binder qty>3)" 
+                    value="{{ request.args.get('q', '') }}" class="main-query-input">
+                <div class="search-actions">
+                    <button type="button" class="btn-search" id="toggleFilters" title="Advanced Filters">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+                    </button>
+
+                    <button type="submit" class="btn-search" title="Submit Search">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </button>
+
+                    {% if request.args %}
+                        <a href="{{ request.path }}" class="btn-clear" title="Clear All">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+
+            <div id="advancedDrawer" class="extra-fields {% if request.args.get('drawer_state') != 'open' %}hidden{% endif %}">
+                
                 <input type="text" name="name" placeholder="Name" value="{{ request.args.get('name', '') }}">
                 <input type="text" name="set" placeholder="Set" value="{{ request.args.get('set', '') }}" class="short-input">
+                
+                
+
                 <input type="text" name="type" placeholder="Type" value="{{ request.args.get('type', '') }}">
                 <input type="text" name="color" placeholder="Color" value="{{ request.args.get('color', '') }}" class="short-input">
+                <input type="text" name="qty" placeholder="Qty (e.g. >2)" value="{{ request.args.get('qty', '') }}" class="short-input">
+                <select name="location" class="short-input">
+                    <option value="">All Locations</option>
+                    {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if request.args.get('location')|string == loc.id|string %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                    {% endfor %}
+                </select>
                 <input type="text" name="text" placeholder="Oracle Text" value="{{ request.args.get('text', '') }}">
-            </div>
-            
-            <div class="search-actions">
-                <button type="submit" class="btn-search" title="Search">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                </button>
-                {% if request.args %}
-                    <a href="{{ request.path }}" class="btn-clear" title="Clear">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </a>
-                {% endif %}
+                <input type="text" name="usd" placeholder="Price (e.g. >2)" value="{{ request.args.get('usd', '') }}" class="short-input">
             </div>
         </form>
     </div>
+
+    
     <div id="card-grid" class="card-container">
         {% include '_card_items.html' %}
     </div>
@@ -126,6 +211,55 @@
                 if (page >= totalPages) observer.unobserve(sentinel);
             });
         }
+
+        // Helper function to keep the hidden input synced with the actual CSS
+        function syncDrawerState() {
+            const drawer = document.getElementById('advancedDrawer');
+            const stateInput = document.getElementById('drawer_state');
+            
+            if (drawer && stateInput) {
+                stateInput.value = drawer.classList.contains('hidden') ? 'closed' : 'open';
+            }
+        }
+
+        // 1. The Toggle Button
+        document.getElementById('toggleFilters').addEventListener('click', function() {
+            const drawer = document.getElementById('advancedDrawer');
+            if (drawer) {
+                drawer.classList.toggle('hidden');
+            }
+            syncDrawerState();
+        });
+
+        // 2. Dropdown Change Handler (Syncs state right before an auto-reload)
+        const locationDropdown = document.querySelector('select[name="location"]');
+        if (locationDropdown) {
+            locationDropdown.addEventListener('change', syncDrawerState);
+        }
+
+        // 3. The Global Form Sync & URL Cleaner (Combined)
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            // Force the value one last time based on actual CSS visibility
+            syncDrawerState();
+
+            // Clean up the URL by disabling empty fields
+            const formElements = this.elements;
+            for (let i = 0; i < formElements.length; i++) {
+                let el = formElements[i];
+                
+                if (el.name) {
+                    // Disable if the field is completely empty
+                    if (el.value.trim() === '') {
+                        el.disabled = true;
+                    }
+                    
+                    // Disable drawer_state from URL if it's just "closed"
+                    if (el.name === 'drawer_state' && el.value === 'closed') {
+                        el.disabled = true;
+                    }
+                }
+            }
+        });
     </script>
 {% endblock %}
 {% block extra_content%}

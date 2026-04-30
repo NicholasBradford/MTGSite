@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Locations{% endblock %}
+
+{% block content %}
+<div class="admin-container" style="padding: 20px; color: white;">
+    <h2 style="color: #ffd700;">Location Management</h2>
+
+    <div class="login-card" style="margin-bottom: 30px; max-width: 400px; background: rgba(255,255,255,0.1);">
+        <h3>Quick Add</h3>
+        <form method="POST" style="display: flex; gap: 10px;">
+            <input type="hidden" name="action" value="add">
+            <input type="text" name="location_name" placeholder="New Location Name" required class="form-input">
+            <button type="submit" class="login-btn" style="width: auto; padding: 0 15px;">Add</button>
+        </form>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden;">
+        <thead>
+            <tr style="background: #ffd700; color: black; text-align: left;">
+                <th style="padding: 12px;">Current ID</th>
+                <th style="padding: 12px;">Location Name</th>
+                <th style="padding: 12px;">Cards Stored</th>
+                <th style="padding: 12px;">Modify ID / Name</th>
+                <th style="padding: 12px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for loc in locations %}
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <td style="padding: 12px;">{{ loc['location_id'] }}</td>
+                <td style="padding: 12px;">{{ loc['name'] }}</td>
+                <td style="padding: 12px;">{{ loc['card_count'] }}</td>
+                <td style="padding: 12px;">
+                    <form method="POST" style="display: flex; gap: 5px;">
+                        <input type="hidden" name="action" value="update_id">
+                        <input type="hidden" name="old_id" value="{{ loc['location_id'] }}">
+                        <input type="number" name="new_id" value="{{ loc['location_id'] }}" style="width: 50px; background: #222; color: white; border: 1px solid #ffd700;">
+                        <input type="text" name="new_name" value="{{ loc['name'] }}" style="background: #222; color: white; border: 1px solid #ffd700;">
+                        <button type="submit" style="background: none; border: none; cursor: pointer;">💾</button>
+                    </form>
+                </td>
+                <td style="padding: 12px;">
+                    <form method="POST" onsubmit="return confirm('Delete this location?');">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="location_id" value="{{ loc['location_id'] }}">
+                        <button type="submit" style="background: #ff4444; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

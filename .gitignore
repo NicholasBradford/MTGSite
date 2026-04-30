@@ -1,7 +1,6 @@
 .env
 /venv
 reboot_table.py
-/helper
 /TODO.md
 *.pyc
 /static/img/cards
@@ -12,3 +11,5 @@ db/test_inventory.db
 /logs
 hotfix.py
 report.txt
+SCHEMA.md
+/helper
