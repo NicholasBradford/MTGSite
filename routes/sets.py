@@ -58,10 +58,12 @@ def set_detail(set_code):
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         WHERE cp.set_code = ?
         AND cp.collector_number = (
-            SELECT MIN(inner_cp.collector_number)
+            SELECT inner_cp.collector_number
             FROM card_printings inner_cp
             WHERE inner_cp.oracle_id = cp.oracle_id 
             AND inner_cp.set_code = cp.set_code
+            ORDER BY LENGTH(inner_cp.collector_number) ASC, inner_cp.collector_number ASC
+            LIMIT 1
         )
         GROUP BY cd.name
         ORDER BY LENGTH(cp.collector_number) ASC, cp.collector_number ASC
