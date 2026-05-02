@@ -22,7 +22,6 @@ def search(search_query, conditions=None):
     }
             
     if search_query:
-        # Improved Regex to handle quoted strings like name:"Jace Beleren"
         tokens = re.findall(r'(?:-?\w+:(?:[^\s"]+|"[^"]*")|-?[^\s"]+|"[^"]*")', search_query)
         
         for token in tokens:
@@ -34,10 +33,8 @@ def search(search_query, conditions=None):
             if match:
                 key = match.group(1).lower()
                 operator = match.group(2)
-                val = match.group(3).strip('"') # Remove quotes from values
-                
-                # 3. If they used a math operator (e.g. usd>2), we glue the '>' back 
-                # onto the '2' so your existing USD/QTY logic lower in the file can read it!
+                val = match.group(3).strip('"') 
+
                 if operator != ':':
                     val = operator + val
                 
@@ -94,12 +91,22 @@ def search(search_query, conditions=None):
     # Color Identity (Commander Logic)
     for term in search_params['identities']:
         is_negated = term.startswith('-')
-        val = term[1:].upper() if is_negated else term.upper()
-        # "id:w" means "Exclude all cards that contain colors NOT white"
-        for c in 'WUBRG':
-            if c not in val:
-                conditions.append(f"cd.color_identity NOT LIKE ?")
-                params.append(f'%{c}%')
+        val = term[1:].replace('id:', '').upper() if is_negated else term.replace('id:', '').upper()
+        
+        if val in ['C', 'COLORLESS']:
+            operator = "!=" if is_negated else "="
+            conditions.append(f"cd.color_identity {operator} ''")
+        else:
+            for c in 'WUBRG':
+                if c not in val:
+                    if not is_negated:
+                        conditions.append("cd.color_identity NOT LIKE ?")
+                        params.append(f'%{c}%')
+            
+            if is_negated:
+                for c in val:
+                    conditions.append("cd.color_identity NOT LIKE ?")
+                    params.append(f'%{c}%')
 
     # Location
     for term in search_params['locs']:
