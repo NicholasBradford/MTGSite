@@ -264,3 +264,7 @@ def process_trade():
         manager.close()
 
     return redirect(url_for('admin.admin_dashboard'))
+
+@admin_bp.route('/search_api', methods=['GET'])
+def search_api():
+     return render_template('search_api.html')

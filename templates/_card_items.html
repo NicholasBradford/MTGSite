@@ -31,7 +31,7 @@
             <br/>
             <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
             
-            {% if view_mode == 'trades'%}
+            {% if view_mode == 'trades' and current_user.is_authenticated%}
             <div class="trade-selector" 
                 data-scryfall-id="{{ card['scryfall_id'] }}" 
                 data-finish="{{ card['finish'] }}" 

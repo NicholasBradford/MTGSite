@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+    {% block title %}Search API Reference {% endblock title %}
+    {% block style %}
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #4facfe;
+            --border-color: #333;
+            --code-bg: #2d2d2d;
+            --danger-color: #ff6b6b;
+        }
+
+        header {
+            background-color: var(--surface-color);
+            padding: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            color: var(--accent-color);
+        }
+
+        .container {
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h2 {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            margin-top: 2rem;
+            color: #fff;
+        }
+
+        h3 {
+            color: #ccc;
+        }
+
+        code {
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #ffca28;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: var(--text-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #252525;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .example-box {
+            background-color: var(--surface-color);
+            border-left: 4px solid var(--accent-color);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .negation {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+    {% endblock style %}
+
+
+{% block content %}
+    <header>
+        <h1>Inventory Search Syntax Guide</h1>
+    </header>
+
+    <div class="container">
+        
+        <section>
+            <h2>Overview</h2>
+            <p>Our search engine supports advanced token-based querying. You can search by simply typing a card name, or use specific tags like <code>type:</code> or <code>usd></code> to narrow down your inventory.
+            
+            <div class="example-box">
+                <strong>Example:</strong> <code>bolt t:instant usd<2 -s:m11</code><br>
+                <em>Finds cards with "bolt" in the name, that are instants, cost less than $2.00, and are NOT from the M11 set.</em>
+            </div>
+        </section>
+
+        <section>
+            <h2>Basic Search (Names & Phrases)</h2>
+            <p>Any word without a prefix is treated as a card name. If a name has spaces, wrap it in double quotes.</p>
+            <ul>
+                <li><code>jace</code> — Finds cards with "jace" in the name.</li>
+                <li><code>"jace beleren"</code> — Finds exact phrase matches.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Supported Filters</h2>
+            <p>Use these prefixes followed by a colon <code>:</code> to target specific card attributes.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Prefix</th>
+                        <th>Shorthand</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>set:</code></td>
+                        <td><code>s:</code></td>
+                        <td>Search by 3-letter set code.</td>
+                        <td><code>s:uma</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>type:</code></td>
+                        <td><code>t:</code></td>
+                        <td>Search by card type (e.g., creature, instant).</td>
+                        <td><code>t:elf</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>color:</code></td>
+                        <td><code>c:</code></td>
+                        <td>Search by card color.</td>
+                        <td><code>c:u</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>identity:</code></td>
+                        <td><code>id:</code></td>
+                        <td>Search by Commander color identity (Excludes cards outside these colors).</td>
+                        <td><code>id:wu</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>oracle:</code> / <code>text:</code></td>
+                        <td><code>o:</code></td>
+                        <td>Search the rules text of the card.</td>
+                        <td><code>o:"draw a card"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>location:</code></td>
+                        <td><code>loc:</code> / <code>l:</code></td>
+                        <td>Search by physical storage location (by ID or string name).</td>
+                        <td><code>loc:"Trade Binder"</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Mathematical Operators</h2>
+            <p>For numeric values like Quantity and Price, you can use mathematical operators instead of colons: <code>></code>, <code><</code>, <code>>=</code>, <code><=</code>, <code>=</code>, <code>!=</code>.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Prefix</th>
+                        <th>Shorthand</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>usd</code></td>
+                        <td>-</td>
+                        <td>Filter by current market price.</td>
+                        <td><code>usd>5.00</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>quantity</code></td>
+                        <td><code>qty</code> / <code>q</code></td>
+                        <td>Filter by the number of copies.</td>
+                        <td><code>qty>=4</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Negation <span class="negation">(-)</span></h2>
+            <p>You can invert any search token by placing a hyphen <code>-</code> directly in front of it. This tells the engine to <strong>exclude</strong> results matching that token.</p>
+            <ul>
+                <li><code>-t:creature</code> — Excludes all creatures.</li><br />
+                <li><code>-id:c</code> — Excludes colorless identities.</li><br />
+                <li><code>-usd>10</code> — Excludes cards over $10 (effectively meaning <code>usd<=10</code>).</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Sorting Results</h2>
+            <p>You can control the order of your results directly from the search bar using the <code>sort:</code> operator.</p>
+            <div class="example-box">
+                <strong>Example:</strong> <code>t:dragon sort:usd</code>
+            </div>
+            
+            <h3>Available Sort Options:</h3>
+            <ul>
+                <li><code>sort:name</code> (Default) — Alphabetical </li><br />
+                <li><code>sort:rarity</code> — Mythic &rarr; Rare &rarr; Uncommon &rarr; Common.</li><br />
+                <li><code>sort:usd</code> — Highest price first (factors in foil pricing).</li><br />
+                <li><code>sort:set</code> — Set code, then by Collector Number.</li><br />
+                <li><code>sort:location</code> — Location name, then alphabetical.</li><br />
+                <li><code>sort:added</code> — Most recently added to your inventory first.</li>
+            </ul>
+        </section>
+
+    </div>
+{% endblock content %}

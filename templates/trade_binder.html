@@ -46,12 +46,13 @@
 
 {% block content %}
     {{ super() }}
-    
+    {% if current_user.is_authenticated %}
     <div id="trade-cart-overlay">
         <h3 style="margin-top: 0; color: #ffca28; border-bottom: 1px solid #ffca28; padding-bottom: 5px;">Your Trade Request</h3>
         <div id="cart-items-container"></div>
         <button id="submit-trade-btn" onclick="submitTradeRequest()">Submit Trade Request</button>
     </div>
+    {% endif %}
 
     <script>
         let tradeCart = JSON.parse(localStorage.getItem('mtgTradeCart')) || {};

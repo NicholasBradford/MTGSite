@@ -2,7 +2,7 @@ import sqlite3, db.db_manager, uuid
 from ScryfallFetcher import ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
-from search_function import search
+from search import search
 from db.db_manager import CardDB
 sort_options = {
         'name': """

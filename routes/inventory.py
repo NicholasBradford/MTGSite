@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import login_required
 from db.db_manager import CardDB
-from search_function import search
+from search import search
 import sqlite3, ScryfallFetcher, db.db_manager, re
 
 sort_options = {
