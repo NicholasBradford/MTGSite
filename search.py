@@ -42,14 +42,14 @@ def search(search_query, conditions=None):
                 
                 if key in ['set', 's']:
                     search_params['sets'].append(prefix_val)
-                elif key in ['id', 'identity']:
+                elif key in ['id', 'identity',"color", "c"]:
                     search_params['identities'].append(prefix_val)
                 elif key in ['loc', 'location', 'l']:
                     search_params['locs'].append(prefix_val)
                 elif key in ['type', 't']:
                     search_params['types'].append(prefix_val)
                 elif key in ["color", "c"]:
-                    search_params['colors'].append(prefix_val)
+                    search_params['colors'].append(prefix_val) #Add functionality for color not identity later
                 elif key in ["text","oracle","o"]:
                     search_params['text'].append(prefix_val)
                 elif key in ["qty", "q", "quantity"]:
@@ -92,10 +92,15 @@ def search(search_query, conditions=None):
     for term in search_params['identities']:
         is_negated = term.startswith('-')
         val = term[1:].replace('id:', '').upper() if is_negated else term.replace('id:', '').upper()
-        
         if val in ['C', 'COLORLESS']:
             operator = "!=" if is_negated else "="
             conditions.append(f"cd.color_identity {operator} ''")
+        elif val in ['MULTICOLOR','MC']:
+            operator = "=" if is_negated else ">"
+            conditions.append(f"LENGTH(cd.color_identity) {operator} 1")
+        elif val in ['MONOCOLOR', 'MONO']:
+            operator = ">" if is_negated else "="
+            conditions.append(f"LENGTH(cd.color_identity) {operator} 1")
         else:
             for c in 'WUBRG':
                 if c not in val:
@@ -107,6 +112,7 @@ def search(search_query, conditions=None):
                 for c in val:
                     conditions.append("cd.color_identity NOT LIKE ?")
                     params.append(f'%{c}%')
+        
 
     # Location
     for term in search_params['locs']:
