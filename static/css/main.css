@@ -22,6 +22,37 @@ body {
   justify-content: center; /* Horizontal centering */
   align-items: center;     /* Vertical centering */
 }
+/* Ensure the UL acts as a flex container */
+.nav-bar ul {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* The right-side group (User, Add Cards, Logout) */
+.nav-right-group {
+    margin-left: auto; /* This is the magic that pushes this item to the far right */
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* "Add Cards" Highlight Button */
+.nav-highlight {
+    background-color: #2e7d32; /* MTG Green-ish */
+    color: white !important;
+    padding: 6px 12px !important;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.nav-highlight:hover {
+    background-color: #388e3c;
+    text-decoration: none;
+}
+
+
 ul{
     background-color: #1f1f1f; 
     list-style-type: none;
@@ -49,33 +80,53 @@ ul li a:hover {
   background-color: #848484;
 }
 
+/* Dropdown Container */
 .dropdown {
-  position: relative;
-  display: inline-block;
-  color: rgb(0, 0, 0);         /* Ensures the text is visible against the dark bar */
-  padding: 14px 16px;   /* Matches the link padding */
-  cursor: pointer;
-  z-index: 9999;
+    position: relative;
+    display: inline-block;
 }
 
-/* Fix the dropdown content positioning */
+/* Dropdown Content (Hidden by Default) */
 .dropdown-content {
-  display: none;
-  position: absolute;
-  left: 100%;              /* Aligns it to the left edge of 'Collections' */
-  top: 0;            /* Places it exactly below the nav bar */   
-  background-color: #f1f1f1;
-  min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;           /* Ensures it stays on top of card images */
+    display: none;
+    position: absolute;
+    background-color: #1f1f1f;
+    min-width: 180px;
+    z-index: 1000;
+    margin-top: 0; 
+    padding-top: 10px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    border-radius: 4px;
 }
 
+/* Links inside the dropdown */
+.dropdown-content a {
+    color: #e0e0e0;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+/* Hover effects */
+.dropdown-content a:hover {
+    background-color: #333;
+    color: #66b2ff; /* Your light blue highlight */
+}
+
+/* Show the dropdown menu on hover */
 .dropdown:hover .dropdown-content {
-  display: block;
+    display: block;
 }
 
-.dropdown-content a{
-    color: rgb(0, 0, 0);
+/* Divider inside dropdown */
+.dropdown-content hr {
+    border: 0;
+    border-top: 1px solid #444;
+    margin: 5px 0;
 }
 /* Card Display */
 .card-container {

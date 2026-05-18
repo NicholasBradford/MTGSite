@@ -5,8 +5,9 @@ from datetime import timedelta,datetime
 headers = {'User-Agent': 'Mozilla/5.0 (MTG-Collection-Tracker/1.0)'}
 IMAGE_PATH = os.environ.get('IMAGE_PATH')
 class ScryfallFetcher:
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, setting = 0):
         self.db = db_manager
+        self.setting = setting
         self.base_url = "https://api.scryfall.com/cards"
         self.image_dir = f"{IMAGE_PATH}/img/cards"
         self.icon_dir = f"{IMAGE_PATH}/img/icons"
@@ -34,7 +35,7 @@ class ScryfallFetcher:
         
         # 3. Determine eligibility
         set_type = set_data.get('set_type')
-        is_expansion = set_type == 'expansion'
+        is_expansion = (set_type == 'expansion') or (set_type == 'core')
         release_date_str = set_data.get('released_at')
         is_recent = False
         
@@ -163,7 +164,8 @@ class ScryfallFetcher:
     def fetch_and_add(self, set_code, collector_number):     
         set_code = set_code.lower()
         # Trigger the full set sync first to ensure checklist is ready
-        self.ensure_set_is_fully_populated(set_code)
+        if self.setting == 0:
+            self.ensure_set_is_fully_populated(set_code)
 
         # 1. Request the specific card from Scryfall
         url = f"{self.base_url}/{set_code}/{collector_number}"

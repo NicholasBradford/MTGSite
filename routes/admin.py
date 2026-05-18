@@ -1,7 +1,7 @@
-import os, datetime
-from flask import Blueprint,request,flash,redirect,url_for, render_template, abort
+import os, datetime, time, requests, json
+from flask import Blueprint, Response, request,flash,redirect,url_for, render_template, abort
 from functools import wraps
-from ScryfallFetcher import ScryfallFetcher
+import ScryfallFetcher
 from flask_login import login_required, current_user
 from db.db_manager import CardDB
 
@@ -22,7 +22,7 @@ def admin():
     return render_template('admin.html')
 
 
-@admin_bp.route('/manage_locations', methods=['GET', 'POST'])
+@admin_bp.route('/admin/locations', methods=['GET', 'POST'])
 @login_required
 def manage_locations():
     manager = CardDB()
@@ -102,6 +102,38 @@ def admin_dashboard():
         # Convert to a list of dicts so we can append items to them
         pending_trades = [dict(t) for t in trades]
         
+        stocks = manager.cursor.execute('''
+            WITH RankedPrices AS (
+                SELECT 
+                    scryfall_id, 
+                    price_usd, 
+                    ROW_NUMBER() OVER(PARTITION BY scryfall_id ORDER BY scraped_at DESC) as rn
+                FROM price_history
+            ),
+            PriceShifts AS (
+                SELECT 
+                    curr.scryfall_id,
+                    prev.price_usd AS old_price,
+                    curr.price_usd AS new_price
+                FROM RankedPrices curr
+                JOIN RankedPrices prev 
+                    ON curr.scryfall_id = prev.scryfall_id 
+                    AND prev.rn = 2
+                WHERE curr.rn = 1
+            )
+            SELECT 
+                SUM(CASE WHEN ps.old_price < 2 AND ps.new_price >= 2 THEN 1 ELSE 0 END) as total_growth,
+                SUM(CASE WHEN ps.old_price >= 2 AND ps.new_price < 2 THEN 1 ELSE 0 END) as total_fall
+            FROM inventory i
+            JOIN PriceShifts ps ON i.scryfall_id = ps.scryfall_id
+            WHERE 
+                (ps.old_price < 2 AND ps.new_price >= 2) 
+                OR 
+                (ps.old_price >= 2 AND ps.new_price < 2)
+        ''').fetchone()
+        growth = stocks['total_growth'] or 0
+        fall = stocks['total_fall'] or 0
+        
         # Fetch the requested cards for each trade
         for trade in pending_trades:
             items = manager.cursor.execute('''
@@ -148,7 +180,8 @@ def admin_dashboard():
     # Make sure to add the new variables to your return statement!
     return render_template('admin_dashboard.html', 
                            total_cards=total_cards, 
-                           unique_cards=unique_cards, 
+                           unique_cards=unique_cards,
+                           change = [growth,fall],
                            active_trades=active_trades,
                            zero_value_count=zero_value_count,
                            unassigned_cards=unassigned_cards,
@@ -160,7 +193,7 @@ def process_incoming_cards(incoming, manager):
         return
     
     # Initialize the fetcher with your current db manager
-    fetcher = ScryfallFetcher(manager)
+    fetcher = ScryfallFetcher.ScryfallFetcher(manager)
     
     incoming_items = [item.strip() for item in incoming.split(',')]
     
@@ -268,3 +301,207 @@ def process_trade():
 @admin_bp.route('/search_api', methods=['GET'])
 def search_api():
      return render_template('search_api.html')
+ 
+@admin_bp.route('/add/wishlist', methods=['GET', 'POST'])
+def wishlist_add():
+    if current_user.role != 'admin':
+        return "Access Denied", 403
+    
+    manager = CardDB()
+    fetcher = ScryfallFetcher.ScryfallFetcher(manager, setting=1)
+
+    query = '''
+        SELECT w.wish_id, cd.name, cp.set_code, cp.collector_number, w.added, w.finish, ph.price_usd as nonfoil, ph.price_foil as foil
+        FROM wishlist w
+        JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
+        JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+        JOIN price_history ph ON ph.scryfall_id = cp.scryfall_id
+        WHERE ph.scraped_At = (
+            SELECT MAX(scraped_at) 
+            FROM price_history 
+            WHERE scryfall_id = cp.scryfall_id
+        )
+        ORDER BY w.added DESC
+    '''
+    
+   
+    if request.method == 'POST':            
+        sc = request.form["set_code"]
+        cn = request.form['collector_number']
+        foil = True if request.form.get('is_foil') == "yes" else False
+        try:              
+            # print(f"DEBUG: {sc}-{cn}:{card_info}")
+                        
+            card_id = fetcher.fetch_and_add(sc, cn)
+            
+            if card_id:
+                manager.cursor.execute("INSERT INTO wishlist (scryfall_id, finish, added) VALUES (?, ?, ?)", 
+                                        (card_id, 
+                                        "foil" if foil else "nonfoil", 
+                                        datetime.datetime.now()
+                                        ))
+                manager.commit()
+        except Exception as e:
+            print(f"Invalid Card Entry: {e}")
+        finally:
+            # Always ensure the connection is closed before leaving the POST block
+            manager.close()
+            return redirect(url_for('.wishlist_add'))
+        
+    # Use manager.conn.execute to fetch the rows
+    cards = manager.cursor.execute(query).fetchall()
+    
+    # Close the connection after we have our data
+    manager.close()
+    
+    return render_template('/wishlist_adder.html', cards=cards,)
+
+@admin_bp.route('/admin/tracker', methods=['GET'])
+def price_tracker():
+    manager = CardDB()
+    
+    main_query ='''
+                    WITH RankedPrices AS (
+                        SELECT 
+                            scryfall_id, 
+                            price_usd, 
+                            ROW_NUMBER() OVER(PARTITION BY scryfall_id ORDER BY scraped_at DESC) as rn
+                        FROM price_history
+                    ),
+                    PriceShifts AS (
+                        SELECT 
+                            curr.scryfall_id,
+                            prev.price_usd AS old_price,
+                            curr.price_usd AS new_price
+                        FROM RankedPrices curr
+                        JOIN RankedPrices prev 
+                            ON curr.scryfall_id = prev.scryfall_id 
+                            AND prev.rn = 2
+                        WHERE curr.rn = 1
+                    )
+                    SELECT 
+                        i.instance_id,
+                        i.scryfall_id,
+                        i.finish,
+                        ps.old_price,
+                        cp.image_url,
+                        ps.new_price,
+                        cd.name, 
+                        cp.image_url, 
+                        cp.set_code, 
+                        cp.collector_number,
+                        l.location_id,
+                        i.finish, COUNT(*) as qty 
+                    FROM inventory i
+                    JOIN PriceShifts ps ON i.scryfall_id = ps.scryfall_id
+                    LEFT JOIN card_printings cp on i.scryfall_id = cp.scryfall_id
+                    LEFT JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+                    LEFT JOIN locations l on i.location_id = l.location_id
+                    WHERE 
+                        (ps.old_price < 2 AND ps.new_price >= 2)
+                        OR 
+                        (ps.old_price >= 2 AND ps.new_price < 2)
+                    GROUP BY i.scryfall_id, i.finish
+                    ORDER BY cd.name ASC;
+                '''
+    
+    cards = manager.cursor.execute(main_query).fetchall()
+    manager.close()
+    
+    card_list = [dict(row) for row in cards]
+
+   
+    return render_template("price_tracker.html",cards=card_list,view_mode='tracking')
+
+
+@admin_bp.route('/delete_wish/<int:wish_id>', methods=['POST'])
+def delete_wish(wish_id):
+    manager = CardDB()
+    try:
+       
+        manager.cursor.execute("DELETE FROM wishlist WHERE wish_id = ?", (wish_id,))
+        
+        manager.commit()
+            
+    except Exception as e:
+        print(f"Error deleting card or cleaning up set: {e}")
+    finally:
+        manager.close()
+    
+    return redirect(url_for('.wishlist_add'))
+
+def update_prices():
+    manager = CardDB()
+    
+    yield f"data: {json.dumps({'progress': 5, 'status': 'Gathering local inventory ids...'})}\n\n"
+    
+    # 1. Fetch your local cards first so we can map by scryfall_id
+    local_cards = manager.cursor.execute('''
+        SELECT DISTINCT cp.scryfall_id 
+        FROM card_printings cp
+        JOIN inventory i ON cp.scryfall_id = i.scryfall_id 
+    ''').fetchall()
+    
+    local_ids = {row['scryfall_id'] for row in local_cards}
+    if not local_ids:
+        yield f"data: {json.dumps({'progress': 100, 'status': 'No cards to update'})}\n\n"
+        manager.close()
+        return
+
+    yield f"data: {json.dumps({'progress': 15, 'status': 'Contacting Scryfall API for bulk meta link...'})}\n\n"
+
+    # 2. Ask Scryfall where today's bulk file is hosted
+    try:
+        bulk_meta_url = "https://api.scryfall.com/bulk-data/default_cards"
+        meta_response = requests.get(bulk_meta_url).json()
+        download_url = meta_response['download_uri']
+    except Exception as e:
+        yield f"data: {json.dumps({'progress': 100, 'status': f'Failed to grab API metadata: {e}'})}\n\n"
+        manager.close()
+        return
+
+    yield f"data: {json.dumps({'progress': 30, 'status': 'Downloading large bulk dataset (takes a few seconds)...'})}\n\n"
+
+    # 3. Download the bulk dataset
+    try:
+        response = requests.get(download_url, stream=True)
+        all_scryfall_cards = response.json() 
+    except Exception as e:
+        yield f"data: {json.dumps({'progress': 100, 'status': f'Download failed: {e}'})}\n\n"
+        manager.close()
+        return
+
+    yield f"data: {json.dumps({'progress': 70, 'status': f'Parsing data and updating local database records...'})}\n\n"
+
+    # 4. Map and execute updates rapidly
+    updated_count = 0
+    for card_data in all_scryfall_cards:
+        sf_id = card_data.get('id')
+        
+        # Only process if this card is actually in your local inventory
+        if sf_id in local_ids:
+            nonfoil = card_data.get('prices', {}).get('usd')
+            foil = card_data.get('prices', {}).get('usd_foil')
+            
+            manager.cursor.execute(''' 
+                UPDATE card_printings
+                SET current_price = ?, current_price_foil = ? 
+                WHERE scryfall_id = ?
+            ''', (nonfoil, foil, sf_id))
+            
+            manager.cursor.execute('''
+                INSERT INTO price_history (scryfall_id, price_usd, price_foil)
+                VALUES (?, ?, ?)
+            ''', (sf_id, nonfoil, foil))
+            updated_count += 1
+
+    manager.commit()
+    manager.close()
+    
+    # 5. Finished pipeline signal
+    yield f"data: {json.dumps({'progress': 100, 'status': f'Complete! Updated {updated_count} cards.'})}\n\n"
+
+# The endpoint the frontend will connect to for streaming updates
+@admin_bp.route('/run-price-update')
+def run_price_update():
+    return Response(update_prices(), mimetype='text/event-stream')

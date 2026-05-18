@@ -12,7 +12,7 @@ def get_db_connection():
 
 adder_bp = Blueprint('adder', __name__)
 
-@adder_bp.route('/card_adder', methods=['GET', 'POST'])
+@adder_bp.route('/add/inventory', methods=['GET', 'POST'])
 @login_required
 def adder():
     
@@ -148,7 +148,7 @@ def delete_card(inventory_id):
     return redirect(url_for('adder.adder'))
 
 # Route 1: To VIEW the page
-@adder_bp.route('/card_adder/bulk_import', methods=['GET'])
+@adder_bp.route('/add/inventory/bulk', methods=['GET'])
 @login_required
 def bulk_import_page():
     manager = CardDB()
@@ -158,7 +158,7 @@ def bulk_import_page():
     return render_template('bulk_adder.html', locations=locations)
 
 # Route 2: To PROCESS the file
-@adder_bp.route('/card_adder/bulk_import', methods=['POST'])
+@adder_bp.route('/add/inventory/bulk', methods=['POST'])
 @login_required
 def bulk_import_action():
     # 1. Admin check (from your adder logic)

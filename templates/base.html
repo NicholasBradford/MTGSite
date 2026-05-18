@@ -22,29 +22,57 @@
             <div class="nav-bar">
                 <ul>
                     <li><a href="/" class="dropbtn">Home</a></li>
-                    <li><a href="/inventory">View Collection</a></li>
-                    <li><a href="/trade_binder">Trade Binder</a></li>
-                    <li><a href="/sets">Set Collections</a></li>
-                    
-                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                        <li><a href='/card_adder'>Add Cards</a></li>
-                    {% endif %}
+
+                    <li class="dropdown">
+                        <a href="javascript:void(0)" class="dropbtn">Collection</a>
+                        <div class="dropdown-content">
+                            <a href="/trade_binder">Trade Binder</a>
+                            <a href="/sets">Set Collections</a>
+                            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                                <hr>
+                                <a href="/inventory">Master Inventory</a>
+                            {% endif %}
+                        </div>
+                    </li>
 
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                        <li>
-                            <a href="{{ url_for('admin.admin') }}">
-                                {{ current_user.username }}
-                            </a>
+                    <li class="dropdown">
+                        <a href="javascript:void(0)" class="dropbtn">Market</a>
+                        <div class="dropdown-content">
+                            <a href="/admin/tracker">Price Tracker</a>
+                            <a href="/wishlist">Wishlist</a>
+                        </div>
+                    </li>
+                    {% endif %}
+
+                    <li>
+                        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                            <a href="/admin/dashboard">Trade Requests</a>
+                        {% else %}
+                        <li class="dropdown">
+                            <a href="/trade" class="dropbtn">Create Trade</a>
+                            <div class="dropdown-content">
+                                <a href="/wishlist">Wishlist</a>
+                            </div>
                         </li>
-                        <li><a href='/logout'>Logout</a></li>
+                        {% endif %}
+                    </li>
 
-                    {% elif current_user.is_authenticated %}
-                    
-                        <li><a href='\logout'>Logout ({{ current_user.username }})</a></li>
-
-                    {% else %}
-                        <li><a href='/login'>Login</a></li>
-                    {% endif %}
+                    <li class="nav-right-group">
+                        {% if current_user.is_authenticated %}
+                            {% if current_user.role == 'admin' %}
+                                <a href="/add/inventory" class="nav-highlight">Add Cards</a>
+                                <a href="{{ url_for('admin.admin') }}" title="Admin Dashboard">
+                                    ⚙️ {{ current_user.username }}
+                                </a>
+                            {% else %}
+                                <span>{{ current_user.username }}</span>
+                            {% endif %}
+                            <a href="/logout">Logout</a>
+                        {% else %}
+                            <a href="/login">Login</a>
+                        {% endif %}
+                    </li>
                 </ul>
             </div>
         </nav>

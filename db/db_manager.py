@@ -7,12 +7,10 @@ class CardDB:
     def __init__(self, db_path=None):
         self.trace_id = random.randint(1000, 9999)
         
-        # 2. Print exactly what function is opening it
         # print(f"\n[+] OPENING connection {self.trace_id} from:")
         # traceback.print_stack(limit=3)
         if db_path is None:
             db_path = os.environ.get('DB_PATH')
-            # print(f"db_path is:{db_path}")
         self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
         self.cursor = self.conn.cursor()
@@ -21,7 +19,6 @@ class CardDB:
         """Safely closes connection, deletes the file, and restarts."""
         if self.conn:
             self.conn.close()
-            # CRITICAL: Delete the references to ensure the file lock is released
             del self.cursor
             del self.conn
             self.conn = None
@@ -29,17 +26,13 @@ class CardDB:
         
         if os.path.exists(self.db_path):
             try:
-                # On Windows, sometimes the OS needs a split second to 
-                # acknowledge the handle closure from 'del'
                 os.remove(self.db_path)
                 print(f"Database {self.db_path} deleted.")
             except PermissionError:
                 import time
-                time.sleep(0.2) # Increased slightly for Windows stability
+                time.sleep(0.2) 
                 os.remove(self.db_path)
             
-    # Do NOT call self.__init__ here. 
-    # Let the nuke() method handle the restart.
     
     def create_tables(self):
         # Enable foreign keys in SQLite
@@ -58,8 +51,6 @@ class CardDB:
                 color_identity TEXT
             )
         ''')
-
-        # 2. card_printings (The "Catalog")
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS card_printings (
                 scryfall_id TEXT PRIMARY KEY,
@@ -76,7 +67,6 @@ class CardDB:
             )
         ''')
 
-        # 3. inventory (The "Collection")
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS inventory (
                 instance_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,7 +91,6 @@ class CardDB:
             )
         ''')
 
-        # 4. price_history (The "Ticker")
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS price_history (
                 price_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,8 +106,11 @@ class CardDB:
             CREATE TABLE IF NOT EXISTS wishlist (
                 wish_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 scryfall_id TEXT,
+                finish TEXT,
                 priority INTEGER DEFAULT 1, -- 1-5 scale
+                added DATETIME,
                 notes TEXT,
+                
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
             )
         ''')

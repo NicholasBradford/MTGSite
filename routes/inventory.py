@@ -77,7 +77,7 @@ def inventory():
         {filter_sql}
         GROUP BY i.scryfall_id, i.finish
         {having_sql}
-        ORDER BY {sort_sql}
+        ORDER BY {sort_sql}, i.finish DESC
         LIMIT ? OFFSET ?
     '''    
 

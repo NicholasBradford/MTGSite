@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Price Alerts{% endblock title %}
+
+{% block style %}
+    /* Container Spacing */
+    .controls-container {
+        margin-bottom: 24px;
+        margin-top: 24px;
+        
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+    }
+
+    /* Button Styling (Ensuring it matches your theme) */
+    .btn-primary {
+        background-color: #007bff; /* Replace with your site's exact primary accent color if different */
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-primary:hover {
+        background-color: #0056b3; /* Slightly darker shade for hover state */
+    }
+
+    .btn-primary:active {
+        transform: scale(0.98);
+    }
+
+    /* Progress Container Alignment */
+    #progress-container {
+        width: 100%;
+        max-width: 400px;
+        margin-top: 4px;
+    }
+
+    /* Modernizing the Native Progress Bar */
+    .progress-bar-wrapper {
+        width: 100%;
+        background-color: #e9ecef;
+        border-radius: 8px;
+        overflow: hidden;
+        height: 12px;
+    }
+
+    progress {
+        display: block;
+        width: 100%;
+        height: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    /* Progress Bar Colors (Webkit / Chrome / Safari / Edge) */
+    progress::-webkit-progress-bar {
+        background-color: #e9ecef;
+    }
+
+    progress::-webkit-progress-value {
+        background-color: #007bff; /* Matches your primary button theme */
+        border-radius: 8px;
+        transition: width 0.3s ease;
+    }
+
+    /* Progress Bar Colors (Firefox) */
+    progress::-moz-progress-bar {
+        background-color: #007bff;
+        border-radius: 8px;
+    }
+
+    /* Status Text Styling */
+    #progress-status {
+        display: block;
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 6px;
+        font-weight: 500;
+    }
+{% endblock style %}
+
+{% block content %}
+<div class="controls-container">
+    <button id="update-btn" class="btn btn-primary" onclick="startPriceUpdate()">
+        <i class="fas fa-sync-alt"></i> Update All Prices
+    </button>
+    
+    <div id="progress-container" style="display: none;">
+        <div class="progress-bar-wrapper">
+            <progress id="progress-bar" value="0" max="100"></progress>
+        </div>
+        <span id="progress-status">Starting...</span>
+    </div>
+</div>
+
+<div id="card-grid" class="card-container">
+    {% include '_card_items.html' %}
+</div>
+
+<script>
+function startPriceUpdate() {
+    const btn = document.getElementById('update-btn');
+    const container = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressStatus = document.getElementById('progress-status');
+
+    // Disable button and show the progress bar
+    btn.disabled = true;
+    container.style.display = 'block';
+    progressBar.value = 0;
+    progressStatus.innerText = "Connecting to server...";
+
+    // Open an SSE connection to the Flask backend
+    const source = new EventSource("{{ url_for('admin.run_price_update') }}");
+
+    source.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        // Update the progress UI
+        progressBar.value = data.progress;
+        progressStatus.innerText = data.status;
+
+        // If complete, close connection and reload page to show fresh prices
+        if (data.progress === 100) {
+            source.close();
+            progressStatus.innerText = "Refreshing page with new prices...";
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000); 
+        }
+    };
+
+    source.onerror = function(err) {
+        console.error("EventSource failed:", err);
+        progressStatus.innerText = "An error occurred during update.";
+        btn.disabled = false;
+        source.close();
+    };
+}
+</script>
+{% endblock content %}

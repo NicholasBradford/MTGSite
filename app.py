@@ -29,6 +29,7 @@ app = Flask(__name__)
 # else:
 # This 'or' chain ensures IMAGE_FOLDER is NEVER None
 IMAGE_FOLDER = os.environ.get('IMAGE_PATH')
+app.config['IMAGE_PATH'] = os.getenv('IMAGE_PATH', '/static/images/')
 
 start_app = CardDB()
 start_app.create_tables()

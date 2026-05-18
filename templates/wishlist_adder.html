@@ -101,7 +101,6 @@
                         <th>Set Code </th>
                         <th>Collector Number</th>
                         <th>Finish</th>
-                        <th>Location</th>
                         <th>Last Price</th>
                         <th>Date Added</th>
                     </tr>
@@ -112,14 +111,13 @@
                         <td>{{card["set_code"]}}</td>
                         <td>{{card["collector_number"]}}</td>
                         <td>{{card["finish"]}}</td>
-                        <td>{{card["location_name"]}}</td>
                         <td>
                             {% set price = card["nonfoil"] if card["finish"] == "nonfoil" else card["foil"] %}
                             {{ "$" ~ "{:,.2f}".format(price|float) if price else "N/A" }}
                         </td>
                         <td>{{card["added"]}}</td>
                         <td>
-                            <form action="{{ url_for('.delete_card', inventory_id=card['instance_id']) }}" method="POST" onsubmit="return confirm('Remove this card?');">
+                            <form action="{{ url_for('admin.delete_wish', wish_id=card['wish_id']) }}" method="POST" onsubmit="return confirm('Remove this card?');">
                                 <button type="submit" class="delete-btn">&times;</button>
                             </form>
                         </td>
@@ -131,34 +129,11 @@
                 <form method="POST">
                     <ul>
                         <li><input type="text" name="set_code" placeholder="Set Code" required></li>
-                        <li><input type="text" name="collector_number" placeholder="Collector #"></li>
-                        
-                        <li>
-                            <select name="condition">
-                                <option value="NM">Near Mint</option>
-                                <option value="LP">Lightly Played</option>
-                                <option value="MP">Moderately Played</option>
-                            </select>
-                        </li>                       
+                        <li><input type="text" name="collector_number" placeholder="Collector #"></li>                      
                         <li class="checkbox-item">
                             <input type="checkbox" id="foil" name="is_foil" value="yes">
                             <label for="foil">Foil?</label>
                         </li>
-                        <li class="checkbox-item">
-                            <input type="checkbox" id="trade" name="is_tradeable" value="yes" checked>
-                            <label for="trade">For Trade?</label>
-                        </li>
-                        <li><input type="number" name="price" placeholder="Price Paid $" step="0.01"></li>
-                                            <li>
-                            <select name="location">
-                                {% for location in locations %}
-                                <option value="{{ location['location_id'] }}"
-                                    {% if location['name'] == 'Unsorted Box' %}selected{% endif %}>
-                                    {{ location['name'] }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </li> 
                         <li class="input-group">
                             <label for="qty" style="font-size: 0.8em; color: #bbb;">Quantity</label>
                             <input type="number" id="qty" name="qty" step="1" value="1" min="1" placeholder="Qty">

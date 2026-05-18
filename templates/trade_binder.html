@@ -55,13 +55,12 @@
     {% endif %}
 
     <script>
-        let tradeCart = JSON.parse(localStorage.getItem('mtgTradeCart')) || {};
+        var tradeCart = JSON.parse(localStorage.getItem('mtgTradeCart')) || {};
 
         document.addEventListener('DOMContentLoaded', () => {
             syncUINumbers();
             renderCartSummary();
 
-            // Watch for infinite scroll additions so we can sync new buttons!
             const grid = document.getElementById('card-grid');
             if (grid) {
                 const observer = new MutationObserver(syncUINumbers);
@@ -69,11 +68,13 @@
             }
         });
 
-        // Loops through visible cards and sets their counter to match the cart
         function syncUINumbers() {
             document.querySelectorAll('.trade-selector').forEach(selector => {
-                const key = `${selector.dataset.scryfallId}_${selector.dataset.finish}`;
+                // Updated key to include direction
+                const direction = selector.dataset.direction || 'outbound';
+                const key = `${selector.dataset.scryfallId}_${selector.dataset.finish}_${direction}`;
                 const qtyDisplay = selector.querySelector('.qty-display');
+                
                 if (tradeCart[key]) {
                     qtyDisplay.innerText = tradeCart[key].qty;
                 } else {
@@ -82,18 +83,25 @@
             });
         }
 
-        // Fired when + or - is clicked
         function updateCart(btn, change) {
             const selector = btn.parentElement;
             const scryfallId = selector.dataset.scryfallId;
             const finish = selector.dataset.finish;
             const name = selector.dataset.name;
             const maxQty = parseInt(selector.dataset.max);
+            const direction = selector.dataset.direction || 'outbound'; // Capture direction
             
-            const cartKey = `${scryfallId}_${finish}`;
+            // Updated key to include direction
+            const cartKey = `${scryfallId}_${finish}_${direction}`;
             
             if (!tradeCart[cartKey]) {
-                tradeCart[cartKey] = { scryfall_id: scryfallId, finish: finish, name: name, qty: 0 };
+                tradeCart[cartKey] = { 
+                    scryfall_id: scryfallId, 
+                    finish: finish, 
+                    name: name, 
+                    qty: 0, 
+                    direction: direction // Store direction in the object
+                };
             }
             
             let newQty = tradeCart[cartKey].qty + change;
@@ -120,29 +128,58 @@
             const overlay = document.getElementById('trade-cart-overlay');
             container.innerHTML = '';
             
-            let hasItems = false;
-            for (const key in tradeCart) {
-                hasItems = true;
-                const item = tradeCart[key];
-                container.innerHTML += `
-                    <div class="cart-item-row">
-                        <span>${item.qty}x ${item.name}</span>
-                        <span style="color: #aaa;">(${item.finish})</span>
-                    </div>
-                `;
+            const items = Object.values(tradeCart);
+            
+            if (items.length === 0) {
+                overlay.style.display = 'none';
+                return;
+            }
+
+            // Split items for display
+            const outboundItems = items.filter(i => i.direction === 'outbound');
+            const inboundItems = items.filter(i => i.direction === 'inbound');
+
+            if (outboundItems.length > 0) {
+                container.innerHTML += `<h4 style="margin: 10px 0 5px 0; color: #ddd;">Requesting (Outbound)</h4>`;
+                outboundItems.forEach(item => {
+                    container.innerHTML += `
+                        <div class="cart-item-row">
+                            <span>${item.qty}x ${item.name}</span>
+                            <span style="color: #aaa;">(${item.finish})</span>
+                        </div>`;
+                });
+            }
+
+            if (inboundItems.length > 0) {
+                container.innerHTML += `<h4 style="margin: 10px 0 5px 0; color: #ddd;">Offering (Inbound)</h4>`;
+                inboundItems.forEach(item => {
+                    container.innerHTML += `
+                        <div class="cart-item-row">
+                            <span>${item.qty}x ${item.name}</span>
+                            <span style="color: #aaa;">(${item.finish})</span>
+                        </div>`;
+                });
             }
             
-            // Show cart if items exist, hide if empty
-            overlay.style.display = hasItems ? 'block' : 'none';
+            overlay.style.display = 'block';
         }
 
         function submitTradeRequest() {
-            if (Object.keys(tradeCart).length === 0) return;
+            console.log("Attempting Trade")
+            const items = Object.values(tradeCart);
+            if (items.length === 0) return;
+
+            // Split the items based on their stored direction
+            const outboundItems = items.filter(item => item.direction === 'outbound');
+            const inboundItems = items.filter(item => item.direction === 'inbound');
 
             fetch('/api/submit_trade', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: Object.values(tradeCart) }) 
+                body: JSON.stringify({ 
+                    outbound: outboundItems, 
+                    inbound: inboundItems 
+                }) 
             })
             .then(res => res.json())
             .then(data => {
@@ -151,7 +188,7 @@
                     localStorage.removeItem('mtgTradeCart');
                     window.location.reload();
                 } else {
-                    alert("Error submitting trade.");
+                    alert("Error submitting trade: " + (data.error || "Unknown error"));
                 }
             })
             .catch(err => console.error("Trade Submission Error:", err));

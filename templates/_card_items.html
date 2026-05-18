@@ -1,48 +1,62 @@
-{% for card in cards %}
-{% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
-    <div class="card_class" >
-        {% if card['image_url'] %}
-            <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
-                <img 
-                    <img src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
-                    alt="{{ card['name'] }}" 
-                    {% if is_admin_inventory %}
-                                onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
-                                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
-                                onmouseover="this.style.borderColor='#ffca28'"
-                                onmouseout="this.style.borderColor='transparent'"
-                    {% else %}
-                        onclick="showPopup('{{ card['name'] }}')"
-                    {% endif %}
-                >
-            </div>
-        {% else %}
-            <div class="no-image">No Image Available</div>
-        {% endif %}
+{% if cards[0]%}
+    {% for card in cards %}
+    {% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
+        <div class="card_class" >
+            {% if card['image_url'] %}
+                <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
+                    <img 
+                        <img src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
+                        alt="{{ card['name'] }}" 
+                        {% if is_admin_inventory %}
+                                    onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
+                                    style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
+                                    onmouseover="this.style.borderColor='#ffca28'"
+                                    onmouseout="this.style.borderColor='transparent'"
+                        {% else %}
+                            onclick="showPopup('{{ card['name'] }}')"
+                        {% endif %}
+                    >
+                </div>
+            {% else %}
+                <div class="no-image">No Image Available</div>
+            {% endif %}
 
-        <div class="card-label">
-            {{ card['name'] }} 
-            {% if card['qty'] > 1 %}
-                <span class="qty-badge">x{{ card['qty'] }}</span>
+            <div class="card-label">
+                {{ card['name'] }} 
+                {% if card['qty'] > 1 %}
+                    <span class="qty-badge">x{{ card['qty'] }}</span>
+                {% endif %}
+                {% if card['finish'] == 'foil' %}
+                    <span style="color: gold;">★</span>
+                {% endif %}
+                <br/>
+                <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
+                
+               
+            </div> 
+        
+
+        {% if view_mode == 'tracking' and current_user.is_authenticated %}
+            {% if card['old_price'] %}
+                {% set price_diff = card['new_price'] - card['old_price'] %}
+                {% if price_diff > 0 %}
+                    {% set perecent_diff = (card['new_price'] / card['old_price']) *100 %}
+                    <span style="color: green;"> 
+                {% else %} 
+                    {% set perecent_diff = (card['old_price'] / card['new_price']) * 100 %}
+                    <span style="color: red;">
+                {% endif %} 
+                    {{ "%.2f"|format(card.old_price) }} → {{ "%.2f"|format(card.new_price) }}
+                    <br/>
+                    {{ "%.2f"|format(perecent_diff) }}%
+                </span>
             {% endif %}
-            {% if card['finish'] == 'foil' %}
-                <span style="color: gold;">★</span>
-            {% endif %}
-            <br/>
-            <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
-            
-            {% if view_mode == 'trades' and current_user.is_authenticated%}
-            <div class="trade-selector" 
-                data-scryfall-id="{{ card['scryfall_id'] }}" 
-                data-finish="{{ card['finish'] }}" 
-                data-name="{{ card['name'] }}"
-                data-max="{{ card['qty'] }}"
-                style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 8px;">
-                <button class="minus-btn" onclick="updateCart(this, -1)" style="cursor: pointer; padding: 2px 8px;">-</button>
-                <span class="qty-display">0</span>
-                <button class="plus-btn" onclick="updateCart(this, 1)" style="cursor: pointer; padding: 2px 8px;">+</button>
-            </div>
-            {% endif %}
-        </div> 
+            {{card["location_name"]}}
+        {% endif %}
     </div>
-{% endfor %}
+    {% endfor %}
+{% elif view_mode == 'tracking' %}
+        <div style="text-align: center; width: 100%; padding: 20px; color: #aaa;">
+            <h2>No recent hits</h2>
+        </div>
+{% endif %}

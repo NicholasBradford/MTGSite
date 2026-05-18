@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+{% block title %}Trade Request{% endblock %}
+
+{% block style %}
+{{super()}}
+<style>
+    .rainbow_image {
+        outline: 3px solid red; !important
+    }
+    
+
+    .rainbow_image img {
+        display: block;
+        width: 100%;
+        border-radius: 4.75% / 3.5%;
+    }
+
+    .rainbow_image::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+
+        background: linear-gradient(
+            115deg,
+            transparent 15%,
+            rgba(255, 150, 255, 0.4) 30%,
+            rgba(100, 255, 255, 0.4) 50%,
+            rgba(255, 255, 100, 0.4) 70%,
+            transparent 85%
+        );
+
+        mix-blend-mode: color-dodge;
+        opacity: 0.5;
+    }
+
+    /* Trade Page Layout */
+    .trade-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Outgoing Search Bar */
+    .search-container {
+        position: relative;
+        width: 100%;
+        background: rgba(20, 20, 20, 0.8);
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #ffd700;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .search-container input {
+        width: 100%;
+        height: 100%;
+        padding: 15px;
+        font-size: 1.2rem;
+        background: #2a2a2a;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 5px;
+    }
+
+    /* Dynamic Dropdown */
+    #search-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 20px;
+        right: 20px;
+        background: rgba(30, 30, 30, 0.95);
+        border: 1px solid #ffd700;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #444;
+        transition: background 0.2s;
+    }
+
+    .dropdown-item:hover {
+        background: rgba(255, 215, 0, 0.2);
+    }
+
+    .dropdown-item img {
+        height: 60px;
+        border-radius: 4%;
+        margin-right: 15px;
+    }
+
+    .dropdown-item .details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dropdown-item .name {
+        font-weight: bold;
+        color: #ffd700;
+        font-size: 1.1rem;
+    }
+
+    .dropdown-item .set-info {
+        font-size: 0.85rem;
+        color: #ccc;
+    }
+
+    /* Two Columns */
+    .trade-columns {
+        display: flex;
+        gap: 30px;
+        width: 100%;
+    }
+
+    .column {
+        flex: 1;
+        background: rgba(20, 20, 20, 0.8);
+        border: 1px solid #444;
+        border-radius: 10px;
+        padding: 20px;
+        min-height: 500px;
+    }
+
+    .column h2 {
+        text-align: center;
+        color: #ffd700;
+        border-bottom: 2px solid #555;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+
+    /* Incoming Form */
+    .incoming-form {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        justify-content: center;
+    }
+
+    .incoming-form input, .incoming-form select {
+        padding: 8px;
+        background: #2a2a2a;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 5px;
+    }
+
+    .btn-gold {
+        background: #ffd700;
+        color: #000;
+        font-weight: bold;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: transform 0.1s;
+    }
+    
+    .btn-gold:hover { transform: scale(1.05); }
+
+    /* Card Grids */
+    .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .trade-card {
+        text-align: center;
+        position: relative;
+    }
+
+    .trade-card img {
+        width: 100%;
+        border-radius: 4.75% / 3.5%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    }
+    
+    .trade-card .remove-btn {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: red;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .qty-badge {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        background: #ffd700;
+        color: #000;
+        font-weight: bold;
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        z-index: 10;
+        pointer-events: none; /* Let clicks pass through to the image */
+    }
+    .card-name-label {
+        position: relative;
+        z-index: 2;
+        display: block;
+        font-size: 0.8rem;
+        color: #ccc;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: transparent;
+    }
+    .trade-card::before,
+    .trade-card::after {
+        content: none !important;
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="trade-dashboard">
+    
+    <div class="search-container">
+        <input type="text" id="outgoing-search" placeholder="Search the Trade Binder... (e.g., Boros)" autocomplete="off">
+        <div id="search-dropdown"></div>
+    </div>
+
+    <div class="trade-columns">
+        <div class="column" id="outgoing-column">
+            <h2>Requested</h2>
+            <div class="card-grid" id="outgoing-grid">
+                </div>
+        </div>
+
+        <div class="column" id="incoming-column">
+            <h2>Offer</h2>
+            
+            <div class="incoming-form">
+                <input type="text" id="inc-set" placeholder="Set (e.g. sos)" size="8">
+                <input type="text" id="inc-cn" placeholder="CN" size="5">
+                <select id="inc-finish">
+                    <option value="nonfoil">Non-Foil</option>
+                    <option value="foil">Foil</option>
+                </select>
+                <button class="btn-gold" onclick="addIncomingCard()">Add</button>
+            </div>
+
+            <div class="card-grid" id="incoming-grid">
+                </div>
+        </div>
+    </div>
+</div>
+<div class="submit-section" style="margin-top: 30px; text-align: center;">
+    {% if current_user.is_authenticated %}
+        <button id="submit-trade-btn" class="btn-gold" onclick="submitTradeRequest()" style="padding: 15px 40px; font-size: 1.2rem;">
+            Submit Trade Proposal
+        </button>
+    {% else %}
+        <div class="auth-prompt" style="background: rgba(255,215,0,0.1); padding: 20px; border-radius: 10px; border: 1px dashed #ffd700;">
+            <p style="color: #ccc;">Ready to finalize this trade?</p>
+            <a href="{{ url_for('authentication.login') }}" class="btn-gold" style="text-decoration: none; display: inline-block;">
+                Log In to Submit Trade
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    let rawPath = "{{ config['IMAGE_PATH'] or '/static/images/' }}";
+    const IMAGE_BASE_PATH = rawPath.replace(/\/$/, '') + '/';
+    let searchTimeout = null;
+    const searchInput = document.getElementById('outgoing-search');
+    const dropdown = document.getElementById('search-dropdown');
+    
+    // Live Search Event
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/trade_search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    dropdown.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(card => {
+                            const item = document.createElement('div');
+                            item.className = 'dropdown-item';
+                            // Build the dropdown row visually
+                            item.innerHTML = `
+                                    <img src="${IMAGE_BASE_PATH}${card.image_url}" alt="${card.name}">                                
+                                <div class="details">
+                                    <span class="name">${card.name}</span>
+                                    <span class="set-info">${card.set_code.toUpperCase()} #${card.collector_number} - ${card.finish} </span>
+                                    <b style="color: #ffd700;">(Available: ${card.qty})</b>
+                                </div>
+                            `;
+                            // When clicked, add to outgoing grid
+                            item.onclick = () => {
+                                const selector = `#outgoing-grid .trade-card[data-card-id="${card.scryfall_id}"][data-finish="${card.finish}"]`;
+                                const currentInTrade = document.querySelectorAll(selector).length;
+                                if (currentInTrade >= card.qty) {
+                                    alert(`Limit Reached: There are only ${card.qty} tradeable copies of ${card.name} (${card.finish}).`);
+                                    return; // Stop the function here
+                                }
+                                console.log("Card object from search:", card);
+                                addCardToGrid('outgoing-grid', card);
+                                searchInput.value = '';
+                                dropdown.style.display = 'none';
+                            };
+                            dropdown.appendChild(item);
+                        });
+                        dropdown.style.display = 'block';
+                    } else {
+                        dropdown.style.display = 'none';
+                    }
+                });
+        }, 300); // 300ms delay to prevent spamming the DB
+    });
+
+    // Hide dropdown if clicked outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && e.target !== dropdown) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Handle incoming card lookup
+    function addIncomingCard() {
+        const setCode = document.getElementById('inc-set').value;
+        const cn = document.getElementById('inc-cn').value;
+        const finish = document.getElementById('inc-finish').value;
+
+        if (!setCode || !cn) {
+            alert("Please provide both Set Code and Collector Number.");
+            return;
+        }
+
+        fetch('/api/fetch_incoming', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ set_code: setCode, cn: cn, finish: finish })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                addCardToGrid('incoming-grid', data);
+                // Clear inputs
+                document.getElementById('inc-set').value = '';
+                document.getElementById('inc-cn').value = '';
+            } else {
+                alert(data.error || "Failed to find card.");
+            }
+        });
+    }
+
+    // Generic function to append card UI to either grid
+    function addCardToGrid(gridId, card) {
+        const grid = document.getElementById(gridId);
+
+        const existingCard = grid.querySelector(`.trade-card[data-id="${card.scryfall_id}"][data-finish="${card.finish}"]`);
+        
+        if (existingCard) {
+            let currentQty = parseInt(existingCard.getAttribute('data-qty'));
+
+            // 2. Inventory Check (Only for Outgoing/Yours)
+            if (gridId === 'outgoing-grid' && currentQty >= card.qty) {
+                alert(`Limit Reached: You only have ${card.qty} tradeable copies of ${card.name}.`);
+                return;
+            }
+
+            // 3. Update existing stack
+            let newQty = currentQty + 1;
+            existingCard.setAttribute('data-qty', newQty);
+            existingCard.querySelector('.qty-badge').innerText = `x${newQty}`;
+            existingCard.querySelector('.qty-badge').style.display = 'block';
+            return; // Exit function so we don't create a duplicate element
+        }
+
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'trade-card';
+        cardDiv.setAttribute('data-id', card.scryfall_id);
+        cardDiv.setAttribute('data-finish', card.finish);
+        cardDiv.setAttribute('data-qty', "1");
+        
+        // Remove button logic
+        const btn = document.createElement('button');
+        btn.className = 'remove-btn';
+        btn.innerText = 'X';
+        btn.onclick = () => {
+            cardDiv.remove();
+            cardDiv.setAttribute('data-qty', "0");
+        }
+
+        // Image
+        const img = document.createElement('img');
+        img.src = (card.image_url && card.image_url.startsWith('http')) 
+              ? card.image_url 
+              : `${IMAGE_BASE_PATH}${card.image_url}`;
+        img.alt = card.name;
+
+        const badge = document.createElement('span');
+        badge.className = 'qty-badge';
+        badge.innerText = 'x1';
+        badge.style.display = 'none';
+
+        
+        
+        if (card.finish === 'foil') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'rainbow_image';
+            wrapper.style.position = 'relative';
+            wrapper.style.display = 'inline-block';
+            wrapper.style.lineHeight = '0';
+            wrapper.style.borderRadius = '4.75% / 3.5%';
+            wrapper.style.overflow = 'hidden';
+            wrapper.style.width = '100%';
+            wrapper.appendChild(img); 
+            cardDiv.appendChild(wrapper);
+        } else {
+            cardDiv.appendChild(img); 
+        }
+
+        cardDiv.appendChild(btn);
+        cardDiv.appendChild(badge);
+        
+        const label = document.createElement('span');
+        label.className = 'card-name-label';
+        label.innerText = card.name;
+        cardDiv.appendChild(label);
+        
+        grid.appendChild(cardDiv);
+    }
+
+    function submitTradeRequest() {
+        // 1. Grab all card elements from both grids
+        const outboundNodes = document.querySelectorAll('#outgoing-grid .trade-card');
+        const inboundNodes = document.querySelectorAll('#incoming-grid .trade-card');
+
+        // 2. Validate that at least one grid has items
+        if (outboundNodes.length === 0 && inboundNodes.length === 0) {
+            alert("Select at least one card to trade.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to submit this trade request?")) return;
+
+        // 3. Helper function to extract the data attributes into an array of objects
+        function extractTradeData(nodes) {
+            const items = [];
+            nodes.forEach(card => {
+                items.push({
+                    scryfall_id: card.getAttribute('data-id'),
+                    finish: card.getAttribute('data-finish'),
+                    qty: parseInt(card.getAttribute('data-qty'))
+                });
+            });
+            return items;
+        }
+
+        // 4. Build the correct payload to match your Flask backend
+        const outboundData = extractTradeData(outboundNodes);
+        const inboundData = extractTradeData(inboundNodes);
+
+        fetch('/api/submit_trade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                outbound: outboundData,
+                inbound: inboundData
+            }) 
+        })
+        .then(res => {
+            if (res.status === 401) throw new Error("Please log in to continue.");
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert("Success! The binder owner has been notified.");
+                // Removed local storage wipe since state is now DOM-based
+                window.location.href = "/dashboard"; // Redirect to their personal dashboard
+            } else {
+                alert(data.error || "Submission failed.");
+            }
+        })
+        .catch(err => alert(err.message));
+    }
+</script>
+{% endblock %}

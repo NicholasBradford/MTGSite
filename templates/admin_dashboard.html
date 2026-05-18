@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard{% endblock %}
-
+{% block style %}
+a {
+  color: rgb(71, 208, 25);
+  text-align: center;
+  text-decoration: none;
+} 
+{% endblock style %}
 {% block content %}
 <div class="admin-header" style="margin-bottom: 30px;">
     <h3>Dashboard</h3>
@@ -13,12 +19,14 @@
         <h4 style="color: #ffd700; margin-top: 0;">📊 Collection Statistics</h4>
         <p><strong>Total Cards:</strong> {{ total_cards }}</p>
         <p><strong>Unique Printings:</strong> {{ unique_cards }}</p>
+        <p><strong>New Hits:</strong> {% if change[0] > 0 %}<a href="/admin/tracker">{{ change[0] }}</a>{% else %} 0 {% endif %}</p>
+        <p><strong>New Misses:</strong> {% if change[1] > 0 %}<a href="/admin/tracker">{{ change[1] }}</a>{% else %} 0 {% endif %}</p>
         <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Updated: Real-time</div>
     </div>
 
     <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #17a2b8; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
         <h4 style="color: #17a2b8; margin-top: 0;">🛠️ Data Integrity</h4>
-        <p><strong>Cards with $0.00 Value:</strong> <span style="color: {% if zero_value_count > 0 %}#ff4444{% else %}#28a745{% endif %};">{% if zero_value_count > 0 %}<a href="/inventory?drawer_state=closed&q=usd%3D0">{{zero_value_count}}</a>{% else %}0{% endif %}</span></p>
+        <p><strong>Cards with $0.00 Value:</strong> <span style="color: {% if zero_value_count > 0 %}#ff4444{% else %}#28a745{% endif %};">{% if zero_value_count > 0 %}<a href="/inventory?q=usd%3D0">{{zero_value_count}}</a>{% else %}0{% endif %}</span></p>
         <p><strong>Unassigned Locations:</strong> <span style="color: {% if unassigned_cards > 0 %}#ffc107{% else %}#28a745{% endif %};">{{ unassigned_cards }}</span></p>
         <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Flags missing prices/locations</div>
     </div>
