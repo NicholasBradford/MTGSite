@@ -432,74 +432,75 @@ def delete_wish(wish_id):
 
 def update_prices():
     manager = CardDB()
-    
     yield f"data: {json.dumps({'progress': 5, 'status': 'Gathering local inventory ids...'})}\n\n"
-    
-    # 1. Fetch your local cards first so we can map by scryfall_id
+
+    # 1. Fetch your unique local cards
     local_cards = manager.cursor.execute('''
         SELECT DISTINCT cp.scryfall_id 
         FROM card_printings cp
         JOIN inventory i ON cp.scryfall_id = i.scryfall_id 
     ''').fetchall()
-    
-    local_ids = {row['scryfall_id'] for row in local_cards}
+
+    local_ids = [row['scryfall_id'] for row in local_cards]
     if not local_ids:
         yield f"data: {json.dumps({'progress': 100, 'status': 'No cards to update'})}\n\n"
         manager.close()
         return
 
-    yield f"data: {json.dumps({'progress': 15, 'status': 'Contacting Scryfall API for bulk meta link...'})}\n\n"
-
-    # 2. Ask Scryfall where today's bulk file is hosted
-    try:
-        bulk_meta_url = "https://api.scryfall.com/bulk-data/default_cards"
-        meta_response = requests.get(bulk_meta_url).json()
-        download_url = meta_response['download_uri']
-    except Exception as e:
-        yield f"data: {json.dumps({'progress': 100, 'status': f'Failed to grab API metadata: {e}'})}\n\n"
-        manager.close()
-        return
-
-    yield f"data: {json.dumps({'progress': 30, 'status': 'Downloading large bulk dataset (takes a few seconds)...'})}\n\n"
-
-    # 3. Download the bulk dataset
-    try:
-        response = requests.get(download_url, stream=True)
-        all_scryfall_cards = response.json() 
-    except Exception as e:
-        yield f"data: {json.dumps({'progress': 100, 'status': f'Download failed: {e}'})}\n\n"
-        manager.close()
-        return
-
-    yield f"data: {json.dumps({'progress': 70, 'status': f'Parsing data and updating local database records...'})}\n\n"
-
-    # 4. Map and execute updates rapidly
+    total_cards = len(local_ids)
+    chunk_size = 75
     updated_count = 0
-    for card_data in all_scryfall_cards:
-        sf_id = card_data.get('id')
-        
-        # Only process if this card is actually in your local inventory
-        if sf_id in local_ids:
-            nonfoil = card_data.get('prices', {}).get('usd')
-            foil = card_data.get('prices', {}).get('usd_foil')
-            
-            manager.cursor.execute(''' 
-                UPDATE card_printings
-                SET current_price = ?, current_price_foil = ? 
-                WHERE scryfall_id = ?
-            ''', (nonfoil, foil, sf_id))
-            
-            manager.cursor.execute('''
-                INSERT INTO price_history (scryfall_id, price_usd, price_foil)
-                VALUES (?, ?, ?)
-            ''', (sf_id, nonfoil, foil))
-            updated_count += 1
-
-    manager.commit()
-    manager.close()
     
-    # 5. Finished pipeline signal
-    yield f"data: {json.dumps({'progress': 100, 'status': f'Complete! Updated {updated_count} cards.'})}\n\n"
+    yield f"data: {json.dumps({'progress': 15, 'status': f'Updating {total_cards} cards via Scryfall Collection API...'})}\n\n"
+
+    # 2. Query Scryfall in batches of 75
+    for i in range(0, total_cards, chunk_size):
+        chunk = local_ids[i:i + chunk_size]
+        identifiers = [{"id": sf_id} for sf_id in chunk]
+        
+        try:
+            # Respect Scryfall's rate limits (max 2 requests/sec for /cards/collection)
+            time.sleep(0.5) 
+            
+            response = requests.post(
+                "https://api.scryfall.com/cards/collection",
+                json={"identifiers": identifiers},
+                headers={"User-Agent": "MTGSitePriceUpdater/1.0", "Accept": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                cards_data = response.json().get('data', [])
+                for card_data in cards_data:
+                    sf_id = card_data.get('id')
+                    nonfoil = card_data.get('prices', {}).get('usd')
+                    foil = card_data.get('prices', {}).get('usd_foil')
+                    
+                    manager.cursor.execute(''' 
+                        UPDATE card_printings
+                        SET current_price = ?, current_price_foil = ? 
+                        WHERE scryfall_id = ?
+                    ''', (nonfoil, foil, sf_id))
+                    
+                    manager.cursor.execute('''
+                        INSERT INTO price_history (scryfall_id, price_usd, price_foil)
+                        VALUES (?, ?, ?)
+                    ''', (sf_id, nonfoil, foil))
+                    updated_count += 1
+                
+                manager.commit()
+                
+            elif response.status_code == 429:
+                time.sleep(5)  # Back off if rate limited
+                continue
+                
+        except Exception as e:
+            continue
+            
+        progress = int(15 + (i / total_cards) * 80)
+        yield f"data: {json.dumps({'progress': progress, 'status': f'Processed {min(i + chunk_size, total_cards)}/{total_cards} cards.'})}\n\n"
+
+    manager.close()
+    yield f"data: {json.dumps({'progress': 100, 'status': f'Successfully updated {updated_count} local records!'})}\n\n"
 
 # The endpoint the frontend will connect to for streaming updates
 @admin_bp.route('/run-price-update')
