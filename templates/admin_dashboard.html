@@ -1,81 +1,266 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard{% endblock %}
+
 {% block style %}
-a {
-  color: rgb(71, 208, 25);
-  text-align: center;
-  text-decoration: none;
-} 
+{{ super() }}
+.admin-header {
+    margin-bottom: 30px;
+}
+.admin-header p {
+    color: #bbb;
+}
+.admin-grid {
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+    gap: 20px; 
+    margin-bottom: 40px;
+}
+.admin-card {
+    background: #1f1f1f; /* Consistent dark theme background */
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+.admin-card.collection { border-top: 4px solid #ffd700; }
+.admin-card.integrity { border-top: 4px solid #17a2b8; }
+.admin-card.health { border-top: 4px solid #28a745; }
+
+.admin-card h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+.collection h4 { color: #ffd700; }
+.integrity h4 { color: #17a2b8; }
+.health h4 { color: #28a745; }
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+}
+.metric-value a {
+    text-decoration: none;
+    font-weight: bold;
+}
+.metric-value a:hover {
+    text-decoration: underline;
+}
+
+/* Status Colors */
+.text-green { color: #2ecc71; }
+.text-red { color: #e74c3c; }
+.text-amber { color: #ffc107; }
+
+.card-footer {
+    margin-top: 15px; 
+    font-size: 0.85em; 
+    color: #888;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+}
+
+/* Trade Dashboard Styles */
+.trade-card {
+    background: #1f1f1f;
+    border-left: 4px solid #ffca28;
+    padding: 20px; 
+    margin-bottom: 20px; 
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.trade-card hr {
+    border-color: #333;
+    margin: 15px 0;
+}
+.form-group {
+    margin-top: 15px;
+}
+.form-group label {
+    font-weight: bold;
+    color: #ddd;
+}
+.form-group textarea {
+    width: 100%; 
+    margin-top: 8px; 
+    background: #111; 
+    color: white; 
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: inherit;
+}
+.btn {
+    padding: 8px 16px; 
+    border: none; 
+    border-radius: 4px; 
+    cursor: pointer;
+    font-weight: bold;
+    transition: filter 0.2s;
+}
+.btn:hover { filter: brightness(1.2); }
+.btn-accept { background: #28a745; color: white; }
+.btn-deny { background: #dc3545; color: white; }
 {% endblock style %}
+
 {% block content %}
-<div class="admin-header" style="margin-bottom: 30px;">
-    <h3>Dashboard</h3>
-    <p style="color: #bbb;">View collection statistics, active trade requests, and site health.</p>
+<div class="admin-header">
+    <h3>Admin Dashboard</h3>
+    <p>View collection statistics, active trade requests, and site health.</p>
 </div>
 
-<div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px;">
-    
-    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #ffd700; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-        <h4 style="color: #ffd700; margin-top: 0;">📊 Collection Statistics</h4>
-        <p><strong>Total Cards:</strong> {{ total_cards }}</p>
-        <p><strong>Unique Printings:</strong> {{ unique_cards }}</p>
-        <p><strong>New Hits:</strong> {% if change[0] > 0 %}<a href="/admin/tracker">{{ change[0] }}</a>{% else %} 0 {% endif %}</p>
-        <p><strong>New Misses:</strong> {% if change[1] > 0 %}<a href="/admin/tracker">{{ change[1] }}</a>{% else %} 0 {% endif %}</p>
-        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Updated: Real-time</div>
+<div class="admin-grid">
+    <div class="admin-card collection">
+        <h4>📊 Market & Collection</h4>
+        <div class="metric-row">
+            <span>Total Cards:</span>
+            <span class="metric-value">{{ total_cards }}</span>
+        </div>
+        <div class="metric-row">
+            <span>Unique Printings:</span>
+            <span class="metric-value">{{ unique_cards }}</span>
+        </div>
+        <div class="metric-row">
+            <span>Price Spikes (Today):</span>
+            <span class="metric-value">
+                {% if change[0] > 0 %}<a href="/admin/tracker" class="text-green">+{{ change[0] }}</a>{% else %} 0 {% endif %}
+            </span>
+        </div>
+        <div class="metric-row">
+            <span>Price Drops (Today):</span>
+            <span class="metric-value">
+                {% if change[1] > 0 %}<a href="/admin/tracker" class="text-red">-{{ change[1] }}</a>{% else %} 0 {% endif %}
+            </span>
+        </div>
+        <div class="card-footer">Tracks value shifts crossing $2 threshold</div>
     </div>
 
-    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #17a2b8; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-        <h4 style="color: #17a2b8; margin-top: 0;">🛠️ Data Integrity</h4>
-        <p><strong>Cards with $0.00 Value:</strong> <span style="color: {% if zero_value_count > 0 %}#ff4444{% else %}#28a745{% endif %};">{% if zero_value_count > 0 %}<a href="/inventory?q=usd%3D0">{{zero_value_count}}</a>{% else %}0{% endif %}</span></p>
-        <p><strong>Unassigned Locations:</strong> <span style="color: {% if unassigned_cards > 0 %}#ffc107{% else %}#28a745{% endif %};">{{ unassigned_cards }}</span></p>
-        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Flags missing prices/locations</div>
+    <div class="admin-card integrity">
+        <h4>🛠️ Data Integrity</h4>
+        <div class="metric-row">
+            <span>Cards Missing Values:</span>
+            <span class="metric-value">
+                {% if zero_value_count > 0 %}
+                    <a href="/inventory?q=usd%3D0" class="text-red">{{ zero_value_count }}</a>
+                {% else %}
+                    <span class="text-green">0</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="metric-row">
+            <span>Unassigned Inventory:</span>
+            <span class="metric-value">
+                {% if unassigned_cards > 0 %}
+                    <a href="/inventory?location=unassigned" class="text-amber">{{ unassigned_cards }}</a>
+                {% else %}
+                    <span class="text-green">0</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="card-footer">Actionable alerts for missing data</div>
     </div>
 
-    <div class="admin-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid #28a745; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-        <h4 style="color: #28a745; margin-top: 0;">🖥️ Infrastructure Health</h4>
-        <p><strong>Database File Size:</strong> {{ db_size_mb }} MB</p>
-        <p><strong>Price Sync Status:</strong> Active 🟢</p>
-        <div style="margin-top: 15px; font-size: 0.85em; color: #888;">Monitor for Render limits</div>
+    <div class="admin-card health">
+        <h4>🖥️ Infrastructure Health</h4>
+        <div class="metric-row">
+            <span>Database Size:</span>
+            <span class="metric-value">{{ db_size_mb }} MB</span>
+        </div>
+        <div class="metric-row">
+            <span>Price Sync Status:</span>
+            <span class="metric-value text-green">Active 🟢</span>
+        </div>
+        <div class="card-footer">Monitor storage against hosting limits</div>
     </div>
 </div> 
 
 <div class="trade-dashboard">
+    <h3 style="margin-bottom: 20px;">Pending Trade Requests</h3>
+    
     {% if pending_trades %}
         {% for trade in pending_trades %}
-        <div class="trade-card" style="border: 1px solid #ffca28; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
-            <h3>Trade ID: {{ trade.trade_id }}</h3>
-            <p><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
-            <p><strong>Date:</strong> {{ trade.created_at }}</p>
+        <div class="trade-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0; color: #ffca28;">Trade ID: {{ trade.trade_id }}</h4>
+                <span style="color: #aaa; font-size: 0.9em;">{{ trade.created_at }}</span>
+            </div>
+            <p style="margin-top: 5px;"><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
             
-            <hr style="border-color: #444;">
+            <hr>
             
-            <h4>Cards Requested from You:</h4>
-            <ul>
-                {% for item in trade.requested_cards%}
-                    <li>{{ item.quantity }}x {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em>{{ item.finish }}</em></li><br />
-                {% endfor %}
-            </ul>
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <h5 style="color: #ff5252; margin-bottom: 10px;">Cards Requested from You:</h5>
+                    <ul style="color: #ccc; line-height: 1.6; padding-left: 20px;">
+                        {% for item in trade.requested_cards %}
+                            <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                        {% else %}
+                            <li><em>None</em></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div style="flex: 1;">
+                    <h5 style="color: #4caf50; margin-bottom: 10px;">Cards Offered to You:</h5>
+                    <ul style="color: #ccc; line-height: 1.6; padding-left: 20px;">
+                        {% for item in trade.offered_cards %}
+                            <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                        {% else %}
+                            <li><em>None</em></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
             
-            <hr style="border-color: #444;">
+            <hr>
             
-            <form action="{{ url_for('admin.process_trade') }}" method="POST">
+            <form action="{{ url_for('admin.manage_trade') }}" method="POST">
                 <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
                 
-                <label for="incoming_cards"><strong>Incoming Cards (Format: set-cn-finish, comma separated):</strong></label><br>
-                <textarea name="incoming_cards" rows="2" style="width: 100%; margin-top: 5px; background: #222; color: white; border: 1px solid #555;" placeholder="e.g. khm-14-foil, dmu-102-nonfoil"></textarea>
+                <div class="form-group">
+                    <label for="trade_notes">Trade Notes (Tracking #, condition notes, etc.):</label>
+                    <textarea name="trade_notes" rows="2" placeholder="Internal notes for this transaction..."></textarea>
+                </div>
                 
-                <label for="trade_notes" style="margin-top: 15px; display: inline-block;"><strong>Trade Notes (Tracking #, usernames, condition notes, etc.):</strong></label><br>
-                <textarea name="trade_notes" rows="2" style="width: 100%; margin-top: 5px; background: #222; color: white; border: 1px solid #555;"></textarea>
-                
-                <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button type="submit" name="action" value="accept" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Accept Trade</button>
-                    <button type="submit" name="action" value="deny" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Deny Trade</button>
+                <div style="margin-top: 20px; display: flex; gap: 15px;">
+                    <button type="button" class="btn-success" onclick="respondToTrade('{{ trade.trade_id }}', 'accept')" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                        Accept Trade
+                    </button>
+                    
+                    <button type="button" class="btn-danger" onclick="respondToTrade('{{ trade.trade_id }}', 'decline')" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                        Deny Trade
+                    </button>
                 </div>
             </form>
         </div>
         {% endfor %}
     {% else %}
-        <p>No pending trade requests at this time.</p>
+        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: #888;">
+            <p style="font-size: 1.1em; margin: 0;">No pending trade requests at this time.</p>
+        </div>
     {% endif %}
 </div>
+<script>
+    function respondToTrade(tradeId, action) {
+        const actionText = action === 'accept' ? 'accept and finalize' : 'decline';
+        if (!confirm(`Are you sure you want to ${actionText} this trade?`)) return;
+
+        fetch('/api/manage_trade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trade_id: tradeId, action: action })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Trade ${action}ed successfully!`);
+                location.reload(); // Refresh the page to update the UI
+            } else {
+                alert("Error: " + data.error);
+            }
+        })
+        .catch(err => alert("Server error occurred."));
+    }
+</script>
 {% endblock %}

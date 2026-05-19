@@ -1,4 +1,4 @@
-import sqlite3, ScryfallFetcher, db.db_manager, datetime, csv, os
+import sqlite3, ScryfallFetcher, db.db_manager, datetime, csv, os, math
 from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, current_app
 from db.db_manager import CardDB
 from flask_login import login_required, current_user
@@ -21,6 +21,22 @@ def adder():
     
     manager = CardDB()
     fetcher = ScryfallFetcher.ScryfallFetcher(manager)
+    
+    page = int(request.args.get('page', 1))
+    per_page = 25  # Number of cards to load per batch
+    offset = (page - 1) * per_page
+    
+    count_query = '''
+        SELECT COUNT(*) 
+        FROM inventory i 
+        JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
+        JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+        JOIN locations l ON i.location_id = l.location_id
+        JOIN price_history ph ON ph.scryfall_id = cp.scryfall_id
+    '''
+    count_result = manager.cursor.execute(count_query).fetchone()
+    total_cards = count_result[0] if count_result else 0
+    total_pages = max(1, math.ceil(total_cards / per_page))
 
     query = '''
         SELECT i.instance_id, cd.name, cp.set_code, cp.collector_number, i.added, i.finish, l.name AS location_name, ph.price_usd as nonfoil, ph.price_foil as foil
@@ -35,6 +51,7 @@ def adder():
             WHERE scryfall_id = cp.scryfall_id
         )
         ORDER BY i.added DESC
+        LIMIT ? OFFSET ?
     '''
     
     query_2 = '''
@@ -97,13 +114,20 @@ def adder():
             return redirect(url_for('.adder'))
         
     # Use manager.conn.execute to fetch the rows
-    cards = manager.cursor.execute(query).fetchall()
+    cards = manager.cursor.execute(query, (per_page, offset)).fetchall()   
     locations = manager.cursor.execute(query_2).fetchall()
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render_template('card_adder_rows.html', cards=cards)
     
     # Close the connection after we have our data
     manager.close()
     
-    return render_template('card_adder.html', cards=cards, locations=locations)
+    return render_template('card_adder.html', 
+                           cards=cards, 
+                           locations=locations,
+                           page=page, 
+                           total_pages=total_pages)
 
 @adder_bp.route('/delete_card/<int:inventory_id>', methods=['POST'])
 def delete_card(inventory_id):

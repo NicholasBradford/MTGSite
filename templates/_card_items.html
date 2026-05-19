@@ -37,21 +37,36 @@
         
 
         {% if view_mode == 'tracking' and current_user.is_authenticated %}
-            {% if card['old_price'] %}
-                {% set price_diff = card['new_price'] - card['old_price'] %}
-                {% if price_diff > 0 %}
-                    {% set perecent_diff = (card['new_price'] / card['old_price']) *100 %}
-                    <span style="color: green;"> 
-                {% else %} 
-                    {% set perecent_diff = (card['old_price'] / card['new_price']) * 100 %}
-                    <span style="color: red;">
-                {% endif %} 
-                    {{ "%.2f"|format(card.old_price) }} → {{ "%.2f"|format(card.new_price) }}
-                    <br/>
-                    {{ "%.2f"|format(perecent_diff) }}%
-                </span>
+            {# Safety check: Ensure old_price is greater than 0 to prevent Divide by Zero errors #}
+            {% if card.old_price and card.old_price > 0 %}
+                {% set price_diff = card.new_price - card.old_price %}
+                {% set percent_diff = (price_diff / card.old_price) * 100 %}
+                
+                <div class="price-shift-data" style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #333; line-height: 1.4;">
+                    {% if price_diff > 0 %}
+                        <span style="color: #2ecc71; font-weight: bold;">
+                            ↑ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
+                            <br/>
+                            +{{ "%.2f"|format(percent_diff) }}%
+                        </span>
+                    {% elif price_diff < 0 %}
+                        <span style="color: #e74c3c; font-weight: bold;">
+                            ↓ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
+                            <br/>
+                            {{ "%.2f"|format(percent_diff) }}%
+                        </span>
+                    {% else %}
+                        <span style="color: #aaa;">No Change</span>
+                    {% endif %}
+                </div>
             {% endif %}
-            {{card["location_name"]}}
+
+            {# Location Tag Formatting #}
+            {% if card.location_name %}
+                <div style="margin-top: 8px; font-size: 0.85em; color: #888;">
+                    <i class="fas fa-box" style="margin-right: 4px;"></i>{{ card.location_name }}
+                </div>
+            {% endif %}
         {% endif %}
     </div>
     {% endfor %}

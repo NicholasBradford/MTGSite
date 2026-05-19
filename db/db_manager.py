@@ -177,7 +177,16 @@ class CardDB:
                     FOREIGN KEY (trade_id) REFERENCES trades(trade_id)
                 );
                 ''')
-        
+        self.cursor.execute(''' 
+                CREATE TABLE IF NOT EXISTS trade_inbound_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id TEXT NOT NULL,
+                scryfall_id TEXT NOT NULL,
+                finish TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (trade_id) REFERENCES trades(trade_id) ON DELETE CASCADE
+                );
+                ''')
         self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
         
         if self.cursor.execute("SELECT * FROM locations").fetchone()[0] == 0:  

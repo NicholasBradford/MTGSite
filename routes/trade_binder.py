@@ -1,5 +1,4 @@
-import sqlite3, db.db_manager, uuid, requests
-from ScryfallFetcher import ScryfallFetcher
+import sqlite3, db.db_manager, uuid, requests,datetime, ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
 from search import search
@@ -31,7 +30,7 @@ def get_db_connection():
 
 trade_bp = Blueprint('trade_binder', __name__)
 
-@trade_bp.route('/trade_binder', methods=['GET', 'POST'])
+@trade_bp.route('/binder/trades', methods=['GET', 'POST'])
 def trade():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
@@ -130,6 +129,8 @@ def submit_trade():
 
     manager = CardDB()
     
+    fetcher = ScryfallFetcher.ScryfallFetcher(manager)
+    
     try:
         # 1. Create the main trade record
         manager.cursor.execute('''
@@ -149,6 +150,7 @@ def submit_trade():
                 item['qty']
             ))
         for item in inbound_items:
+            fetcher.fetch_and_add(item['set_code'], item['cn'])
             manager.cursor.execute('''
                 INSERT INTO trade_inbound_items (trade_id, scryfall_id, finish, quantity)
                 VALUES (?, ?, ?, ?)
@@ -287,6 +289,7 @@ def fetch_incoming_card():
         return jsonify({
             'success': True,
             'name': card_data['name'],
+            'scryfall_id': card_data['id'],
             'set_code': set_code,
             'cn': cn,
             'finish': finish,

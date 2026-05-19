@@ -2,56 +2,85 @@
 {% block title %}Price Alerts{% endblock title %}
 
 {% block style %}
-    /* Container Spacing */
-    .controls-container {
-        margin-bottom: 24px;
-        margin-top: 24px;
+{{ super() }}
+    /* Header Styling (Matches Admin Dashboard) */
+    .page-header {
+        margin-bottom: 25px;
+    }
+    .page-header h3 {
+        margin: 0 0 5px 0;
+        font-size: 1.6em;
+        color: #eee;
+    }
+    .page-header p {
+        color: #bbb;
+        margin: 0;
+    }
+
+    /* Control Panel Card */
+    .controls-card {
+        background: #1f1f1f;
+        border-left: 4px solid #17a2b8; /* Teal accent */
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        margin-bottom: 30px;
         
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 15px;
         align-items: center;
     }
 
-    /* Button Styling (Ensuring it matches your theme) */
-    .btn-primary {
-        background-color: #007bff; /* Replace with your site's exact primary accent color if different */
-        color: #ffffff;
-        border: none;
-        padding: 10px 20px;
-        font-size: 0.95rem;
+    /* Button Styling (Dark Theme Aligned) */
+    .btn-sync {
+        background-color: #222;
+        color: #17a2b8;
+        border: 1px solid #17a2b8;
+        padding: 10px 24px;
+        font-size: 1rem;
         font-weight: 600;
         border-radius: 6px;
         cursor: pointer;
-        transition: background-color 0.2s ease, transform 0.1s ease;
+        transition: all 0.2s ease;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        gap: 10px;
     }
 
-    .btn-primary:hover {
-        background-color: #0056b3; /* Slightly darker shade for hover state */
+    .btn-sync:hover {
+        background-color: #17a2b8; 
+        color: #111; /* Dark text on bright background */
+        box-shadow: 0 0 10px rgba(23, 162, 184, 0.4);
     }
 
-    .btn-primary:active {
-        transform: scale(0.98);
+    .btn-sync:active {
+        transform: scale(0.97);
+    }
+
+    .btn-sync:disabled {
+        background-color: #333;
+        color: #666;
+        border-color: #444;
+        cursor: not-allowed;
+        box-shadow: none;
     }
 
     /* Progress Container Alignment */
     #progress-container {
         width: 100%;
-        max-width: 400px;
-        margin-top: 4px;
+        max-width: 450px;
+        text-align: center;
     }
 
-    /* Modernizing the Native Progress Bar */
+    /* Modernizing the Native Progress Bar (Dark Mode) */
     .progress-bar-wrapper {
         width: 100%;
-        background-color: #e9ecef;
+        background-color: #333; /* Dark background track */
         border-radius: 8px;
         overflow: hidden;
-        height: 12px;
+        height: 14px;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
     }
 
     progress {
@@ -64,47 +93,71 @@
 
     /* Progress Bar Colors (Webkit / Chrome / Safari / Edge) */
     progress::-webkit-progress-bar {
-        background-color: #e9ecef;
+        background-color: #333;
     }
 
     progress::-webkit-progress-value {
-        background-color: #007bff; /* Matches your primary button theme */
+        background-color: #17a2b8; /* Teal fill */
         border-radius: 8px;
         transition: width 0.3s ease;
     }
 
     /* Progress Bar Colors (Firefox) */
     progress::-moz-progress-bar {
-        background-color: #007bff;
+        background-color: #17a2b8;
         border-radius: 8px;
     }
 
     /* Status Text Styling */
     #progress-status {
-        display: block;
-        font-size: 0.85em;
-        color: #6c757d;
-        margin-top: 6px;
+        display: inline-block;
+        font-size: 0.9em;
+        color: #aaa;
+        margin-top: 10px;
         font-weight: 500;
+        letter-spacing: 0.5px;
     }
 {% endblock style %}
 
 {% block content %}
-<div class="controls-container">
-    <button id="update-btn" class="btn btn-primary" onclick="startPriceUpdate()">
-        <i class="fas fa-sync-alt"></i> Update All Prices
+<div class="page-header">
+    <h3>📈 Price Alerts & Market Shifts</h3>
+    <p>Monitor your collection's volatile price changes and synchronize with current market data.</p>
+</div>
+
+<div class="controls-card">
+    <button id="update-btn" class="btn-sync" onclick="startPriceUpdate()">
+        <i class="fas fa-sync-alt"></i> Run Market Price Sync
     </button>
     
     <div id="progress-container" style="display: none;">
         <div class="progress-bar-wrapper">
             <progress id="progress-bar" value="0" max="100"></progress>
         </div>
-        <span id="progress-status">Starting...</span>
+        <span id="progress-status">Initializing connection...</span>
     </div>
 </div>
 
-<div id="card-grid" class="card-container">
-    {% include '_card_items.html' %}
+<div class="tracker-section" style="margin-bottom: 40px;">
+    <h3 style="color: #2ecc71; border-bottom: 1px solid #2ecc71; padding-bottom: 10px; margin-bottom: 20px;">
+        📈 Market Spikes
+    </h3>
+    <div id="card-grid-spikes" class="card-container">
+        {% with cards=spikes %}
+            {% include '_card_items.html' %}
+        {% endwith %}
+    </div>
+</div>
+
+<div class="tracker-section">
+    <h3 style="color: #e74c3c; border-bottom: 1px solid #e74c3c; padding-bottom: 10px; margin-bottom: 20px;">
+        📉 Market Drops
+    </h3>
+    <div id="card-grid-drops" class="card-container">
+        {% with cards=drops %}
+            {% include '_card_items.html' %}
+        {% endwith %}
+    </div>
 </div>
 
 <script>
@@ -118,7 +171,7 @@ function startPriceUpdate() {
     btn.disabled = true;
     container.style.display = 'block';
     progressBar.value = 0;
-    progressStatus.innerText = "Connecting to server...";
+    progressStatus.innerText = "Connecting to market server...";
 
     // Open an SSE connection to the Flask backend
     const source = new EventSource("{{ url_for('admin.run_price_update') }}");
@@ -133,7 +186,8 @@ function startPriceUpdate() {
         // If complete, close connection and reload page to show fresh prices
         if (data.progress === 100) {
             source.close();
-            progressStatus.innerText = "Refreshing page with new prices...";
+            progressStatus.innerText = "Sync complete. Refreshing page...";
+            progressStatus.style.color = "#28a745"; // Flash green on success
             setTimeout(() => {
                 window.location.reload();
             }, 1000); 
@@ -142,7 +196,8 @@ function startPriceUpdate() {
 
     source.onerror = function(err) {
         console.error("EventSource failed:", err);
-        progressStatus.innerText = "An error occurred during update.";
+        progressStatus.innerText = "An error occurred during the update.";
+        progressStatus.style.color = "#e74c3c"; // Flash red on error
         btn.disabled = false;
         source.close();
     };

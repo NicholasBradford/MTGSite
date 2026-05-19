@@ -1,126 +1,155 @@
 {% extends "base.html" %}
-{% block title %}Admin Dashboard{% endblock %}
+{% block title %}Admin Control Panel{% endblock %}
 
 {% block style %}
-/* Admin specific styling to match the site theme */
-.admin-container {
-    padding: 40px 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-    text-align: center;
-}
+{{ super() }}
+    /* Header matches the dashboard */
+    .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-top: 20px;
+    }
+    .page-header h1 {
+        color: #eee;
+        margin-bottom: 10px;
+        font-size: 2.2em;
+    }
+    .page-header p {
+        color: #bbb;
+        font-size: 1.1em;
+        max-width: 600px;
+        margin: 0 auto;
+    }
 
-.admin-container h1 {
-    color: #ffd700; /* Matching your gold theme */
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    margin-bottom: 40px;
-    font-size: 2.5em;
-}
+    /* Grid Layout */
+    .admin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 25px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px 40px 20px;
+    }
 
-.admin-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 30px;
-    padding: 10px;
-}
+    /* Card styling aligned with recent updates */
+    .admin-menu-card {
+        background: #1f1f1f;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-left: 4px solid #444; /* Default, overridden below */
+    }
+    .admin-menu-card:hover {
+        transform: translateY(-4px);
+    }
 
-.admin-card {
-    background: rgba(40, 40, 40, 0.9); /* Dark glass effect */
-    border: 2px solid #444;
-    border-radius: 15px;
-    padding: 30px;
-    transition: transform 0.3s ease, border-color 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-}
+    /* Accent Colors for each card type */
+    .card-dashboard { border-left-color: #ffca28; } /* Gold */
+    .card-dashboard:hover { box-shadow: 0 6px 20px rgba(255, 202, 40, 0.15); }
 
-.admin-card:hover {
-    transform: translateY(-10px);
-    border-color: #ffd700; /* Gold glow on hover */
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
-}
+    .card-locations { border-left-color: #17a2b8; } /* Teal */
+    .card-locations:hover { box-shadow: 0 6px 20px rgba(23, 162, 184, 0.15); }
 
-.admin-card h3 {
-    color: #fff;
-    margin-top: 0;
-    font-size: 1.5em;
-}
+    .card-bulk { border-left-color: #2ecc71; } /* Green */
+    .card-bulk:hover { box-shadow: 0 6px 20px rgba(46, 204, 113, 0.15); }
 
-.admin-card p {
-    color: #ccc;
-    font-size: 0.95em;
-    line-height: 1.6;
-    margin-bottom: 25px;
-}
+    .card-manual { border-left-color: #007bff; } /* Blue */
+    .card-manual:hover { box-shadow: 0 6px 20px rgba(0, 123, 255, 0.15); }
 
-/* Matching your site's button style */
-.btn-admin {
-    background: linear-gradient(135deg, #ffd700, #b8860b);
-    color: #000;
-    padding: 12px 20px;
-    text-decoration: none;
-    border-radius: 8px;
-    font-weight: bold;
-    text-transform: uppercase;
-    transition: background 0.3s ease, transform 0.2s ease;
-}
+    .card-wishlist { border-left-color: #e74c3c; } /* Red */
+    .card-wishlist:hover { box-shadow: 0 6px 20px rgba(231, 76, 60, 0.15); }
 
-.btn-admin:hover {
-    background: linear-gradient(135deg, #fff200, #ffd700);
-    transform: scale(1.05);
-}
+    /* Typography */
+    .admin-menu-card h3 {
+        color: #eee;
+        margin: 0 0 10px 0;
+        font-size: 1.4em;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .admin-menu-card p {
+        color: #aaa;
+        font-size: 0.95em;
+        line-height: 1.5;
+        margin-bottom: 25px;
+    }
 
-.btn-admin:active {
-    transform: scale(0.98);
-}
-{% endblock %}
+    /* Adaptive Buttons */
+    .btn-menu {
+        background-color: #222;
+        color: #eee;
+        border: 1px solid #555;
+        padding: 12px 20px;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        text-align: center;
+        transition: all 0.2s ease;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Hover effects match the card's accent color */
+    .card-dashboard .btn-menu:hover { background-color: #ffca28; color: #111; border-color: #ffca28; }
+    .card-locations .btn-menu:hover { background-color: #17a2b8; color: #111; border-color: #17a2b8; }
+    .card-bulk .btn-menu:hover { background-color: #2ecc71; color: #111; border-color: #2ecc71; }
+    .card-manual .btn-menu:hover { background-color: #007bff; color: #fff; border-color: #007bff; }
+    .card-wishlist .btn-menu:hover { background-color: #e74c3c; color: #fff; border-color: #e74c3c; }
+    
+    .btn-menu:active {
+        transform: scale(0.98);
+    }
+{% endblock style %}
 
 {% block content %}
-<div class="admin-container">
+<div class="page-header">
     <h1>Admin Control Panel</h1>
+    <p>Manage your collection, update infrastructure, and track market shifts.</p>
+</div>
     
-    <div class="admin-grid">
-        <div class="admin-card">
-            <div>
-                <h3>Dashboard</h3>
-                <p>View collection statistics, active trade requests, and site health.</p>
-            </div>
-            <a href="/admin/dashboard" class="btn-admin">Open Dashboard</a>
+<div class="admin-grid">
+    <div class="admin-menu-card card-dashboard">
+        <div>
+            <h3><i class="fas fa-chart-pie" style="color: #ffca28;"></i> System Dashboard</h3>
+            <p>View high-level collection statistics, process active trade requests, and monitor site health.</p>
         </div>
+        <a href="/admin/dashboard" class="btn-menu">Open Dashboard</a>
+    </div>
 
-        <div class="admin-card">
-            <div>
-                <h3>Manage Locations</h3>
-                <p>Add, edit, or remove physical storage boxes, binders, and commander decks.</p>
-            </div>
-            <a href="/admin/locations" class="btn-admin">Manage Boxes</a>
+    <div class="admin-menu-card card-locations">
+        <div>
+            <h3><i class="fas fa-boxes" style="color: #17a2b8;"></i> Manage Locations</h3>
+            <p>Add, edit, or remove physical storage assignments like binders, boxes, and commander decks.</p>
         </div>
+        <a href="/admin/locations" class="btn-menu">Manage Boxes</a>
+    </div>
 
-        <div class="admin-card">
-            <div>
-                <h3>Bulk Add Cards</h3>
-                <p>Upload CSV files to update Master Sets or import large chunks of inventory at once.</p>
-            </div>
-            <a href="/add/inventory/bulk_import" class="btn-admin">Start Import</a>
+    <div class="admin-menu-card card-bulk">
+        <div>
+            <h3><i class="fas fa-file-csv" style="color: #2ecc71;"></i> Bulk Import</h3>
+            <p>Upload CSV files to update Master Sets or import large chunks of inventory simultaneously.</p>
         </div>
+        <a href="/add/inventory/bulk_import" class="btn-menu">Start Import</a>
+    </div>
 
-        <div class="admin-card">
-            <div>
-                <h3>Inventory Adder</h3>
-                <p>Standard search-and-add interface for individual card entry.</p>
-            </div>
-            <a href="/add/inventory" class="btn-admin">Manual Entry</a>
+    <div class="admin-menu-card card-manual">
+        <div>
+            <h3><i class="fas fa-search-plus" style="color: #007bff;"></i> Inventory Adder</h3>
+            <p>Access the standard search-and-add interface to log individual cards directly into your collection.</p>
         </div>
+        <a href="/add/inventory" class="btn-menu">Manual Entry</a>
+    </div>
 
-        <div class="admin-card">
-            <div>
-                <h3>Wishlist Adder</h3>
-                <p>Standard search-and-add interface for adding individual cards to the Wishlist.</p>
-            </div>
-            <a href="/add/wishlist" class="btn-admin">Wishlist Entry</a>
+    <div class="admin-menu-card card-wishlist">
+        <div>
+            <h3><i class="fas fa-star" style="color: #e74c3c;"></i> Wishlist Adder</h3>
+            <p>Search and queue highly-desired missing pieces for your decks into your public trade Wishlist.</p>
         </div>
+        <a href="/add/wishlist" class="btn-menu">Wishlist Entry</a>
     </div>
 </div>
 {% endblock %}

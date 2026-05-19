@@ -136,9 +136,11 @@ def get_instances(scryfall_id, finish):
     manager = CardDB()
     
     query = '''
-        SELECT i.scryfall_id, i.instance_id, i.location_id, i.is_tradeable, l.name as location_name
+        SELECT i.scryfall_id, i.instance_id, i.location_id, i.is_tradeable, i.finish,
+        cp.current_price, cp.current_price_foil, l.name as location_name
         FROM inventory i
         JOIN locations l ON i.location_id = l.location_id
+        JOIN card_printings cp on i.scryfall_id = cp.scryfall_id
         WHERE i.scryfall_id = ? AND i.finish = ?
     '''
     

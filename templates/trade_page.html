@@ -407,6 +407,8 @@
         cardDiv.setAttribute('data-id', card.scryfall_id);
         cardDiv.setAttribute('data-finish', card.finish);
         cardDiv.setAttribute('data-qty', "1");
+        cardDiv.setAttribute('data-set', card.set_code);
+        cardDiv.setAttribute('data-cn', card.cn || card.collector_number);
         
         // Remove button logic
         const btn = document.createElement('button');
@@ -477,7 +479,9 @@
                 items.push({
                     scryfall_id: card.getAttribute('data-id'),
                     finish: card.getAttribute('data-finish'),
-                    qty: parseInt(card.getAttribute('data-qty'))
+                    qty: parseInt(card.getAttribute('data-qty')),
+                    set_code: card.getAttribute('data-set'),
+                    cn: card.getAttribute('data-cn')
                 });
             });
             return items;
@@ -503,7 +507,7 @@
             if (data.success) {
                 alert("Success! The binder owner has been notified.");
                 // Removed local storage wipe since state is now DOM-based
-                window.location.href = "/dashboard"; // Redirect to their personal dashboard
+                window.location.href = "/binder/trades"; // Redirect to their personal dashboard
             } else {
                 alert(data.error || "Submission failed.");
             }

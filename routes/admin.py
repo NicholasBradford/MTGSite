@@ -1,5 +1,5 @@
 import os, datetime, time, requests, json
-from flask import Blueprint, Response, request,flash,redirect,url_for, render_template, abort
+from flask import Blueprint, Response, request, flash, redirect, url_for, render_template, abort, jsonify
 from functools import wraps
 import ScryfallFetcher
 from flask_login import login_required, current_user
@@ -124,7 +124,11 @@ def admin_dashboard():
             SELECT 
                 SUM(CASE WHEN ps.old_price < 2 AND ps.new_price >= 2 THEN 1 ELSE 0 END) as total_growth,
                 SUM(CASE WHEN ps.old_price >= 2 AND ps.new_price < 2 THEN 1 ELSE 0 END) as total_fall
-            FROM inventory i
+            FROM (
+                SELECT scryfall_id, finish 
+                FROM inventory 
+                GROUP BY scryfall_id, finish
+                ) i
             JOIN PriceShifts ps ON i.scryfall_id = ps.scryfall_id
             WHERE 
                 (ps.old_price < 2 AND ps.new_price >= 2) 
@@ -136,7 +140,7 @@ def admin_dashboard():
         
         # Fetch the requested cards for each trade
         for trade in pending_trades:
-            items = manager.cursor.execute('''
+            reqs = manager.cursor.execute('''
                 SELECT ti.quantity, ti.finish, cd.name, cp.set_code, cp.collector_number
                 FROM trade_outbound_items ti
                 JOIN card_printings cp ON ti.scryfall_id = cp.scryfall_id
@@ -144,7 +148,20 @@ def admin_dashboard():
                 WHERE ti.trade_id = ?
             ''', (trade['trade_id'],)).fetchall()
             
-            trade['requested_cards'] = [dict(i) for i in items]
+            offers = manager.cursor.execute('''
+                SELECT ti.scryfall_id, ti.quantity, ti.finish, cd.name, cp.set_code, cp.collector_number
+                FROM trade_inbound_items ti
+                LEFT JOIN card_printings cp ON ti.scryfall_id = cp.scryfall_id
+                LEFT JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+                WHERE ti.trade_id = ?
+            ''', (trade['trade_id'],)).fetchall()
+            
+            
+            trade['requested_cards'] = [dict(i) for i in reqs]
+            trade['offered_cards'] = [dict(i) for i in offers]
+            
+            
+                
         
         # --- 3. NEW DASHBOARD METRICS (Add these) ---
         
@@ -186,117 +203,181 @@ def admin_dashboard():
                            zero_value_count=zero_value_count,
                            unassigned_cards=unassigned_cards,
                            pending_trades=pending_trades,
-                           db_size_mb=db_size_mb)
+                           db_size_mb=db_size_mb,
+                           trades=trades)
 
-def process_incoming_cards(incoming, manager):
-    if not incoming:
-        return
-    
-    # Initialize the fetcher with your current db manager
-    fetcher = ScryfallFetcher.ScryfallFetcher(manager)
-    
-    incoming_items = [item.strip() for item in incoming.split(',')]
-    
-    for item in incoming_items:
-        if not item: 
-            continue
-        
-        parts = item.split('-')
-        if len(parts) != 3:
-            print(f"Skipping badly formatted item: {item}")
-            continue
-            
-        set_code, cn, finish = parts
-        
-        # 1. Try to find the card in the local DB first
-        card = manager.cursor.execute('''
-            SELECT scryfall_id FROM card_printings 
-            WHERE set_code = ? AND collector_number = ?
-        ''', (set_code.lower(), cn.lower())).fetchone()
-        
-        scryfall_id = None
-        
-        # print(f"DEBUG: {dict(card)}")
-
-        if card:
-            scryfall_id = card['scryfall_id']
-        else:
-            # 2. If NOT found, use ScryfallFetcher to get it from the API
-            print(f"Card {set_code}-{cn} not in DB. Fetching from Scryfall...")
-            card = fetcher.fetch_and_add(set_code, cn)
-
-
-        # 3. If we have a scryfall_id (either from DB or Fetcher), add to inventory
-        if card:
-            manager.cursor.execute('''
-                INSERT INTO inventory (scryfall_id, finish, is_surplus, is_tradeable, location_id, added)
-                VALUES (?, ?, 0, 0, 1, ?)
-            ''', (card['scryfall_id'], finish.lower(),datetime.datetime.now(),))
-            print(f"Successfully added {set_code}-{cn} ({finish}) to inventory!")
-            return True
-        else:
-            print(f"Error: Card {set_code}-{cn} could not be found or fetched.")
-            return False
-
-@admin_bp.route('/process_trade', methods=['POST'])
+@admin_bp.route('/api/manage_trade', methods=['POST'])
 @login_required
-@admin_required
-def process_trade():
-    trade_id = request.form.get('trade_id')
-    action = request.form.get('action')
-    incoming_cards = request.form.get('incoming_cards')
-    trade_notes = request.form.get('trade_notes')
+def manage_trade():
+    data = request.json
+    trade_id = data.get('trade_id')
+    action = data.get('action') # 'accept' or 'decline'
+
+    if not trade_id or action not in ['accept', 'decline']:
+        return jsonify({'success': False, 'error': 'Invalid request parameters.'}), 400
 
     manager = CardDB()
+    
     try:
         if action == 'accept':
-            new_status = 'Accepted'
-            
-            check = process_incoming_cards(incoming_cards, manager)
-            if not check:
-                raise Exception("Invalid Trade: One or more incoming cards could not be resolved.")
-            
-            # --- INVENTORY REMOVAL LOGIC ---
-            outbound_items = manager.cursor.execute('''
+            # 1. INBOUND: Add offered cards to your inventory
+            inbound_items = manager.cursor.execute('''
                 SELECT scryfall_id, finish, quantity 
-                FROM trade_outbound_items 
-                WHERE trade_id = ?
+                FROM trade_inbound_items WHERE trade_id = ?
             ''', (trade_id,)).fetchall()
             
-            # For each group of cards they requested...
+            for item in inbound_items:
+                # Insert a new row for each individual copy of the card
+                for _ in range(item['quantity']):
+                    # Note: You can change location_id to whatever your "Main Binder" ID is.
+                    manager.cursor.execute('''
+                        INSERT INTO inventory (scryfall_id, finish, condition, location_id, is_tradeable, added)
+                        VALUES (?, ?, "NM", 5, 0, ?)
+                    ''', (item['scryfall_id'], item['finish'], datetime.datetime.now())),
+
+            # 2. OUTBOUND: Remove requested cards from your inventory
+            outbound_items = manager.cursor.execute('''
+                SELECT scryfall_id, finish, quantity 
+                FROM trade_outbound_items WHERE trade_id = ?
+            ''', (trade_id,)).fetchall()
+            
             for item in outbound_items:
-                # Find exactly [quantity] instance_ids from your inventory that match
-                instances = manager.cursor.execute('''
-                    SELECT instance_id 
-                    FROM inventory 
-                    WHERE scryfall_id = ? AND finish = ? AND is_tradeable = 1
-                    LIMIT ?
-                ''', (item['scryfall_id'], item['finish'], item['quantity'])).fetchall()
-                
-            # Delete those specific physical copies from your database
-                for instance in instances:
-                        manager.cursor.execute('''
-                            DELETE FROM inventory WHERE instance_id = ?
-                        ''', (instance['instance_id'],))
-                
-                
-                    
-        elif action == 'deny':
-            new_status = 'Rejected'
-        else:
-            return "Invalid action", 400 # Just in case something weird happens
-        
-        manager.cursor.execute('''
-            UPDATE trades SET status = ?, notes = ?, incoming = ? WHERE trade_id = ?
-        ''', (new_status, trade_notes, incoming_cards, trade_id))
-        manager.commit()
-        flash(f"Trade {trade_id} {new_status.lower()} successfully.")
+                # Safely delete exactly 'X' copies of the card that are marked as tradeable
+                manager.cursor.execute('''
+                    DELETE FROM inventory 
+                    WHERE instance_id IN (
+                        SELECT instance_id FROM inventory 
+                        WHERE scryfall_id = ? AND finish = ? AND is_tradeable = 1
+                        LIMIT ?
+                    )
+                ''', (item['scryfall_id'], item['finish'], item['quantity']))
+
+            # 3. Update the trade status to Completed
+            manager.cursor.execute("UPDATE trades SET status = 'Completed' WHERE trade_id = ?", (trade_id,))
+
+        elif action == 'decline':
+            # Just update the status, don't move any inventory
+            manager.cursor.execute("UPDATE trades SET status = 'Declined' WHERE trade_id = ?", (trade_id,))
+
+        manager.conn.commit()
+        return jsonify({'success': True, 'action': action})
+
     except Exception as e:
-        flash(f"Error processing trade: {e}", "error")
+        manager.conn.rollback() # If anything fails, revert the entire transaction!
+        print(f"Trade Resolution Error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         manager.close()
 
-    return redirect(url_for('admin.admin_dashboard'))
+# def process_incoming_cards(incoming, manager):
+#     if not incoming:
+#         return
+    
+#     # Initialize the fetcher with your current db manager
+#     fetcher = ScryfallFetcher.ScryfallFetcher(manager)
+    
+#     incoming_items = [item.strip() for item in incoming.split(',')]
+    
+#     for item in incoming_items:
+#         if not item: 
+#             continue
+        
+#         parts = item.split('-')
+#         if len(parts) != 3:
+#             print(f"Skipping badly formatted item: {item}")
+#             continue
+            
+#         set_code, cn, finish = parts
+        
+#         # 1. Try to find the card in the local DB first
+#         card = manager.cursor.execute('''
+#             SELECT scryfall_id FROM card_printings 
+#             WHERE set_code = ? AND collector_number = ?
+#         ''', (set_code.lower(), cn.lower())).fetchone()
+        
+#         scryfall_id = None
+        
+#         # print(f"DEBUG: {dict(card)}")
+
+#         if card:
+#             scryfall_id = card['scryfall_id']
+#         else:
+#             # 2. If NOT found, use ScryfallFetcher to get it from the API
+#             print(f"Card {set_code}-{cn} not in DB. Fetching from Scryfall...")
+#             card = fetcher.fetch_and_add(set_code, cn)
+
+
+#         # 3. If we have a scryfall_id (either from DB or Fetcher), add to inventory
+#         if card:
+#             manager.cursor.execute('''
+#                 INSERT INTO inventory (scryfall_id, finish, is_surplus, is_tradeable, location_id, added)
+#                 VALUES (?, ?, 0, 0, 1, ?)
+#             ''', (card['scryfall_id'], finish.lower(),datetime.datetime.now(),))
+#             print(f"Successfully added {set_code}-{cn} ({finish}) to inventory!")
+#             return True
+#         else:
+#             print(f"Error: Card {set_code}-{cn} could not be found or fetched.")
+#             return False
+
+# @admin_bp.route('/process_trade', methods=['POST'])
+# @login_required
+# @admin_required
+# def process_trade():
+#     trade_id = request.form.get('trade_id')
+#     action = request.form.get('action')
+#     incoming_cards = request.form.get('incoming_cards')
+#     trade_notes = request.form.get('trade_notes')
+
+#     manager = CardDB()
+#     try:
+#         if action == 'accept':
+#             new_status = 'Accepted'
+            
+#             check = process_incoming_cards(incoming_cards, manager)
+#             if not check:
+#                 raise Exception("Invalid Trade: One or more incoming cards could not be resolved.")
+            
+#             # --- INVENTORY REMOVAL LOGIC ---
+#             outbound_items = manager.cursor.execute('''
+#                 SELECT scryfall_id, finish, quantity 
+#                 FROM trade_outbound_items 
+#                 WHERE trade_id = ?
+#             ''', (trade_id,)).fetchall()
+            
+#             # For each group of cards they requested...
+#             for item in outbound_items:
+#                 # Find exactly [quantity] instance_ids from your inventory that match
+#                 instances = manager.cursor.execute('''
+#                     SELECT instance_id 
+#                     FROM inventory 
+#                     WHERE scryfall_id = ? AND finish = ? AND is_tradeable = 1
+#                     LIMIT ?
+#                 ''', (item['scryfall_id'], item['finish'], item['quantity'])).fetchall()
+                
+#             # Delete those specific physical copies from your database
+#                 for instance in instances:
+#                         manager.cursor.execute('''
+#                             DELETE FROM inventory WHERE instance_id = ?
+#                         ''', (instance['instance_id'],))
+                
+                
+                    
+#         elif action == 'deny':
+#             new_status = 'Rejected'
+#         else:
+#             return "Invalid action", 400 # Just in case something weird happens
+        
+#         manager.cursor.execute('''
+#             UPDATE trades SET status = ?, notes = ?, incoming = ? WHERE trade_id = ?
+#         ''', (new_status, trade_notes, incoming_cards, trade_id))
+#         manager.commit()
+#         flash(f"Trade {trade_id} {new_status.lower()} successfully.")
+#     except Exception as e:
+#         flash(f"Error processing trade: {e}", "error")
+#     finally:
+#         manager.close()
+
+#     return redirect(url_for('admin.admin_dashboard'))
 
 @admin_bp.route('/search_api', methods=['GET'])
 def search_api():
@@ -409,9 +490,18 @@ def price_tracker():
     manager.close()
     
     card_list = [dict(row) for row in cards]
+    
+    spikes = [card for card in card_list if card['new_price'] > card['old_price']]
+    drops = [card for card in card_list if card['new_price'] < card['old_price']]
 
    
-    return render_template("price_tracker.html",cards=card_list,view_mode='tracking')
+    return render_template(
+                        "price_tracker.html",
+                        cards=card_list,
+                        spikes=spikes,
+                        drops=drops,
+                        view_mode='tracking'
+                                        )
 
 
 @admin_bp.route('/delete_wish/<int:wish_id>', methods=['POST'])

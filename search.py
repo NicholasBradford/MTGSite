@@ -123,19 +123,27 @@ def search(search_query, conditions=None):
             conditions.append(f"i.location_id {'!=' if is_negated else '='} ?")
             # print(f"DEBUG: {conditions}")
             params.append(int(val))
+        elif val == "NULL" or val == "unassigned":
+            conditions.append(f"i.location_id {'IS NOT' if is_negated else 'IS'} NULL")
         else:
             conditions.append(f"i.location_id {'NOT IN' if is_negated else 'IN'} (SELECT location_id FROM locations WHERE name LIKE ?)")
             params.append(f'%{val}%')
 
     # USD Logic
     for usd_term in search_params['usd']:
+        if usd_term.upper() == "NULL" or usd_term.lower() == "unassigned":
+            conditions.append(f"""
+                (CASE WHEN i.finish = 'foil' THEN cp.current_price_foil
+                ELSE cp.current_price END) {'IS NOT' if is_negated else 'IS'} NULL""")
+            continue # Skip the rest of the loop and move to the next term
+        
         match = re.match(r'([<>=!]+)?([\d\.]+)', usd_term)
         if match:
             op, val = match.group(1) or '=', float(match.group(2))
             if op in ['>', '<', '>=', '<=', '=', '!=']:
                 conditions.append(f"""
                     (CASE WHEN i.finish = 'foil' THEN COALESCE(cp.current_price_foil, 0)
-                     ELSE COALESCE(cp.current_price, 0) END) {op} ?""")
+                    ELSE COALESCE(cp.current_price, 0) END) {op} ?""")
                 params.append(val)
 
     # Final SQL construction

@@ -1,0 +1,19 @@
+{% for card in cards %}
+<tr>
+    <td>{{card["name"]}}</td>
+    <td>{{card["set_code"]}}</td>
+    <td>{{card["collector_number"]}}</td>
+    <td>{{card["finish"]}}</td>
+    <td>{{card["location_name"]}}</td>
+    <td>
+        {% set price = card["nonfoil"] if card["finish"] == "nonfoil" else card["foil"] %}
+        {{ "$" ~ "{:,.2f}".format(price|float) if price else "N/A" }}
+    </td>
+    <td>{{card["added"]}}</td>
+    <td>
+        <form action="{{ url_for('.delete_card', inventory_id=card['instance_id']) }}" method="POST" onsubmit="return confirm('Remove this card?');">
+            <button type="submit" class="delete-btn">&times;</button>
+        </form>
+    </td>
+</tr>
+{% endfor %}

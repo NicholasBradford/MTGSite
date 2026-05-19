@@ -221,15 +221,6 @@
             }
         }
 
-        // 1. The Toggle Button
-        document.getElementById('toggleFilters').addEventListener('click', function() {
-            const drawer = document.getElementById('advancedDrawer');
-            if (drawer) {
-                drawer.classList.toggle('hidden');
-            }
-            syncDrawerState();
-        });
-
         // 2. Dropdown Change Handler (Syncs state right before an auto-reload)
         const locationDropdown = document.querySelector('select[name="location"]');
         if (locationDropdown) {
