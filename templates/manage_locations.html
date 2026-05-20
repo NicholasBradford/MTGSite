@@ -2,54 +2,161 @@
 
 {% block title %}Manage Locations{% endblock %}
 
+{% block style %}
+{{ super() }}
+
+/* --- Integrity & Controls Palette (Teal) --- */
+.page-header-teal {
+    color: #17a2b8; /* Vault Teal Accent */
+    margin-bottom: 20px;
+    padding-left: 10px;
+}
+
+.card-teal-left {
+    border-left: 4px solid #17a2b8;
+}
+
+.card-teal-top {
+    border-top: 4px solid #17a2b8;
+}
+
+/* --- Forms & Buttons --- */
+.inline-form {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap; /* Allows clean stacking on smaller screens */
+}
+
+.form-input-small {
+    width: 80px;
+    text-align: center;
+}
+
+.btn-teal {
+    background: #222;
+    color: white;
+    border: 1px solid #17a2b8;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-teal:hover {
+    background: #17a2b8;
+    color: #000;
+}
+
+/* --- Data Tables --- */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.data-table thead {
+    background: #17a2b8; /* Teal Header matching the accent */
+    color: #000;
+}
+
+.data-table th, 
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid #333; /* Subdued Borders */
+    text-align: left;
+}
+
+.data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05); /* Subtle Row Highlight */
+}
+
+/* --- Action Buttons --- */
+.btn-deny {
+    background: #dc3545; /* Red Accent for Danger/Deny */
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+.btn-deny:hover {
+    background: #ff5252;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: transform 0.1s;
+}
+
+.btn-icon:hover {
+    transform: scale(1.2);
+}
+{% endblock style %}
+
 {% block content %}
-<div class="admin-container" style="padding: 20px; color: white;">
-    <h2 style="color: #ffd700;">Location Management</h2>
+<div class="admin-container">
+    <h2 class="page-header-teal">Location Management</h2>
 
-    <div class="login-card" style="margin-bottom: 30px; max-width: 400px; background: rgba(255,255,255,0.1);">
-        <h3>Quick Add</h3>
-        <form method="POST" style="display: flex; gap: 10px;">
-            <input type="hidden" name="action" value="add">
-            <input type="text" name="location_name" placeholder="New Location Name" required class="form-input">
-            <button type="submit" class="login-btn" style="width: auto; padding: 0 15px;">Add</button>
-        </form>
+    <div class="admin-grid">
+        
+        <div class="admin-card card-teal-left">
+            <h3>Quick Add</h3>
+            <p style="color: #bbb; margin-bottom: 15px; font-size: 0.9em;">Create a new storage location in the vault.</p>
+            <form method="POST" class="inline-form">
+                <input type="hidden" name="action" value="add">
+                <input type="text" name="location_name" placeholder="New Location Name" required class="form-input">
+                <button type="submit" class="btn-teal">Add Location</button>
+            </form>
+        </div>
+
+        <div class="admin-card card-teal-top" style="grid-column: 1 / -1;">
+            <h3>Active Locations</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Current ID</th>
+                        <th>Location Name</th>
+                        <th>Cards Stored</th>
+                        <th>Modify ID / Name</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loc in locations %}
+                    <tr>
+                        <td>{{ loc['location_id'] }}</td>
+                        <td>{{ loc['name'] }}</td>
+                        <td>{{ loc['card_count'] }}</td>
+                        <td>
+                            <form method="POST" class="inline-form">
+                                <input type="hidden" name="action" value="update_id">
+                                <input type="hidden" name="old_id" value="{{ loc['location_id'] }}">
+                                <input type="number" name="new_id" value="{{ loc['location_id'] }}" class="form-input form-input-small" required>
+                                <input type="text" name="new_name" value="{{ loc['name'] }}" class="form-input" required>
+                                <button type="submit" class="btn-icon" title="Save Changes">💾</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" onsubmit="return confirm('Delete this location?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="location_id" value="{{ loc['location_id'] }}">
+                                <button type="submit" class="btn-deny">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     </div>
-
-    <table style="width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden;">
-        <thead>
-            <tr style="background: #ffd700; color: black; text-align: left;">
-                <th style="padding: 12px;">Current ID</th>
-                <th style="padding: 12px;">Location Name</th>
-                <th style="padding: 12px;">Cards Stored</th>
-                <th style="padding: 12px;">Modify ID / Name</th>
-                <th style="padding: 12px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for loc in locations %}
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <td style="padding: 12px;">{{ loc['location_id'] }}</td>
-                <td style="padding: 12px;">{{ loc['name'] }}</td>
-                <td style="padding: 12px;">{{ loc['card_count'] }}</td>
-                <td style="padding: 12px;">
-                    <form method="POST" style="display: flex; gap: 5px;">
-                        <input type="hidden" name="action" value="update_id">
-                        <input type="hidden" name="old_id" value="{{ loc['location_id'] }}">
-                        <input type="number" name="new_id" value="{{ loc['location_id'] }}" style="width: 50px; background: #222; color: white; border: 1px solid #ffd700;">
-                        <input type="text" name="new_name" value="{{ loc['name'] }}" style="background: #222; color: white; border: 1px solid #ffd700;">
-                        <button type="submit" style="background: none; border: none; cursor: pointer;">💾</button>
-                    </form>
-                </td>
-                <td style="padding: 12px;">
-                    <form method="POST" onsubmit="return confirm('Delete this location?');">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="location_id" value="{{ loc['location_id'] }}">
-                        <button type="submit" style="background: #ff4444; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </div>
 {% endblock %}

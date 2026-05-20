@@ -63,6 +63,9 @@
     .card-wishlist { border-left-color: #e74c3c; } /* Red */
     .card-wishlist:hover { box-shadow: 0 6px 20px rgba(231, 76, 60, 0.15); }
 
+    .card-automation { border-left-color: #9b59b6; } /* Amethyst Purple */
+    .card-automation:hover { box-shadow: 0 6px 20px rgba(155, 89, 182, 0.15); }
+
     /* Typography */
     .admin-menu-card h3 {
         color: #eee;
@@ -133,7 +136,7 @@
             <h3><i class="fas fa-file-csv" style="color: #2ecc71;"></i> Bulk Import</h3>
             <p>Upload CSV files to update Master Sets or import large chunks of inventory simultaneously.</p>
         </div>
-        <a href="/add/inventory/bulk_import" class="btn-menu">Start Import</a>
+        <a href="/add/inventory/bulk" class="btn-menu">Start Import</a>
     </div>
 
     <div class="admin-menu-card card-manual">
@@ -151,5 +154,51 @@
         </div>
         <a href="/add/wishlist" class="btn-menu">Wishlist Entry</a>
     </div>
+
+    <div class="admin-menu-card card-automation">
+        <form id="sorterForm" action="" method="POST" onsubmit="return handleSortSubmission();" style="display: flex; flex-direction: column; height: 100%; justify-content: space-between; margin: 0; padding: 0;">
+            <div>
+                <h3><i class="fas fa-magic" style="color: #9b59b6;"></i> Inventory Sorter</h3>
+                <p>Automatically organize cards from a staging area or custom box into sorted alphabetical WUBRG slots.</p>
+            </div>
+            
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <label for="dynamic_source_id" style="color: #aaa; font-size: 0.9em; white-space: nowrap;">Source Location ID:</label>
+                <input type="number" id="dynamic_source_id" value="5" min="1" required class="dynamic-input">
+            </div>
+
+            <button type="submit" class="btn-menu" id="sortSubmitBtn">
+                Run Auto-Sort
+            </button>
+        </form>
+    </div>
 </div>
+
+<script>
+    function handleSortSubmission() {
+        const locationId = document.getElementById('dynamic_source_id').value;
+        
+        if(confirm(`Are you sure you want to run the automatic box layout parser on Location ID: ${locationId}? This will batch rewrite physical locations for all matching cards.`)) {
+            const btn = document.getElementById('sortSubmitBtn');
+            const form = document.getElementById('sorterForm');
+
+            // 1. Let Flask's Jinja2 engine build the exact base URL, accounting for any Blueprint prefixes
+            // We pass '0' as a dummy ID so Jinja can construct the string without throwing an error
+            let actionUrl = "{{ url_for('sorter.sort_and_relocate_inventory', source_location_id=0) }}";
+            
+            // 2. Safely swap the dummy '/0' for the user's inputted location ID
+            actionUrl = actionUrl.replace('/0', '/' + locationId);
+
+            // 3. Set the form action to the guaranteed-correct path
+            form.action = actionUrl;
+            
+            // 4. Update UI
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 6px;"></i> Sorting Box Lines...';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.6';
+            return true;
+        }
+        return false;
+    }
+</script>
 {% endblock %}
