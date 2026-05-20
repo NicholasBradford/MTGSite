@@ -1,5 +1,5 @@
 import sqlite3, ScryfallFetcher, db.db_manager, datetime, csv, os, math
-from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, current_app
+from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, session, current_app
 from db.db_manager import CardDB
 from flask_login import login_required, current_user
 from io import TextIOWrapper
@@ -68,11 +68,17 @@ def adder():
         price = request.form['price']
         loc_id = request.form.get('location')
         qty = request.form['qty']
+        
+            
         if sc == "RESET" and cn == "":
             # manager.close()
             manager.nuke()
             # Nuke closes the connection internally, so we just redirect
             return redirect(url_for('.adder'))
+        
+        if sc != "RESET":
+            session['last_set_code'] = sc
+        
         surplus_val = 0
         try:              
             card_info = manager.cursor.execute(
@@ -123,11 +129,14 @@ def adder():
     # Close the connection after we have our data
     manager.close()
     
+    last_set_code = session.get('last_set_code', '')
+    
     return render_template('card_adder.html', 
                            cards=cards, 
                            locations=locations,
                            page=page, 
-                           total_pages=total_pages)
+                           total_pages=total_pages,
+                           last_set_code=last_set_code)
 
 @adder_bp.route('/delete_card/<int:inventory_id>', methods=['POST'])
 def delete_card(inventory_id):
@@ -366,3 +375,20 @@ def download_template():
         as_attachment=True,
         download_name='mtg_bulk_import_template.csv'
     )
+    
+@adder_bp.before_app_request
+def clear_stale_set_code():
+    """
+    Clears the remembered set_code if the user navigates away from the single-card adder.
+    """
+    # 1. Ensure the request actually has an endpoint (ignores malformed requests)
+    if request.endpoint:
+        # 2. Define the endpoints where we WANT to keep the set code alive
+        # - 'adder.adder' is the main GET/POST page.
+        # - 'adder.delete_card' ensures deleting a card doesn't wipe your input.
+        # - 'static' ensures loading CSS/JS doesn't accidentally trigger the wipe.
+        keep_endpoints = ['adder.adder', 'adder.delete_card', 'static']
+        
+        if request.endpoint not in keep_endpoints:
+            # User navigated away (e.g., to dashboard or bulk import). Nuke the variable.
+            session.pop('last_set_code', None)

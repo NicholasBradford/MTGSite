@@ -6,7 +6,7 @@
             align-items: flex-start; /* Keeps the form at the top */
             gap: 20px;
             width: 100%;
-        }
+        }   w1
         .left-bar {
             flex: 1; /* Takes up the remaining space */
         }
@@ -136,7 +136,7 @@
     <div class="right-bar">
         <form method="POST">
             <ul>
-                <li><input type="text" name="set_code" placeholder="Set Code" required></li>
+                <li><input type="text" name="set_code" placeholder="Set Code" value="{{ last_set_code }}" required></li>
                 <li><input type="text" name="collector_number" placeholder="Collector #"></li>
                 
                 <li>
@@ -259,5 +259,19 @@
             }
         });
     }
+
+    // Auto-focus logic for rapid data entry
+    document.addEventListener('DOMContentLoaded', function() {
+        const setCodeInput = document.getElementById('set_code_input');
+        const collectorNumInput = document.getElementById('collector_number_input');
+        
+        if (setCodeInput && setCodeInput.value.trim() !== '') {
+            // If the set code is remembered, jump straight to the collector number
+            collectorNumInput.focus();
+        } else if (setCodeInput) {
+            // Otherwise, focus the set code field for a new entry
+            setCodeInput.focus();
+        }
+    });
 </script>
 {% endblock %}

@@ -13,12 +13,65 @@ def search(search_query, conditions=None):
     }
     
     sort_options = {
-        'name': """LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
-        'rarity': """CASE cp.rarity WHEN 'mythic' THEN 1 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 3 WHEN 'common' THEN 4 ELSE 5 END ASC, cd.name ASC""",
+        'name': """LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
+        'rarity': """CASE cp.rarity WHEN 'mythic' THEN 1 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 3 WHEN 'common' THEN 4 ELSE 5 END ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC """,
+        'color': """CASE 
+                        -- 1. MONO-COLOR (Standard WUBRG)
+                        WHEN color_identity = 'W' THEN 10
+                        WHEN color_identity = 'U' THEN 11
+                        WHEN color_identity = 'B' THEN 12
+                        WHEN color_identity = 'R' THEN 13
+                        WHEN color_identity = 'G' THEN 14
+
+                        -- 2. TWO-COLOR PAIRS: ALLIES (Grouped by Primary Color)
+                        WHEN color_identity IN ('W,U', 'U,W') THEN 20  -- WU
+                        WHEN color_identity IN ('U,B', 'B,U') THEN 21  -- UB
+                        WHEN color_identity IN ('B,R', 'R,B') THEN 22  -- BR
+                        WHEN color_identity IN ('G,R', 'R,G') THEN 23  -- RG
+                        WHEN color_identity IN ('G,W', 'W,G') THEN 24  -- GW
+
+                        -- 2. TWO-COLOR PAIRS: ENEMIES (Grouped by Primary Color)
+                        WHEN color_identity IN ('B,W', 'W,B') THEN 25  -- WB
+                        WHEN color_identity IN ('R,U', 'U,R') THEN 26  -- UR
+                        WHEN color_identity IN ('B,G', 'G,B') THEN 27  -- BG
+                        WHEN color_identity IN ('R,W', 'W,R') THEN 28  -- RW
+                        WHEN color_identity IN ('G,U', 'U,G') THEN 29  -- GU
+
+                        -- 3. THREE-COLOR COMBINATIONS: SHARDS (Clockwise)
+                        WHEN color_identity IN ('B,U,W', 'B,W,U', 'U,B,W', 'U,W,B', 'W,B,U', 'W,U,B') THEN 30 -- WUB (Esper)
+                        WHEN color_identity IN ('B,R,U', 'B,U,R', 'R,B,U', 'R,U,B', 'U,B,R', 'U,R,B') THEN 31 -- UBR (Grixis)
+                        WHEN color_identity IN ('B,G,R', 'B,R,G', 'G,B,R', 'G,R,B', 'R,B,G', 'R,G,B') THEN 32 -- BRG (Jund)
+                        WHEN color_identity IN ('G,R,W', 'G,W,R', 'R,G,W', 'R,W,G', 'W,G,R', 'W,R,G') THEN 33 -- RGW (Naya)
+                        WHEN color_identity IN ('G,U,W', 'G,W,U', 'U,G,W', 'U,W,G', 'W,G,U', 'W,U,G') THEN 34 -- GWU (Bant)
+
+                        -- 3. THREE-COLOR COMBINATIONS: WEDGES (Counter-Clockwise)
+                        WHEN color_identity IN ('B,G,W', 'B,W,G', 'G,B,W', 'G,W,B', 'W,B,G', 'W,G,B') THEN 35 -- WBG (Abzan)
+                        WHEN color_identity IN ('R,U,W', 'R,W,U', 'U,R,W', 'U,W,R', 'W,R,U', 'W,U,R') THEN 36 -- URW (Jeskai)
+                        WHEN color_identity IN ('B,G,U', 'B,U,G', 'G,B,U', 'G,U,B', 'U,B,G', 'U,G,B') THEN 37 -- BGU (Sultai)
+                        WHEN color_identity IN ('B,R,W', 'B,W,R', 'R,B,W', 'R,W,B', 'W,B,R', 'W,R,B') THEN 38 -- RWB (Mardu)
+                        WHEN color_identity IN ('G,R,U', 'G,U,R', 'R,G,U', 'R,U,G', 'U,G,R', 'U,R,G') THEN 39 -- GUR (Temur)
+
+                        -- 4. FOUR-COLOR COMBINATIONS (Clockwise, beginning after missing color)
+                        WHEN LENGTH(color_identity) - LENGTH(REPLACE(color_identity, ',', '')) = 3 THEN
+                            CASE 
+                                WHEN color_identity NOT LIKE '%W%' THEN 40 -- Missing W: UBRG
+                                WHEN color_identity NOT LIKE '%U%' THEN 41 -- Missing U: BRGW
+                                WHEN color_identity NOT LIKE '%B%' THEN 42 -- Missing B: RGWU
+                                WHEN color_identity NOT LIKE '%R%' THEN 43 -- Missing R: GWUB
+                                WHEN color_identity NOT LIKE '%G%' THEN 44 -- Missing G: WUBR
+                            END
+
+                        -- 5. FIVE-COLOR 
+                        WHEN LENGTH(color_identity) - LENGTH(REPLACE(color_identity, ',', '')) = 4 THEN 50
+
+                        -- Colorless fallback (Eldrazi, Artifacts, etc.)
+                        ELSE 51 
+                    END ASC"""
+                    ,
         'usd': """(CASE WHEN i.finish = 'foil' THEN COALESCE(cp.current_price_foil, 0) ELSE COALESCE(cp.current_price, 0) END) DESC""",
-        'set': "cp.set_code ASC, CAST(cp.collector_number AS INTEGER) ASC",
-        'location': "l.name ASC, cd.name ASC",
-        'added': "i.added DESC",
+        'set': """cp.set_code ASC""",
+        'location': """l.name ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
+        'added': """i.added DESC"""
     }
             
     if search_query:
