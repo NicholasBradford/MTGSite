@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Commander Deck Gallery{% endblock %}
+
+{% block style %}
+{{ super }}
+    /* Inheriting the image and pill structures from set_detail.html */
+    .image_wrapper {
+        position: relative;
+        width: 100%;
+        margin-bottom: 15px; /* Creates breathing room before the text */
+    }
+
+    .color_pill {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #121212;
+        color: #ffca28;
+        border: 1px solid #ffca28;
+        padding: 2px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: bold;
+        z-index: 2;
+    }
+
+    /* Standardizing the text blocks under the image */
+    .card_label {
+        text-align: center;
+        color: #eee;
+        line-height: 1.4;
+    }
+{% endblock style %}
+
+{% block content %}
+    <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #eee; margin-bottom: 5px;">EDH Armory</h1>
+        <p style="color: #bbb;">Select a commander to view deck inventory and stats.</p>
+    </div>
+
+    <div class="card-container">
+        {% for deck in decks %}
+        <div class="card_class">
+            <div class="admin-card collection-card" 
+                onclick="location.href='{{ url_for('edh.edh_view', deck_name=deck.deck_name) }}'"
+                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
+                onmouseover="this.style.borderColor='#ffca28'"
+                onmouseout="this.style.borderColor='transparent'">
+                
+                <div class="image_wrapper">
+                    <img src="{{ url_for('serve_card_image', filename = deck['image_url'] ) }}" 
+                        alt="{{ deck.commander_name }}" 
+                        class="card_img"
+                        style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                    
+                    <div class="color_pill">
+                        {{ deck.color_identity }}
+                    </div>
+                </div>
+
+                <div class="card_label">
+                    <strong style="font-size: 1.2em; color: #eee;">{{ deck.deck_name }}</strong><br/>
+                    <span style="font-size: 0.9em; color: #bbb;">{{ deck.commander_name }}</span>
+                </div>
+                
+            </div> 
+        </div> 
+        {% endfor %}
+    </div>
+
+    {% if not decks %}
+    <div class="admin-card" style="text-align: center; padding: 40px;">
+        <h3 class="text-muted">No decks found.</h3>
+        <p>Head over to the import page to add your first EDH deck!</p>
+        <a href="{{ url_for('edh.import_deck') }}" class="btn btn-primary" style="margin-top: 10px;">Import Deck</a>
+    </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}{{ deck['deck_name'] }} - View{% endblock %}
+
+{% block style %}
+{{ super() }}
+    /* Styling isolated to this view for the column layout */
+    .deck-container {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        margin-top: 20px;
+    }
+    .commander-sidebar {
+        flex: 0 0 300px;
+        position: sticky;
+        top: 20px;
+    }
+    .deck-lists {
+        flex: 1;
+        column-count: 3; /* Masonry layout for MTG types */
+        column-gap: 20px;
+    }
+    .category-card {
+        break-inside: avoid; /* Prevents a category from splitting across columns */
+        margin-bottom: 20px;
+        background: #1f1f1f; /* Vault Theme Card Surface */
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid #333; /* Vault Theme Border */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .card-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 0.9em;
+        border-bottom: 1px solid #333;
+    }
+    .card-row:last-child {
+        border-bottom: none;
+    }
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .status-owned { background-color: #28a745; } /* Green Accent */
+    .status-missing { background-color: #dc3545; } /* Red Accent */
+    
+    .mana-curve-graph {
+        display: flex;
+        align-items: flex-end;
+        height: 100px;
+        gap: 5px;
+        margin-top: 10px;
+        background: rgba(0,0,0,0.2);
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #333;
+    }
+    .bar {
+        flex: 1;
+        background-color: #17a2b8; /* Teal Accent for integrity/data */
+        border-radius: 3px 3px 0 0;
+        transition: height 0.3s ease;
+    }
+
+    /* --- Vault Tooltip Styling --- */
+    .card-name-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    .card-name-wrapper.owned {
+        cursor: help;
+        border-bottom: 1px dotted #17a2b8; /* Subtle Teal Accent underline */
+    }
+    .vault-tooltip {
+        visibility: hidden;
+        background-color: #1f1f1f; /* Card Surface */
+        color: #bbb; /* Secondary Text */
+        text-align: left;
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px solid #333; /* Borders & Dividers */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        position: absolute;
+        z-index: 10;
+        bottom: 130%; 
+        left: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        transform: translateY(5px);
+        width: max-content;
+        font-size: 0.9em;
+    }
+    .card-name-wrapper.owned:hover .vault-tooltip {
+        visibility: visible;
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .vault-tooltip .highlight {
+        color: #ffca28; /* Gold Accent for highlighted data */
+        font-weight: bold;
+    }
+
+    /* --- Admin Control Buttons --- */
+    .card-controls {
+        display: flex;
+        gap: 5px;
+        margin-left: 15px;
+    }
+    .vault-btn {
+        background: #222;
+        border: 1px solid #333;
+        color: #bbb;
+        border-radius: 4px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        font-weight: bold;
+        padding: 0;
+    }
+    .vault-btn.add:hover {
+        border-color: #28a745; /* Green Accent */
+        color: #28a745;
+        box-shadow: 0 0 5px rgba(40, 167, 69, 0.4);
+    }
+    .vault-btn.remove:hover {
+        border-color: #dc3545; /* Red Accent */
+        color: #dc3545;
+        box-shadow: 0 0 5px rgba(220, 53, 69, 0.4);
+    }
+{% endblock style %}
+
+{% block content %}
+
+<div class="deck-container">
+    <div class="commander-sidebar">
+             {% if current_user.is_authenticated %}
+        <div class="admin-card" style="margin-top: 20px;">
+            <h3 style="color: #eee; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px;">Add Card</h3>
+            <form action="{{ url_for('edh.add_card_to_deck_by_name', deck_id=deck['deck_id']) }}" method="POST" style="display: flex; gap: 10px; margin-top: 15px;">
+                <input 
+                    type="text" 
+                    name="card_name" 
+                    placeholder="Enter card name..." 
+                    style="flex: 1; padding: 8px 12px; border-radius: 4px; background: #121212; border: 1px solid #333; color: #eee; font-size: 0.9em;" 
+                    required>
+                
+                <button type="submit" class="vault-btn add" style="width: auto; padding: 0 15px; border-color: #28a745; color: #28a745;">
+                    Add
+                </button>
+            </form>
+        </div>
+    {% endif %}
+        <div class="admin-card collection-card">
+            
+            <img src="{{ url_for('serve_card_image', filename=deck['image_url']) }}" 
+                 alt="{{ deck['commander_name'] }}" 
+                 style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            
+            <h2 style="margin-top: 15px; color: #eee; text-align: center; margin-bottom: 5px;">{{ deck['deck_name'] }}</h2>
+            <div class="text-secondary" style="text-align: center; color: #bbb; font-weight: bold;">{{ deck['commander_name'] }}</div>
+            
+            <div class="color_pill" style="margin: 15px auto 0 auto; width: max-content; background: #121212; color: #ffca28; border: 1px solid #ffca28; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold; display: block;">
+                {{ deck['color_identity'] }}
+            </div>
+        </div>
+
+        <div class="admin-card stats-card" style="margin-top: 20px;">
+            <h3 style="color: #eee;">Mana Curve</h3>
+            <div class="mana-curve-graph">
+                {% for cost, percentage in mana_curve.items() %}
+                <div class="bar" style="height: {{ percentage }}%;" title="CMC {{ cost }}: {{ percentage|round(1) }}%"></div>
+                {% endfor %}
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 10px;" class="text-muted">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6+</span>
+            </div>
+        </div>
+
+    
+    </div>
+
+   
+
+    <div class="deck-lists">
+        {% for category, card_list in cards.items() %}
+        <div class="category-card">
+            <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; color: #eee;">
+                {{ category }} ({{ card_list|length }})
+            </h3>
+            {% for card in card_list %}
+            <div class="card-row">
+                
+                <div style="display: flex; align-items: center;">
+                    <span class="status-indicator {{ 'status-owned' if card['is_owned'] else 'status-missing' }}"></span>
+                    
+                    <div class="card-name-wrapper {{ 'owned' if card['is_owned'] else '' }}">
+                    <span style="color: #bbb;">{{ card['quantity_needed'] }}x {{ card['name'] }}</span>
+                    
+                    {% if card['is_owned'] %}
+                    <div class="vault-tooltip">
+                        <div style="margin-bottom: 4px;">
+                            Version: <span class="highlight">{{ card['set_name'] | default('Unknown Set') }}</span>
+                        </div>
+                        
+                        <div style="margin-bottom: 4px;">
+                            Location: <span class="highlight">{{ card['available_location'] | default('General Binder') }}</span>
+                        </div>
+                        
+                        {% if card['available_price'] %}
+                        <div>
+                            Price: <span class="highlight">${{ "%.2f"|format(card['available_price']) }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                </div>
+
+                <div style="display: flex; align-items: center;">
+                    <span class="mana-cost" style="color: #bbb;">{{ card['mana_cost'] }}</span>
+                    
+                    {% if current_user.is_authenticated %}
+                    <div class="card-controls">
+                        <form action="{{ url_for('edh.remove_card_from_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="vault-btn remove" title="Remove 1">-</button>
+                        </form>
+                        <form action="{{ url_for('edh.add_card_to_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="vault-btn add" title="Add 1">+</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

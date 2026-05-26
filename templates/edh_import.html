@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Import Deck{% endblock %}
+
+{% block content %}
+<div class="admin-card" style="max-width: 500px; margin: 40px auto;">
+    <h1>Import Decklist</h1>
+    <form action="{{ url_for('edh.import_deck') }}" method="post" enctype="multipart/form-data">
+        <div style="margin-bottom: 15px;">
+            <label>Deck Name:</label><br>
+            <input type="text" name="deck_name" required style="width: 100%; padding: 8px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Color Identity (e.g., WUBRG):</label><br>
+            <input type="text" name="color_identity" style="width: 100%; padding: 8px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Decklist (.txt file):</label><br>
+            <input type="file" name="file" accept=".txt" required>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Commander Name:</label><br>
+            <input type="text" name="commander_name" placeholder="e.g., Sydri, Galvanic Genius" required style="width: 100%; padding: 8px;">
+        </div>
+        <button type="submit" style="padding: 10px 20px; background: var(--teal); color: white; border: none; cursor: pointer;">
+            Upload & Process
+        </button>
+
+    </form>
+</div>
+{% endblock %}

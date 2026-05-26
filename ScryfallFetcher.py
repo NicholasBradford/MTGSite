@@ -109,6 +109,7 @@ class ScryfallFetcher:
 
                 name = card.get('name')
                 cmc = card.get('cmc', 0.0)
+                color = "".join(card.get('color', []))
                 color_identity = "".join(card.get('color_identity', []))
                 
                 # These often go missing on double-faced cards
@@ -138,10 +139,10 @@ class ScryfallFetcher:
                 # 3. The Clean Insert
                 self.db.cursor.execute("""
                     INSERT OR IGNORE INTO card_definitions 
-                    (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity
+                    oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity
                 ))
 
                 # 3. B. Populate card_printings with the LOCAL path
@@ -203,6 +204,7 @@ class ScryfallFetcher:
         foil_price = prices.get("usd_foil")
         name = data.get('name')
         cmc = data.get('cmc', 0.0)
+        color = "".join(data.get('color', []))
         color_identity = "".join(data.get('color_identity', []))
         
         # These often go missing on double-faced cards
@@ -229,10 +231,10 @@ class ScryfallFetcher:
 
             self.db.cursor.execute("""
                 INSERT OR IGNORE INTO card_definitions 
-                (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                oracle_id, name, mana_cost, cmc, type_line, oracle_text, color_identity
+                oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity
             ))
             
             self.db.cursor.execute('''

@@ -48,6 +48,7 @@ class CardDB:
                 cmc REAL,
                 type_line TEXT,
                 oracle_text TEXT,
+                color TEXT,
                 color_identity TEXT
             )
         ''')
@@ -77,9 +78,12 @@ class CardDB:
                 purchase_price REAL,
                 location_id INTEGER ,
                 is_surplus BOOL,
+                in_deck BOOL,
                 added DATETIME,
+                deck_id INTEGER,
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id),
-                FOREIGN KEY (location_id) REFERENCES locations (location_id)
+                FOREIGN KEY (location_id) REFERENCES locations (location_id),
+                FOREIGN KEY (deck_id) REFERENCES edh_decks (deck_id)
             )
         ''')
         
@@ -187,6 +191,29 @@ class CardDB:
                 FOREIGN KEY (trade_id) REFERENCES trades(trade_id) ON DELETE CASCADE
                 );
                 ''')
+        
+        self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS edh_decks (
+                deck_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck_name VARCHAR(255) NOT NULL,
+                commander_scryfall_id VARCHAR(36) NOT NULL,
+                color_identity VARCHAR(10),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
+        
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS edh_deck_cards (
+                deck_id INTEGER,
+                scryfall_id TEXT NOT NULL,
+                quantity INTEGER DEFAULT 1,
+                category TEXT,
+                PRIMARY KEY (deck_id, scryfall_id),
+                FOREIGN KEY (deck_id) REFERENCES edh_decks (deck_id) ON DELETE CASCADE,
+                FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
+            );
+        ''')
+        
         self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
         
         if self.cursor.execute("SELECT * FROM locations").fetchone()[0] == 0:  

@@ -14,6 +14,7 @@ from routes.authentication import authentication_bp
 from routes.admin import admin_bp
 from routes.sets import sets_bp
 from routes.card_sorting import sorter_bp
+from routes.edh import edh_bp
 
 # Import your database manager to load users
 from db.db_manager import CardDB
@@ -78,6 +79,7 @@ app.register_blueprint(authentication_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(sets_bp)
 app.register_blueprint(sorter_bp)
+app.register_blueprint(edh_bp)
 
 
 # Error handlers
