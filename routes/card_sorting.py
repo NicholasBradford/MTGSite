@@ -9,6 +9,11 @@ ALPHABET_BINS = [
     ('S', 'Z', 'S:Z')
 ]
 
+COLORLESS_BINS = [
+    ('A', 'M', 'A:M'),
+    ('N', 'Z', 'N:Z')
+]
+
 sorter_bp = Blueprint('sorter', __name__)
 manager = CardDB()
 
@@ -28,16 +33,22 @@ def parse_collector_number(col_num):
         return (int(match.group(1)), match.group(2).lower())
     return (0, str(col_num).lower())
 
-def determine_box_range(first_char):
+def determine_box_range(first_char, colorless):
     """ Finds which alphabetical bin a character falls into. """
     if not first_char or not first_char.isalpha():
         return "A:G"
     
     char = first_char.upper()
-    for start, end, label in ALPHABET_BINS:
-        if start <= char <= end:
-            return label
-    return "A:G"
+    if not colorless:
+        for start, end, label in ALPHABET_BINS:
+            if start <= char <= end:
+                return label
+        return "A:G"
+    else:
+        for start, end, label in COLORLESS_BINS:
+            if start <= char <= end:
+                return label
+        return "A:M"
 
 def determine_color_prefix(colors_str):
     """ Maps card colors field into specific classification prefix identifiers. """
@@ -79,7 +90,7 @@ def sort_and_relocate_inventory(source_location_id):
     try:
         # 1. Fetch source dataset 
         query = '''
-            SELECT i.instance_id AS inventory_id, cd.name, cd.color_identity, c.collector_number, cd.type_line
+            SELECT i.instance_id AS inventory_id, cd.name, cd.color, c.collector_number, cd.type_line
             FROM inventory i
             JOIN card_printings c ON i.scryfall_id = c.scryfall_id
             JOIN card_definitions cd ON c.oracle_id = cd.oracle_id
@@ -103,8 +114,8 @@ def sort_and_relocate_inventory(source_location_id):
             elif 'Land' in item['type_line']:
                 box_name = "Land (Util)"
             else:  
-                color_prefix = determine_color_prefix(item['color_identity'])
-                alpha_range = determine_box_range(first_letter)
+                color_prefix = determine_color_prefix(item['color'])
+                alpha_range = determine_box_range(first_letter, color_prefix == "C" )
                 box_name = f"{color_prefix}-{alpha_range}"
                 
             sort_key = (
