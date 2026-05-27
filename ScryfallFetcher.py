@@ -109,7 +109,7 @@ class ScryfallFetcher:
 
                 name = card.get('name')
                 cmc = card.get('cmc', 0.0)
-                color = "".join(card.get('color', []))
+                color = "".join(card.get('colors', []))
                 color_identity = "".join(card.get('color_identity', []))
                 
                 # These often go missing on double-faced cards
@@ -204,7 +204,7 @@ class ScryfallFetcher:
         foil_price = prices.get("usd_foil")
         name = data.get('name')
         cmc = data.get('cmc', 0.0)
-        color = "".join(data.get('color', []))
+        color = "".join(data.get('colors', []))
         color_identity = "".join(data.get('color_identity', []))
         
         # These often go missing on double-faced cards
