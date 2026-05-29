@@ -110,12 +110,7 @@ def trade():
     loc_list = [dict(row) for row in locs]
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='inventory', locations=loc_list)
-    
-    # 5. AJAX CHECK FOR INFINITE SCROLL
-    # If the request comes from our infinite scroll script, ONLY return the card snippets
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='trades')
+        return render_template('_card_items.html', cards=card_list, view_mode='trades', locations=loc_list)
     
     # Otherwise, return the full page layout on initial load
     return render_template('trade_binder.html', 
