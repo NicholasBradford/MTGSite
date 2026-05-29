@@ -52,11 +52,8 @@
                     <img src="{{ url_for('serve_card_image', filename = deck['image_url'] ) }}" 
                         alt="{{ deck.commander_name }}" 
                         class="card_img"
-                        style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                    
-                    <div class="color_pill">
-                        {{ deck.color_identity }}
-                    </div>
+                        style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"
+                    >
                 </div>
 
                 <div class="card_label">

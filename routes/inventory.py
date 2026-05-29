@@ -109,7 +109,25 @@ def inventory():
     loc_list = [dict(row) for row in locs]
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='inventory', locations=loc_list)
+        view_mode = request.headers.get(
+            "X-View-Mode",
+            request.args.get("view_mode", "grid")
+        )
+
+        if view_mode == "table":
+            return render_template(
+                "_table_rows.html",
+                cards=card_list,
+                view_mode="inventory",
+                locations=loc_list
+            )
+
+        return render_template(
+            "_card_items.html",
+            cards=card_list,
+            view_mode="inventory",
+            locations=loc_list
+        )
 
     return render_template('inventory.html', 
                         cards=card_list, 
@@ -172,86 +190,101 @@ def get_instances(scryfall_id, finish):
     # Return using jsonify to ensure correct headers for fetch()
     return jsonify({"instances": instances_list})
 
-@inventory_bp.route('/inventory/table', methods=['GET'])
-@login_required
-def inventory_table():
-    search_query = request.args.get('q', '').strip()
-    page = request.args.get('page', 1, type=int)
-    per_page = 50 
-    offset = (page - 1) * per_page
+# @inventory_bp.route('/inventory/table', methods=['GET'])
+# @login_required
+# def inventory_table():
+#     search_query = request.args.get('q', '').strip()
+#     page = request.args.get('page', 1, type=int)
+#     per_page = 50 
+#     offset = (page - 1) * per_page
     
-    manager = CardDB()
+#     manager = CardDB()
 
-    # Reusing your existing search logic
-    params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
-    sort_by = request.args.get('sort', 'name')
+#     # Reusing your existing search logic
+#     params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
+#     sort_by = request.args.get('sort', 'name')
     
-    if sort_by not in sort_options:
-        sort_by = 'name'
+#     if sort_by not in sort_options:
+#         sort_by = 'name'
 
-        # Calculate Total Pages for pagination
-    count_query = f'''
-        SELECT COUNT(*) FROM (
-            SELECT i.scryfall_id 
-            FROM inventory i 
-            JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
-            JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
-            {filter_sql}
-            GROUP BY i.scryfall_id, i.finish
-            {having_sql}
-        )
-    '''
-    total_items = manager.cursor.execute(count_query, params + having_params).fetchone()[0]
-    total_pages = (total_items + per_page - 1) // per_page
+#         # Calculate Total Pages for pagination
+#     count_query = f'''
+#         SELECT COUNT(*) FROM (
+#             SELECT i.scryfall_id 
+#             FROM inventory i 
+#             JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
+#             JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+#             {filter_sql}
+#             GROUP BY i.scryfall_id, i.finish
+#             {having_sql}
+#         )
+#     '''
+#     total_items = manager.cursor.execute(count_query, params + having_params).fetchone()[0]
+#     total_pages = (total_items + per_page - 1) // per_page
     
-    main_query = f'''
-        SELECT 
-            i.scryfall_id, 
-            i.finish, 
-            i.location_id,
-            i.is_tradeable,
-            i.instance_id,
-            cd.name, 
-            cd.type_line, 
-            cd.cmc, 
-            cp.collector_number,
-            cd.mana_cost,
-            cp.set_code, 
-            COUNT(i.instance_id) as qty,
-            CASE 
-                WHEN i.finish = 'foil' THEN cp.current_price_foil
-                WHEN i.finish = 'etched' THEN cp.current_price_foil 
-                ELSE cp.current_price 
-            END as price
-        FROM inventory i 
-        JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
-        JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
-        {filter_sql}
-        GROUP BY i.scryfall_id, i.finish
-        {having_sql}
-        ORDER BY {sort_sql}, CAST(cp.collector_number AS INTEGER) ASC, i.finish DESC
-        LIMIT ? OFFSET ?
-    '''    
+#     main_query = f'''
+#         SELECT 
+#             i.scryfall_id, 
+#             i.finish, 
+#             i.location_id,
+#             i.is_tradeable,
+#             i.instance_id,
+#             cd.name, 
+#             cd.type_line, 
+#             cd.cmc, 
+#             cp.collector_number,
+#             cd.mana_cost,
+#             cp.set_code, 
+#             COUNT(i.instance_id) as qty,
+#             CASE 
+#                 WHEN i.finish = 'foil' THEN cp.current_price_foil
+#                 WHEN i.finish = 'etched' THEN cp.current_price_foil 
+#                 ELSE cp.current_price 
+#             END as price
+#         FROM inventory i 
+#         JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
+#         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
+#         {filter_sql}
+#         GROUP BY i.scryfall_id, i.finish
+#         {having_sql}
+#         ORDER BY {sort_sql}, CAST(cp.collector_number AS INTEGER) ASC, i.finish DESC
+#         LIMIT ? OFFSET ?
+#     '''    
 
-    cards = manager.cursor.execute(main_query, params + having_params + [per_page, offset]).fetchall()
+#     cards = manager.cursor.execute(main_query, params + having_params + [per_page, offset]).fetchall()
 
-    query_locs = 'SELECT location_id as id, name FROM locations ORDER BY name'
-    locs = manager.cursor.execute(query_locs).fetchall()
+#     query_locs = 'SELECT location_id as id, name FROM locations ORDER BY name'
+#     locs = manager.cursor.execute(query_locs).fetchall()
 
-    manager.close()
+#     manager.close()
 
-    card_list = [dict(row) for row in cards]
-    loc_list = [dict(row) for row in locs]
+#     card_list = [dict(row) for row in cards]
+#     loc_list = [dict(row) for row in locs]
 
-    # Designed to be modular: Return just the partial if requested via fetch/AJAX
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_inventory_table.html', cards=card_list, locations=loc_list)
+#     # Designed to be modular: Return just the partial if requested via fetch/AJAX
+#     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+#         view_mode = request.headers.get("X-View-Mode", request.args.get("view_mode", "grid"))
 
-    # Fallback to full page render if accessed directly via URL
-    return render_template('_inventory_table.html', 
-                        cards=card_list, 
-                        locations=loc_list, 
-                        view_mode='inventory',
-                        page=page,
-                        total_pages=total_pages,
-                        search_query=search_query)
+#         if view_mode == "table":
+#             return render_template(
+#                 "_table_rows.html",
+#                 cards=card_list,
+#                 view_mode="inventory",
+#                 locations=loc_list
+#             )
+
+#         return render_template(
+#             "_card_items.html",
+#             cards=card_list,
+#             view_mode="inventory",
+#             locations=loc_list
+#         )
+
+#     # Fallback to full page render if accessed directly via URL
+#     return render_template('_inventory_table.html', 
+#                         cards=card_list, 
+#                         locations=loc_list, 
+#                         view_mode='inventory',
+#                         page=page,
+#                         total_pages=total_pages,
+#                         search_query=search_query)

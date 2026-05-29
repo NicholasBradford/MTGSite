@@ -110,7 +110,22 @@ def trade():
     loc_list = [dict(row) for row in locs]
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='trades', locations=loc_list)
+        view_mode = request.headers.get("X-View-Mode", request.args.get("view_mode", "grid"))
+
+        if view_mode == "table":
+            return render_template(
+                "_table_rows.html",
+                cards=card_list,
+                view_mode="trades",
+                locations=loc_list
+            )
+
+        return render_template(
+            "_card_items.html",
+            cards=card_list,
+            view_mode="trades",
+            locations=loc_list
+        )
     
     # Otherwise, return the full page layout on initial load
     return render_template('trade_binder.html', 

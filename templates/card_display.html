@@ -959,7 +959,7 @@
             <form action="{{ url_for('inventory.inventory') }}" method="GET" class="advanced-search-form open" id="searchForm">
 
                 <input type="hidden" name="drawer_state" id="drawer_state_open" value="open">
-                <input type="hidden" name="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
+                <input type="hidden" name="view_mode" id="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
 
                 {# This is the actual search value your Flask route reads #}
                 <input type="hidden" name="q" id="compiledSearchQuery" value="{{ request.args.get('q', '') }}">
@@ -1376,13 +1376,22 @@
             const urlParams = new URLSearchParams(window.location.search);
             urlParams.set('page', page);
 
+            const currentViewMode =
+                viewInput?.value ||
+                urlParams.get('view_mode') ||
+                'grid';
+
+            urlParams.set('view_mode', currentViewMode);
+
             fetch(`${endpoint}?${urlParams.toString()}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-View-Mode': currentViewMode
+                }
             })
             .then(res => res.text())
             .then(html => {
-                const currentViewMode = viewInput ? viewInput.value : 'grid';
-
+                
                 const targetContainer = currentViewMode === 'table'
                     ? document.getElementById('card-table-body')
                     : document.getElementById('card-grid');

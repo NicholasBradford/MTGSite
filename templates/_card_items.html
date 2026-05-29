@@ -5,7 +5,7 @@
             {% if card['image_url'] %}
                 <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
                     <img 
-                        <img src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
+                        src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
                         alt="{{ card['name'] }}" 
                         {% if is_admin_inventory %}
                                     onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
