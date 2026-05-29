@@ -1,0 +1,38 @@
+
+
+<tbody>
+    {% for card in cards %}
+        <tr class="card-item" data-scryfall-id="{{ card.scryfall_id }}">
+            <td class="center-align font-bold">{{ card.qty }}</td>
+            <td class="font-bold">{{ card.name }}</td>
+            <td class="center-align uppercase">{{ card.set_code }}</td>
+            <td class="center-align">{{ card.collector_number }}</td>
+            <td class="text-muted">{{ card.type_line if card.type_line else '—' }}</td>
+            <td class="center-align">{{ card.mana_cost if card.mana_cost is not none else '{0}' }}</td>
+            <td class="center-align">{{ card.cmc|int if card.cmc is not none else 0 }}</td>
+            <td class="capitalize">{{ card.finish }}</td>
+            <td class="right-align text-accent">
+                {% if card.price %}
+                    ${{ "%.2f"|format(card.price) }}
+                {% else %}
+                    $0.00
+                {% endif %}
+            </td>
+            {% if current_user.is_authenticated %}
+                <td class="center-align">
+                    <button class="vault-btn" onclick="openEditModal('{{ card.instance_id }}', '{{card.location_id}}' , '{{card.is_tradeable}}', '{{ card.scryfall_id }}', '{{ card.finish|lower }}', this)">
+                        Manage
+                    </button>
+                </td>
+            {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="10" class="center-align" style="padding: 40px 20px;">
+                <span class="text-muted">No cards found matching this query in your inventory.</span>
+            </td>
+        </tr>
+    {% endfor %}
+</tbody>
+
+

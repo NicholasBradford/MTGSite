@@ -73,31 +73,44 @@ def trade():
             i.location_id, 
             i.is_tradeable,
             cd.name, 
-            cd.cmc, 
-            cd.color_identity, 
             cp.image_url, 
             cp.set_code, 
             cp.collector_number,
             i.finish, 
-            COUNT(*) as qty 
+            i.instance_id,
+            cd.type_line, 
+            cd.cmc, 
+            cd.mana_cost,
+            COUNT(i.instance_id) as qty,
+            CASE 
+                WHEN i.finish = 'foil' THEN cp.current_price_foil
+                WHEN i.finish = 'etched' THEN cp.current_price_foil 
+                ELSE cp.current_price 
+            END as price,
+            i.finish, COUNT(*) as qty 
         FROM inventory i 
         JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
         GROUP BY i.scryfall_id, i.finish
         {having_sql}
-        ORDER BY {sort_sql}, i.finish DESC
+        ORDER BY {sort_sql}, CAST(cp.collector_number AS INTEGER) ASC, i.finish DESC
         LIMIT ? OFFSET ?
     '''    
     
     # Execute main query passing the search params PLUS the limit and offset params
     cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
     
-    # Close the connection after we have our data
+    query_locs = 'SELECT location_id as id, name FROM locations ORDER BY name'
+    locs = manager.cursor.execute(query_locs).fetchall()
+
     manager.close()
-    
-    # Safely convert tuples to dictionaries so Jinja doesn't crash
+
     card_list = [dict(row) for row in cards]
+    loc_list = [dict(row) for row in locs]
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render_template('_card_items.html', cards=card_list, view_mode='inventory', locations=loc_list)
     
     # 5. AJAX CHECK FOR INFINITE SCROLL
     # If the request comes from our infinite scroll script, ONLY return the card snippets
@@ -107,9 +120,11 @@ def trade():
     # Otherwise, return the full page layout on initial load
     return render_template('trade_binder.html', 
                            cards=card_list, 
+                           locations=loc_list,
                            view_mode="trades",
                            page=page,
-                           total_pages=total_pages)
+                           total_pages=total_pages,
+                           search_query=search_query)
     
 @trade_bp.route('/api/submit_trade', methods=['POST'])
 @login_required

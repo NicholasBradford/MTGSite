@@ -104,6 +104,8 @@ def search(search_query, conditions=None):
                     search_params['locs'].append(prefix_val)
                 elif key in ['type', 't']:
                     search_params['types'].append(prefix_val)
+                elif key in ['cn', 'collector', 'collector_number', 'number']:
+                    search_params['cns'].append(prefix_val)
                 elif key in ["color", "c"]:
                     search_params['colors'].append(prefix_val) 
                 elif key in ["text","oracle","o"]:
@@ -137,6 +139,13 @@ def search(search_query, conditions=None):
         val = term[1:] if is_negated else term
         conditions.append(f"cd.type_line {'NOT ' if is_negated else ''}LIKE ?")
         params.append(f'%{val}%')
+        
+    for term in search_params['cns']:
+        is_negated = term.startswith('-')
+        val = term[1:] if is_negated else term
+
+        conditions.append(f"cp.collector_number {'!=' if is_negated else '='} ?")
+        params.append(val)
 
     for term in search_params['text']:
         is_negated = term.startswith('-')

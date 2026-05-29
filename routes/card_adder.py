@@ -178,7 +178,7 @@ def delete_card(inventory_id):
     finally:
         manager.close()
     
-    return redirect(url_for('adder.adder'))
+    return redirect(request.referrer or url_for('index'))
 
 # Route 1: To VIEW the page
 @adder_bp.route('/add/inventory/bulk', methods=['GET'])

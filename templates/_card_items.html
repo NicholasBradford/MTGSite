@@ -1,6 +1,6 @@
 {% if cards[0]%}
     {% for card in cards %}
-    {% set is_admin_inventory = current_user.is_authenticated and view_mode == 'inventory' %}
+    {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
         <div class="card_class" >
             {% if card['image_url'] %}
                 <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
