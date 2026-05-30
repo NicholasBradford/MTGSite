@@ -392,7 +392,15 @@ def wishlist_add():
     fetcher = ScryfallFetcher.ScryfallFetcher(manager, setting=1)
 
     query = '''
-        SELECT w.wish_id, cd.name, cp.set_code, cp.collector_number, w.added, w.finish, ph.price_usd as nonfoil, ph.price_foil as foil
+        SELECT 
+        w.wish_id, 
+        cd.name, 
+        cp.set_code, 
+        cp.collector_number,
+        w.added, 
+        w.finish, 
+        ph.price_usd as nonfoil, 
+        ph.price_foil as foil
         FROM wishlist w
         JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id

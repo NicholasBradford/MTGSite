@@ -3,248 +3,862 @@
 
 {% block style %}
 {{ super() }}
-    /* Styling isolated to this view for the column layout */
-    .deck-container {
-        display: flex;
-        gap: 20px;
-        align-items: flex-start;
-        margin-top: 20px;
-    }
-    .commander-sidebar {
-        flex: 0 0 300px;
-        position: sticky;
-        top: 20px;
-    }
-    .deck-lists {
-        flex: 1;
-        column-count: 3; /* Masonry layout for MTG types */
-        column-gap: 20px;
-    }
-    .category-card {
-        break-inside: avoid; /* Prevents a category from splitting across columns */
-        margin-bottom: 20px;
-        background: #1f1f1f; /* Vault Theme Card Surface */
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid #333; /* Vault Theme Border */
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .card-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 6px 0;
-        font-size: 0.9em;
-        border-bottom: 1px solid #333;
-    }
-    .card-row:last-child {
-        border-bottom: none;
-    }
-    .status-indicator {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 8px;
-    }
-    .status-owned { background-color: #28a745; } /* Green Accent */
-    .status-missing { background-color: #dc3545; } /* Red Accent */
-    
-    .mana-curve-graph {
-        display: flex;
-        align-items: flex-end;
-        height: 100px;
-        gap: 5px;
-        margin-top: 10px;
-        background: rgba(0,0,0,0.2);
-        padding: 10px;
-        border-radius: 4px;
-        border: 1px solid #333;
-    }
-    .bar {
-        flex: 1;
-        background-color: #17a2b8; /* Teal Accent for integrity/data */
-        border-radius: 3px 3px 0 0;
-        transition: height 0.3s ease;
+    .deck-page {
+        max-width: 1450px;
+        margin: 0 auto;
+        padding: 28px 20px 56px;
     }
 
-    /* --- Vault Tooltip Styling --- */
+    .deck-header {
+        position: relative;
+        margin-bottom: 26px;
+        padding: 26px 30px;
+        border: 1px solid rgba(255, 202, 40, 0.22);
+        border-radius: 20px;
+        background:
+            radial-gradient(circle at top left, rgba(255, 202, 40, 0.16), transparent 34%),
+            linear-gradient(135deg, rgba(38, 28, 12, 0.95), rgba(14, 14, 18, 0.98));
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+        overflow: hidden;
+    }
+
+    .deck-header::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+        pointer-events: none;
+    }
+
+    .deck-kicker {
+        margin: 0 0 6px;
+        color: #ffca28;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .deck-title {
+        margin: 0;
+        color: #f4f1e8;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 1;
+        letter-spacing: -0.045em;
+    }
+
+    .deck-subtitle {
+        margin: 10px 0 0;
+        color: #c8c1ad;
+        font-size: 1.02rem;
+    }
+
+    .bar {
+        position: relative;
+        flex: 1;
+        min-height: 4px;
+        border-radius: 6px 6px 2px 2px;
+        background: linear-gradient(180deg, #38d5e8, #167d93);
+        box-shadow: 0 0 12px rgba(23, 162, 184, 0.22);
+        transition: height 0.3s ease, filter 0.2s ease;
+    }
+
+    .bar:hover {
+        filter: brightness(1.16);
+    }
+
+    .category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid rgba(255, 202, 40, 0.16);
+        background:
+            radial-gradient(circle at top left, rgba(255, 202, 40, 0.08), transparent 48%),
+            rgba(255, 255, 255, 0.02);
+    }
+
+    .category-title {
+        margin: 0;
+        color: #f1ecdf;
+        font-size: 1.05rem;
+        letter-spacing: -0.02em;
+    }
+
+    .category-count {
+        color: #28d8ff;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .category-body {
+        padding: 8px;
+    }
+
+    .card-row {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 9px;
+        border-radius: 10px;
+        color: #bbb;
+        font-size: 0.9rem;
+        transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .card-row + .card-row {
+        margin-top: 2px;
+    }
+
+    .card-row:hover {
+        background: rgba(255, 255, 255, 0.045);
+    }
+
+    .card-main {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .status-indicator {
+        flex: 0 0 auto;
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+    }
+
+    .status-owned {
+        background-color: #28a745;
+        box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+    }
+
+    .status-missing {
+        background-color: #dc3545;
+        box-shadow: 0 0 8px rgba(220, 53, 69, 0.4);
+    }
+
     .card-name-wrapper {
         position: relative;
         display: inline-block;
+        min-width: 0;
     }
+
     .card-name-wrapper.owned {
         cursor: help;
-        border-bottom: 1px dotted #17a2b8; /* Subtle Teal Accent underline */
     }
+
+    .deck-card-name {
+        color: #cfc8b8;
+    }
+
+    .card-name-wrapper.owned .deck-card-name {
+        border-bottom: 1px dotted rgba(23, 162, 184, 0.8);
+    }
+
+    .card-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex: 0 0 auto;
+    }
+
+    .mana-cost {
+        color: #a9a9a9;
+        font-size: 0.86rem;
+        white-space: nowrap;
+    }
+
     .vault-tooltip {
         visibility: hidden;
-        background-color: #1f1f1f; /* Card Surface */
-        color: #bbb; /* Secondary Text */
-        text-align: left;
-        padding: 10px 15px;
-        border-radius: 8px;
-        border: 1px solid #333; /* Borders & Dividers */
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         position: absolute;
-        z-index: 10;
-        bottom: 130%; 
+        z-index: 30;
+        bottom: 135%;
         left: 0;
-        opacity: 0;
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        transform: translateY(5px);
         width: max-content;
-        font-size: 0.9em;
+        max-width: 260px;
+        padding: 11px 13px;
+        border: 1px solid rgba(255, 202, 40, 0.18);
+        border-radius: 12px;
+        background:
+            linear-gradient(180deg, rgba(34, 34, 38, 0.98), rgba(16, 16, 19, 0.99));
+        color: #bbb;
+        text-align: left;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.58);
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        pointer-events: none;
+        font-size: 0.84rem;
     }
+
+    .vault-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 14px;
+        border-width: 7px;
+        border-style: solid;
+        border-color: rgba(16, 16, 19, 0.99) transparent transparent transparent;
+    }
+
     .card-name-wrapper.owned:hover .vault-tooltip {
         visibility: visible;
         opacity: 1;
         transform: translateY(0);
     }
-    .vault-tooltip .highlight {
-        color: #ffca28; /* Gold Accent for highlighted data */
-        font-weight: bold;
+
+    .tooltip-row + .tooltip-row {
+        margin-top: 5px;
     }
 
-    /* --- Admin Control Buttons --- */
+    .vault-tooltip .highlight {
+        color: #73daff;
+        font-weight: 800;
+    }
+
     .card-controls {
         display: flex;
         gap: 5px;
-        margin-left: 15px;
     }
+
+    .deck-form {
+        margin: 0;
+    }
+
     .vault-btn {
-        background: #222;
-        border: 1px solid #333;
-        color: #bbb;
-        border-radius: 4px;
-        width: 24px;
-        height: 24px;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-width: 26px;
+        height: 26px;
+        padding: 0 9px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #191919;
+        color: #bbb;
         cursor: pointer;
-        transition: all 0.2s ease;
+        font-weight: 900;
+        line-height: 1;
         text-decoration: none;
-        font-weight: bold;
-        padding: 0;
+        transition:
+            border-color 0.2s ease,
+            color 0.2s ease,
+            box-shadow 0.2s ease,
+            transform 0.15s ease;
     }
+
+    .vault-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .vault-btn.add {
+        border-color: rgba(40, 167, 69, 0.45);
+        color: #44d06b;
+    }
+
     .vault-btn.add:hover {
-        border-color: #28a745; /* Green Accent */
-        color: #28a745;
-        box-shadow: 0 0 5px rgba(40, 167, 69, 0.4);
+        border-color: #28a745;
+        color: #5cff83;
+        box-shadow: 0 0 12px rgba(40, 167, 69, 0.28);
     }
+
+    .vault-btn.remove {
+        border-color: rgba(220, 53, 69, 0.38);
+        color: #e26370;
+    }
+
     .vault-btn.remove:hover {
-        border-color: #dc3545; /* Red Accent */
-        color: #dc3545;
-        box-shadow: 0 0 5px rgba(220, 53, 69, 0.4);
+        border-color: #dc3545;
+        color: #ff7a86;
+        box-shadow: 0 0 12px rgba(220, 53, 69, 0.24);
+    }
+
+    .vault-btn.submit-add {
+        min-width: 58px;
+        height: auto;
+        padding: 0 15px;
+    }
+    .deck-container {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        gap: 24px;
+        align-items: start;
+    }
+
+    .commander-sidebar {
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
+    .commander-sidebar .commander-image-frame {
+        max-width: 235px;
+        margin: 0 auto;
+    }
+
+    .vault-panel {
+        border: 1px solid rgba(255, 202, 40, 0.13);
+        border-radius: 18px;
+        background:
+            linear-gradient(180deg, rgba(35, 35, 39, 0.97), rgba(16, 16, 20, 0.99));
+        box-shadow:
+            0 12px 26px rgba(0, 0, 0, 0.38),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        overflow: hidden;
+    }
+
+    .vault-panel-inner {
+        padding: 13px;
+    }
+
+    .commander-card {
+        padding: 12px;
+    }
+
+    .commander-image-frame {
+        position: relative;
+        border-radius: 4.75% / 3.5%;
+        overflow: hidden;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65);
+    }
+
+    .commander-image-frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+            inset 0 -40px 60px rgba(0, 0, 0, 0.16);
+        pointer-events: none;
+    }
+
+    .commander-image {
+        display: block;
+        width: 100%;
+        border-radius: 4.75% / 3.5%;
+    }
+
+    .commander-title-block {
+        padding: 14px 8px 8px;
+        text-align: center;
+    }
+
+    .commander-deck-name {
+        margin: 0;
+        color: #f3efe3;
+        font-size: 1.18rem;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+    }
+
+    .commander-name {
+        margin-top: 6px;
+        color: #bdb5a3;
+        font-size: 0.86rem;
+        font-weight: 700;
+    }
+
+    .color_pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+        padding: 3px 12px;
+        border: 1px solid rgba(255, 202, 40, 0.78);
+        border-radius: 999px;
+        background: rgba(18, 18, 18, 0.9);
+        color: #ffdf73;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        box-shadow: 0 0 16px rgba(255, 202, 40, 0.08);
+    }
+
+    .panel-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 0 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        color: #eee;
+        font-size: 0.98rem;
+    }
+
+    .add-card-form {
+        display: flex;
+        gap: 10px;
+    }
+
+    .deck-input {
+        min-width: 0;
+        flex: 1;
+        padding: 9px 12px;
+        border: 1px solid #333;
+        border-radius: 10px;
+        background: #111;
+        color: #eee;
+        font-size: 0.92rem;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .deck-input:focus {
+        border-color: rgba(255, 202, 40, 0.75);
+        box-shadow: 0 0 0 3px rgba(255, 202, 40, 0.12);
+    }
+
+    .mana-curve-graph {
+        display: flex;
+        align-items: flex-end;
+        height: 95px;
+        gap: 7px;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        background:
+            linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.36));
+    }
+
+    .mana-curve-labels {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 12px 0;
+        color: #8f8f8f;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .commander-sidebar-admin {
+        gap: 10px;
+    }
+
+    .commander-sidebar-admin .commander-card {
+        padding: 9px;
+    }
+
+    .commander-sidebar-admin .commander-image-frame {
+        max-width: 205px;
+    }
+
+    .commander-sidebar-admin .commander-title-block {
+        padding: 9px 8px 4px;
+    }
+
+    .commander-sidebar-admin .commander-deck-name {
+        font-size: 1.04rem;
+        line-height: 1.08;
+    }
+
+    .commander-sidebar-admin .commander-name {
+        margin-top: 3px;
+        font-size: 0.76rem;
+        line-height: 1.1;
+    }
+
+    .commander-sidebar-admin .color_pill {
+        margin-top: 7px;
+        padding: 2px 10px;
+        font-size: 0.7rem;
+    }
+
+    .commander-sidebar-admin .vault-panel-inner {
+        padding: 10px 12px;
+    }
+
+    .commander-sidebar-admin .panel-heading {
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        font-size: 0.9rem;
+    }
+
+    .commander-sidebar-admin .deck-input {
+        padding: 7px 10px;
+        font-size: 0.84rem;
+    }
+
+    .commander-sidebar-admin .vault-btn.submit-add {
+        min-width: 48px;
+        padding: 0 11px;
+    }
+
+    .commander-sidebar-admin .mana-curve-graph {
+        height: 78px;
+        padding: 8px;
+        margin-top: 8px;
+    }
+
+    .commander-sidebar-admin .mana-curve-labels {
+        padding: 5px 10px 0;
+        font-size: 0.7rem;
+    }
+
+    /* JS-balanced deck columns */
+
+    .deck-lists {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+        align-items: start;
+    }
+
+    .deck-list-column {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .category-card {
+        width: 100%;
+        margin: 0;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background:
+            linear-gradient(180deg, rgba(32, 32, 36, 0.98), rgba(17, 17, 21, 0.99));
+        box-shadow:
+            0 10px 24px rgba(0, 0, 0, 0.32),
+            inset 0 1px 0 rgba(255, 255, 255, 0.035);
+        overflow: visible;
+    }
+
+    /* Responsive */
+
+    @media (max-width: 1150px) {
+        .deck-container {
+            grid-template-columns: 290px minmax(0, 1fr);
+        }
+
+        .deck-lists {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 800px) {
+        .deck-container {
+            grid-template-columns: 1fr;
+        }
+
+        .commander-sidebar {
+            position: static;
+            max-height: none;
+            overflow-y: visible;
+            padding-right: 0;
+        }
+
+        .commander-sidebar,
+        .commander-sidebar-admin {
+            gap: 14px;
+        }
+
+        .commander-sidebar .commander-image-frame,
+        .commander-sidebar-admin .commander-image-frame {
+            max-width: 260px;
+        }
+
+        .deck-lists {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 520px) {
+        .deck-page {
+            padding: 20px 14px 42px;
+        }
+
+        .deck-header {
+            padding: 22px 20px;
+        }
+
+        .add-card-form {
+            flex-direction: column;
+        }
+
+        .vault-btn.submit-add {
+            min-height: 36px;
+        }
+
+        .card-row {
+            align-items: flex-start;
+        }
+
+        .card-meta {
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
     }
 {% endblock style %}
 
 {% block content %}
+<div class="deck-page">
 
-<div class="deck-container">
-    <div class="commander-sidebar">
-             {% if current_user.is_authenticated %}
-        <div class="admin-card" style="margin-top: 20px;">
-            <h3 style="color: #eee; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px;">Add Card</h3>
-            <form action="{{ url_for('edh.add_card_to_deck_by_name', deck_id=deck['deck_id']) }}" method="POST" style="display: flex; gap: 10px; margin-top: 15px;">
-                <input 
-                    type="text" 
-                    name="card_name" 
-                    placeholder="Enter card name..." 
-                    style="flex: 1; padding: 8px 12px; border-radius: 4px; background: #121212; border: 1px solid #333; color: #eee; font-size: 0.9em;" 
-                    required>
-                
-                <button type="submit" class="vault-btn add" style="width: auto; padding: 0 15px; border-color: #28a745; color: #28a745;">
-                    Add
-                </button>
-            </form>
-        </div>
-    {% endif %}
-        <div class="admin-card collection-card">
-            
-            <img src="{{ url_for('serve_card_image', filename=deck['image_url']) }}" 
-                 alt="{{ deck['commander_name'] }}" 
-                 style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-            
-            <h2 style="margin-top: 15px; color: #eee; text-align: center; margin-bottom: 5px;">{{ deck['deck_name'] }}</h2>
-            <div class="text-secondary" style="text-align: center; color: #bbb; font-weight: bold;">{{ deck['commander_name'] }}</div>
-            
-            <div class="color_pill" style="margin: 15px auto 0 auto; width: max-content; background: #121212; color: #ffca28; border: 1px solid #ffca28; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold; display: block;">
-                {{ deck['color_identity'] }}
+    <section class="deck-header">
+        <p class="deck-kicker">Commander Loadout</p>
+        <h1 class="deck-title">{{ deck['deck_name'] }}</h1>
+        <p class="deck-subtitle">{{ deck['commander_name'] }} · {{ deck['color_identity'] }}</p>
+    </section>
+
+    <div class="deck-container">
+        <aside class="commander-sidebar {% if current_user.is_authenticated and current_user.role == 'admin' %}commander-sidebar-admin{% endif %}">
+
+
+            <div class="vault-panel commander-card">
+                <div class="commander-image-frame">
+                    <img src="{{ url_for('serve_card_image', filename=deck['image_url']) }}"
+                         alt="{{ deck['commander_name'] }}"
+                         class="commander-image"
+                         loading="lazy">
+                </div>
+
+                <div class="commander-title-block">
+                    <h2 class="commander-deck-name">{{ deck['deck_name'] }}</h2>
+                    <div class="commander-name">{{ deck['commander_name'] }}</div>
+                    <div class="color_pill">{{ deck['color_identity'] }}</div>
+                </div>
             </div>
-        </div>
 
-        <div class="admin-card stats-card" style="margin-top: 20px;">
-            <h3 style="color: #eee;">Mana Curve</h3>
-            <div class="mana-curve-graph">
-                {% for cost, percentage in mana_curve.items() %}
-                <div class="bar" style="height: {{ percentage }}%;" title="CMC {{ cost }}: {{ percentage|round(1) }}%"></div>
-                {% endfor %}
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+            <div class="vault-panel">
+                <div class="vault-panel-inner">
+                    <h3 class="panel-heading">Add Card</h3>
+
+                    <form action="{{ url_for('edh.add_card_to_deck_by_name', deck_id=deck['deck_id']) }}"
+                          method="POST"
+                          class="add-card-form">
+                        <input type="text"
+                               name="card_name"
+                               placeholder="Enter card name..."
+                               class="deck-input"
+                               required>
+
+                        <button type="submit" class="vault-btn add submit-add">
+                            Add
+                        </button>
+                    </form>
+                </div>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 5px 10px;" class="text-muted">
-                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6+</span>
-            </div>
-        </div>
+            {% endif %}
 
-    
-    </div>
+            <div class="vault-panel">
+                <div class="vault-panel-inner">
+                    <h3 class="panel-heading">Mana Curve</h3>
 
-   
-
-    <div class="deck-lists">
-        {% for category, card_list in cards.items() %}
-        <div class="category-card">
-            <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; color: #eee;">
-                {{ category }} ({{ card_list|length }})
-            </h3>
-            {% for card in card_list %}
-            <div class="card-row">
-                
-                <div style="display: flex; align-items: center;">
-                    <span class="status-indicator {{ 'status-owned' if card['is_owned'] else 'status-missing' }}"></span>
-                    
-                    <div class="card-name-wrapper {{ 'owned' if card['is_owned'] else '' }}">
-                    <span style="color: #bbb;">{{ card['quantity_needed'] }}x {{ card['name'] }}</span>
-                    
-                    {% if card['is_owned'] %}
-                    <div class="vault-tooltip">
-                        <div style="margin-bottom: 4px;">
-                            Version: <span class="highlight">{{ card['set_name'] | default('Unknown Set') }}</span>
+                    <div class="mana-curve-graph">
+                        {% for cost, percentage in mana_curve.items() %}
+                        <div class="bar"
+                             style="height: {{ percentage }}%;"
+                             title="CMC {{ cost }}: {{ percentage|round(1) }}%">
                         </div>
-                        
-                        <div style="margin-bottom: 4px;">
-                            Location: <span class="highlight">{{ card['available_location'] | default('General Binder') }}</span>
-                        </div>
-                        
-                        {% if card['available_price'] %}
-                        <div>
-                            Price: <span class="highlight">${{ "%.2f"|format(card['available_price']) }}</span>
-                        </div>
-                        {% endif %}
+                        {% endfor %}
                     </div>
-                    {% endif %}
-                </div>
-                </div>
 
-                <div style="display: flex; align-items: center;">
-                    <span class="mana-cost" style="color: #bbb;">{{ card['mana_cost'] }}</span>
-                    
-                    {% if current_user.is_authenticated %}
-                    <div class="card-controls">
-                        <form action="{{ url_for('edh.remove_card_from_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="vault-btn remove" title="Remove 1">-</button>
-                        </form>
-                        <form action="{{ url_for('edh.add_card_to_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="vault-btn add" title="Add 1">+</button>
-                        </form>
+                    <div class="mana-curve-labels">
+                        <span>0</span>
+                        <span>1</span>
+                        <span>2</span>
+                        <span>3</span>
+                        <span>4</span>
+                        <span>5</span>
+                        <span>6+</span>
                     </div>
-                    {% endif %}
                 </div>
-
             </div>
+
+        </aside>
+
+        <main class="deck-lists balanced-deck-lists" id="deckLists">
+            {% for category, card_list in cards.items() %}
+            <section class="category-card">
+                <header class="category-header">
+                    <h3 class="category-title">{{ category }}</h3>
+                    <span class="category-count">{{ card_list|length }}</span>
+                </header>
+
+                <div class="category-body">
+                    {% for card in card_list %}
+                    <div class="card-row">
+                        <div class="card-main">
+                            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                            <span class="status-indicator {{ 'status-owned' if card['is_owned'] else 'status-missing' }}"></span>
+                            {% endif %}
+                            <div class="card-name-wrapper {{ 'owned' if card['is_owned'] else '' }}">
+                                <span class="deck-card-name">{{ card['quantity_needed'] }}x {{ card['name'] }}</span>
+
+                                {% if card['is_owned'] %}
+                                <div class="vault-tooltip">
+                                    <div class="tooltip-row">
+                                        Version:
+                                        <span class="highlight">{{ card['set_name'] | default('Unknown Set') }}</span>
+                                    </div>
+
+                                    <div class="tooltip-row">
+                                        Location:
+                                        <span class="highlight">{{ card['available_location'] | default('General Binder') }}</span>
+                                    </div>
+
+                                    {% if card['available_price'] %}
+                                    <div class="tooltip-row">
+                                        Price:
+                                        <span class="highlight">${{ "%.2f"|format(card['available_price']) }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="card-meta">
+                            <span class="mana-cost">{{ card['mana_cost'] }}</span>
+
+                            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                            <div class="card-controls">
+                                <form action="{{ url_for('edh.remove_card_from_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}"
+                                      method="POST"
+                                      class="deck-form">
+                                    <button type="submit" class="vault-btn remove" title="Remove 1">−</button>
+                                </form>
+
+                                <form action="{{ url_for('edh.add_card_to_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}"
+                                      method="POST"
+                                      class="deck-form">
+                                    <button type="submit" class="vault-btn add" title="Add 1">+</button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
             {% endfor %}
-        </div>
-        {% endfor %}
+        </main>
     </div>
+
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const deckLists = document.getElementById("deckLists");
+
+    if (!deckLists) return;
+
+    const originalCards = Array.from(deckLists.querySelectorAll(".category-card"));
+
+    function getDeckColumnCount() {
+        if (window.innerWidth <= 800) return 1;
+        if (window.innerWidth <= 1150) return 2;
+        return 3;
+    }
+
+    function getGap() {
+        return 20;
+    }
+
+    function measureCards(columnWidth) {
+        const measureBox = document.createElement("div");
+        measureBox.style.position = "absolute";
+        measureBox.style.visibility = "hidden";
+        measureBox.style.pointerEvents = "none";
+        measureBox.style.width = `${columnWidth}px`;
+        measureBox.style.left = "-9999px";
+        measureBox.style.top = "0";
+
+        document.body.appendChild(measureBox);
+
+        const measured = originalCards.map(card => {
+            measureBox.appendChild(card);
+            return {
+                card,
+                height: card.offsetHeight
+            };
+        });
+
+        document.body.removeChild(measureBox);
+
+        return measured;
+    }
+
+    function createDeckColumns(columnCount) {
+        deckLists.innerHTML = "";
+
+        return Array.from({ length: columnCount }, () => {
+            const column = document.createElement("div");
+            column.className = "deck-list-column";
+            deckLists.appendChild(column);
+            return column;
+        });
+    }
+
+    function balanceDeckColumns() {
+        const columnCount = getDeckColumnCount();
+        const gap = getGap();
+
+        if (columnCount === 1) {
+            deckLists.innerHTML = "";
+            originalCards.forEach(card => deckLists.appendChild(card));
+            return;
+        }
+
+        const totalWidth = deckLists.clientWidth;
+        const columnWidth = (totalWidth - gap * (columnCount - 1)) / columnCount;
+
+        const measuredCards = measureCards(columnWidth);
+        const columns = createDeckColumns(columnCount);
+        const columnHeights = Array(columnCount).fill(0);
+
+        /*
+            Estimate a target height from the full deck-list content.
+            This ignores the commander sidebar entirely.
+        */
+        const totalContentHeight = measuredCards.reduce((sum, item) => {
+            return sum + item.height + gap;
+        }, 0);
+
+        const targetHeight = Math.ceil(totalContentHeight / columnCount);
+
+        let currentColumn = 0;
+
+        measuredCards.forEach((item, index) => {
+            const isLastColumn = currentColumn === columnCount - 1;
+            const nextHeight = columnHeights[currentColumn] + item.height + gap;
+
+            /*
+                Move to the next deck-list column if this card would push the
+                current column past the target height.
+
+                The last deck-list column is allowed to absorb overflow.
+            */
+            if (
+                !isLastColumn &&
+                columnHeights[currentColumn] > 0 &&
+                nextHeight > targetHeight
+            ) {
+                currentColumn++;
+            }
+
+            columns[currentColumn].appendChild(item.card);
+            columnHeights[currentColumn] += item.height + gap;
+        });
+    }
+
+    balanceDeckColumns();
+
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(balanceDeckColumns, 150);
+    });
+});
+</script>   
 {% endblock %}

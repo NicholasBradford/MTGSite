@@ -1,0 +1,166 @@
+{% extends "card_display.html" %}
+
+{% block title %}Planeswalker Vault{% endblock %}
+
+{% block style %}
+{{ super() }}
+
+    /*
+        Planeswalker page-specific layout.
+        Binder pages are 3 rows of 4 cards, so desktop display is fixed to 4 across.
+    */
+    .planeswalker-vault-page #card-grid.card-container {
+        display: grid;
+        grid-template-columns: repeat(4, 250px);
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .planeswalker-vault-page .pw-name-search {
+        max-width: 720px;
+        margin: 0 auto 24px;
+    }
+
+    .planeswalker-vault-page .pw-name-search .search-inputs {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    @media (max-width: 1100px) {
+        .planeswalker-vault-page #card-grid.card-container {
+            grid-template-columns: repeat(3, 250px);
+        }
+    }
+
+    @media (max-width: 850px) {
+        .planeswalker-vault-page #card-grid.card-container {
+            grid-template-columns: repeat(2, 250px);
+        }
+    }
+
+    @media (max-width: 560px) {
+        .planeswalker-vault-page #card-grid.card-container {
+            grid-template-columns: 250px;
+        }
+    }
+
+{% endblock %}
+
+{% block content %}
+<div class="planeswalker-vault-page">
+    <br />
+
+    <div class="page-header center-align" style="margin-top: 10px; margin-bottom: 24px;">
+        <h2><i class="fas fa-book-magic text-accent"></i> The Planeswalker Vault</h2>
+        <p class="text-muted">Tracking every spark in the multiverse. Organized by historical release order.</p>
+    </div>
+
+    <div class="search-container pw-name-search">
+        <form action="" method="GET" class="advanced-search-form closed" id="searchForm">
+            <div class="search-inputs">
+                <input
+                    type="text"
+                    name="name_query"
+                    placeholder="Search planeswalker name..."
+                    value="{{ request.args.get('name_query', '') }}"
+                    class="main-query-input"
+                >
+
+                <div class="search-actions">
+                    <button type="submit" class="btn-search" title="Search Planeswalkers">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+
+                    {% if request.args.get('name_query') %}
+                        <a href="{{ request.path }}" class="btn-clear" title="Clear Search">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div id="card-grid" class="card-container">
+        {% include '_pw_items.html' %}
+
+        {% if not planeswalkers and page == 1 %}
+            <div class="center-align text-muted" style="grid-column: 1 / -1; padding: 40px;">
+                No planeswalkers found matching your search.
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="scroll-sentinel" style="height: 20px;"></div>
+
+    <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #aaa;">
+        <p>Locating Sparks...</p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sentinel = document.getElementById('scroll-sentinel');
+        const loader = document.getElementById('loading-indicator');
+
+        let page = {{ page | default(1) }};
+        const totalPages = {{ total_pages | default(1) }};
+
+        function loadMore() {
+            if (!loader) return;
+
+            page++;
+            loader.style.display = 'block';
+
+            const endpoint = window.location.pathname;
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('page', page);
+
+            fetch(`${endpoint}?${urlParams.toString()}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-View-Mode': 'grid'
+                }
+            })
+            .then(res => res.text())
+            .then(html => {
+                const targetContainer = document.getElementById('card-grid');
+
+                if (targetContainer) {
+                    targetContainer.insertAdjacentHTML('beforeend', html);
+                }
+
+                loader.style.display = 'none';
+
+                if (page >= totalPages && observer && sentinel) {
+                    observer.unobserve(sentinel);
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load more planeswalkers:', err);
+                loader.style.display = 'none';
+            });
+        }
+
+        let observer = null;
+
+        if (sentinel) {
+            observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && page < totalPages) {
+                    loadMore();
+                }
+            }, { threshold: 0.1 });
+
+            observer.observe(sentinel);
+        }
+    });
+</script>
+{% endblock %}

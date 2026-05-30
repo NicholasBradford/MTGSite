@@ -313,7 +313,7 @@
                             item.className = 'dropdown-item';
                             // Build the dropdown row visually
                             item.innerHTML = `
-                                    <img src="${IMAGE_BASE_PATH}${card.image_url}" alt="${card.name}">                                
+                                    <img src="${IMAGE_BASE_PATH}${card.image_url}" alt="${card.name}" loading="lazy">                                
                                 <div class="details">
                                     <span class="name">${card.name}</span>
                                     <span class="set-info">${card.set_code.toUpperCase()} #${card.collector_number} - ${card.finish} </span>

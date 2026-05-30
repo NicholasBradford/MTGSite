@@ -1171,42 +1171,42 @@
             </form>
         {% endif %}
     </div>
-
-    {% if request.args.get('view_mode') == 'table' %}
-        <div class="vault-table-container">
-            <table class="vault-table">
-                <thead>
-                    <tr>
-                        <th class="center-align">Qty</th>
-                        <th>Name</th>
-                        <th class="center-align">Set</th>
-                        <th class="center-align">Collector Number</th>
-                        <th>Type Line</th>
-                        <th class="center-align">Mana Cost</th>
-                        <th class="center-align">MV</th>
-                        <th>Finish</th>
-                        <th class="right-align">Price</th>
-                        {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                        <th class="center-align">Actions</th>
-                        {%endif%}
-                    </tr>
-                </thead>
-                <tbody id="card-table-body">
-                    {% include '_table_rows.html' %} 
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div id="card-grid" class="card-container">
-            {% include '_card_items.html' %}
-        </div>
-    {% endif %}
+    </div> {% block display_area %}
+        {% if request.args.get('view_mode') == 'table' %}
+            <div class="vault-table-container">
+                <table class="vault-table">
+                    <thead>
+                        <tr>
+                            <th class="center-align">Qty</th>
+                            <th>Name</th>
+                            <th class="center-align">Set</th>
+                            <th class="center-align">Collector Number</th>
+                            <th>Type Line</th>
+                            <th class="center-align">Mana Cost</th>
+                            <th class="center-align">MV</th>
+                            <th>Finish</th>
+                            <th class="right-align">Price</th>
+                            {% if current_user.is_authenticated and current_user.role == 'admin' and view_mode != 'wishlist' %}
+                            <th class="center-align">Actions</th>
+                            {%endif%}
+                        </tr>
+                    </thead>
+                    <tbody id="card-table-body">
+                        {% include '_table_rows.html' %} 
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div id="card-grid" class="card-container">
+                {% include '_card_items.html' %}
+            </div>
+        {% endif %}
 
     <div id="scroll-sentinel" style="height: 20px;"></div>
     <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #aaa;">
         <p>Fetching more cards...</p>
     </div>
-
+{% endblock %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const searchForm = document.getElementById('searchForm');

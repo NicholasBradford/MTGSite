@@ -1,0 +1,43 @@
+{% for pw in planeswalkers %}
+    <div class="card_class pw-wrapper">
+        
+        {% if pw.binder_image %}
+            <div class="{% if pw.binder_finish == 'foil' %}rainbow_image{% endif %}" title="{{ pw.name }} (Collected)">
+                <img 
+                    src="{{ url_for('serve_card_image', filename=pw.binder_image) }}" 
+                    alt="{{ pw.name }}"
+                    loading="lazy"
+                >
+            </div>
+
+        {% elif pw.total_owned > 0 and pw.default_image %}
+            <div title="{{ pw.name }} - {{ pw.other_location or 'Owned in another location' }}" style="position: relative;">
+                <img 
+                    src="{{ url_for('serve_card_image', filename=pw.default_image) }}" 
+                    alt="{{ pw.name }}"
+                    style="filter: grayscale(100%); opacity: 0.8; box-shadow: 0 0 15px 3px #9b59b6; border: 2px solid #9b59b6;"
+                >
+                <span class="qty-badge" title="{{ pw.other_location }}">
+                    Locate Copy
+                </span>
+            </div>
+
+        {% elif pw.default_image %}
+            <div title="{{ pw.name }} (Uncollected)">
+                <img 
+                    src="{{ url_for('serve_card_image', filename=pw.default_image) }}" 
+                    alt="{{ pw.name }}"
+                    style="filter: grayscale(100%); opacity: 0.4;"
+                    loading="lazy"
+                >
+            </div>
+
+        {% else %}
+            <div class="no-image">No Image Available</div>
+        {% endif %}
+
+        <div class="card-label">
+            {{ pw.name }}
+        </div>
+    </div>
+{% endfor %}

@@ -114,7 +114,8 @@
                     {# Path construction using your existing logic #}
                     <img src="{{ url_for('serve_card_image', filename='img/icons/' ~ set.set_code|lower ~ '.svg') }}" 
                          class="set-symbol" 
-                         alt="{{ set.set_name }} symbol">
+                         alt="{{ set.set_name }} symbol"
+                         loading="lazy">
                 </div>
                 
                 <div class="set-label-code">{{ set.set_code|upper }}</div>

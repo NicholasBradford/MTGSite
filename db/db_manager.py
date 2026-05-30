@@ -213,6 +213,14 @@ class CardDB:
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
             );
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS planeswalker_tracker (
+                oracle_id TEXT PRIMARY KEY,
+                default_scryfall_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                release_date DATE NOT NULL
+            );
+        ''')
         
         self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
         

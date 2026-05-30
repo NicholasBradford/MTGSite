@@ -68,7 +68,8 @@
                     <div class="{% if card.owned_count > 0 %}rainbow_image{% endif %}">
                         <img src="{{ url_for('serve_card_image', filename=card.image_url) }}" 
                             class="card_img {% if card.owned_count == 0 %}uncollected{% endif %}" 
-                            alt="{{ card.name }}">
+                            alt="{{ card.name }}"
+                            loading="lazy">
                     </div>
                     {% if set.standard_legal %}
                         <div class="count_pill">

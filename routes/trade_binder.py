@@ -147,6 +147,25 @@ def submit_trade():
     if not outbound_items and not inbound_items:
         return jsonify({'success': False, 'error': 'No cards selected for trade.'}), 400
     
+    required_outbound_fields = {"scryfall_id", "finish", "qty"}
+    required_inbound_fields = {"scryfall_id", "finish", "qty", "set_code", "cn"}
+
+    for index, item in enumerate(outbound_items):
+        missing_fields = required_outbound_fields - item.keys()
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Outbound item {index + 1} is missing required field(s): {', '.join(sorted(missing_fields))}."
+            }), 400
+
+    for index, item in enumerate(inbound_items):
+        missing_fields = required_inbound_fields - item.keys()
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Inbound item {index + 1} is missing required field(s): {', '.join(sorted(missing_fields))}."
+            }), 400
+    
     # Generate a unique alphanumeric trade ID (e.g., "TRD-8A3B9C")
     trade_id = f"TRD-{uuid.uuid4().hex[:6].upper()}"
     
@@ -222,21 +241,31 @@ def wishlist():
             w.wish_id, 
             w.finish, 
             cd.name, 
-            cd.cmc, 
-            cd.color_identity, 
             cp.image_url, 
             cp.set_code, 
             cp.collector_number,
-            COUNT(*) as qty 
-        FROM wishlist w 
+            cd.type_line, 
+            cd.color,
+            cd.color_identity,
+            cd.cmc, 
+            cd.mana_cost,
+            COUNT(w.wish_id) as qty,
+            CASE 
+                WHEN w.finish = 'foil' THEN cp.current_price_foil
+                WHEN w.finish = 'etched' THEN cp.current_price_foil 
+                ELSE cp.current_price 
+            END as price,
+            w.finish, COUNT(*) as qty 
+        FROM wishlist w
         JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
         GROUP BY w.scryfall_id, w.finish
         {having_sql}
-        ORDER BY {sort_sql}, w.finish DESC
+        ORDER BY {sort_sql}, CAST(cp.collector_number AS INTEGER) ASC, w.finish DESC
         LIMIT ? OFFSET ?
-    '''    
+    '''   
+    
    
     cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
 
@@ -245,7 +274,20 @@ def wishlist():
     card_list = [dict(row) for row in cards]
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('_card_items.html', cards=card_list, view_mode='trades')
+        view_mode = request.headers.get("X-View-Mode", request.args.get("view_mode", "grid"))
+
+        if view_mode == "table":
+            return render_template(
+                "_table_rows.html",
+                cards=card_list,
+                view_mode="wishlist",
+            )
+
+        return render_template(
+            "_card_items.html",
+            cards=card_list,
+            view_mode="wishlist",
+        )
     
     return render_template('wishlist.html',cards=card_list, 
                            view_mode="wishlist",

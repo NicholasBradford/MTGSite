@@ -17,7 +17,7 @@
                 $0.00
             {% endif %}
         </td>
-        {% if current_user.is_authenticated %}
+        {% if current_user.is_authenticated and view_mode != "wishlist"%}
             <td class="center-align">
                 <button class="vault-btn" onclick="openEditModal('{{ card.instance_id }}', '{{card.location_id}}' , '{{card.is_tradeable}}', '{{ card.scryfall_id }}', '{{ card.finish|lower }}', this)">
                     Manage

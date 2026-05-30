@@ -169,7 +169,7 @@
     <section class="hero-spotlight">
         {% if spotlight %}
             <div class="spotlight-card">
-                <img src="{{ url_for('serve_card_image', filename = spotlight.image_url) }}" alt="{{ spotlight.name }}" class="featured-img">
+                <img src="{{ url_for('serve_card_image', filename = spotlight.image_url) }}" alt="{{ spotlight.name }}" class="featured-img" loading="lazy">
                 <div class="spotlight-text">
                     <h1><i class="fas fa-star"></i> Featured Collection Piece</h1>
                     <h2>{{ spotlight.name }}</h2>
@@ -209,13 +209,13 @@
             <div class="recent-scroll" id="carousel">
                 {% for card in recent %}
                     <div class="recent-card">
-                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }}">
+                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }} loading="lazy"">
                     </div>
                 {% endfor %}
                 
                 {% for card in recent %}
                     <div class="recent-card">
-                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }}">
+                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }} loading="lazy"">
                     </div>
                 {% endfor %}
             </div>

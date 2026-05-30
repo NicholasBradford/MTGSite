@@ -2,75 +2,252 @@
 {% block title %}Commander Deck Gallery{% endblock %}
 
 {% block style %}
-{{ super }}
-    /* Inheriting the image and pill structures from set_detail.html */
+{{ super() }}
+    .edh-gallery-page {
+        max-width: 1250px;
+        margin: 0 auto;
+        padding: 28px 20px 50px;
+    }
+
+    .edh-hero {
+        position: relative;
+        margin-bottom: 28px;
+        padding: 28px 32px;
+        border: 1px solid rgba(255, 202, 40, 0.22);
+        border-radius: 18px;
+        background:
+            radial-gradient(circle at top left, rgba(255, 202, 40, 0.16), transparent 34%),
+            linear-gradient(135deg, rgba(36, 28, 12, 0.95), rgba(15, 15, 18, 0.98));
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+    }
+
+    .edh-hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            120deg,
+            transparent,
+            rgba(255, 255, 255, 0.035),
+            transparent
+        );
+        pointer-events: none;
+    }
+
+    .edh-kicker {
+        margin: 0 0 6px;
+        color: #ffca28;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .edh-title {
+        margin: 0;
+        color: #f4f1e8;
+        font-size: clamp(2rem, 4vw, 3.25rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+    }
+
+    .edh-subtitle {
+        max-width: 620px;
+        margin: 12px 0 0;
+        color: #c8c1ad;
+        font-size: 1rem;
+        line-height: 1.55;
+    }
+
+    .deck-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 24px;
+    }
+
+    .deck-card-shell {
+        position: relative;
+    }
+
+    .deck-gallery-card {
+        position: relative;
+        display: block;
+        height: 100%;
+        padding: 14px;
+        border: 1px solid rgba(255, 202, 40, 0.12);
+        border-radius: 18px;
+        background:
+            linear-gradient(180deg, rgba(38, 38, 42, 0.96), rgba(17, 17, 20, 0.98));
+        box-shadow:
+            0 12px 24px rgba(0, 0, 0, 0.38),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        color: inherit;
+        text-decoration: none;
+        transition:
+            transform 0.2s ease,
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+        overflow: hidden;
+    }
+
+    .deck-gallery-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(circle at top, rgba(255, 202, 40, 0.12), transparent 48%);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+    }
+
+    .deck-gallery-card:hover {
+        transform: translateY(-5px);
+        border-color: rgba(255, 202, 40, 0.65);
+        box-shadow:
+            0 18px 34px rgba(0, 0, 0, 0.52),
+            0 0 24px rgba(255, 202, 40, 0.12);
+    }
+
+    .deck-gallery-card:hover::before {
+        opacity: 1;
+    }
+
     .image_wrapper {
         position: relative;
         width: 100%;
-        margin-bottom: 15px; /* Creates breathing room before the text */
+        margin-bottom: 16px;
     }
 
-    .color_pill {
+    .image_wrapper::after {
+        content: "";
         position: absolute;
-        bottom: -10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #121212;
-        color: #ffca28;
-        border: 1px solid #ffca28;
-        padding: 2px 12px;
-        border-radius: 12px;
-        font-size: 0.85em;
-        font-weight: bold;
-        z-index: 2;
+        inset: 0;
+        border-radius: 4.75% / 3.5%;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        pointer-events: none;
     }
 
-    /* Standardizing the text blocks under the image */
-    .card_label {
-        text-align: center;
-        color: #eee;
-        line-height: 1.4;
+    .deck-card-image {
+        display: block;
+        width: 100%;
+        border-radius: 4.75% / 3.5%;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.62);
+        transition: transform 0.2s ease, filter 0.2s ease;
     }
+
+    .deck-gallery-card:hover .deck-card-image {
+        transform: scale(1.018);
+        filter: brightness(1.08) contrast(1.04);
+    }
+
+    .card_label {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        line-height: 1.35;
+        padding: 4px 4px 2px;
+    }
+
+    .deck-name {
+        display: block;
+        color: #f3efe3;
+        font-size: 1.08rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+    }
+
+    .commander-name {
+        display: block;
+        margin-top: 4px;
+        color: #bdb5a3;
+        font-size: 0.88rem;
+    }
+
+    .deck-gallery-card:hover .deck-name {
+        color: #ffdf73;
+    }
+
+    .empty-gallery-message {
+        max-width: 560px;
+        margin: 30px auto 0;
+        text-align: center;
+        padding: 42px;
+        border: 1px solid rgba(255, 202, 40, 0.18);
+        border-radius: 18px;
+        background:
+            radial-gradient(circle at top, rgba(255, 202, 40, 0.12), transparent 45%),
+            rgba(22, 22, 25, 0.96);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .empty-gallery-message p {
+        color: #bbb;
+    }
+
+    .empty-gallery-message .btn {
+        margin-top: 10px;
+    }
+
+    @media (max-width: 600px) {
+        .edh-gallery-page {
+            padding: 20px 14px 40px;
+        }
+
+        .edh-hero {
+            padding: 22px 20px;
+        }
+
+        .deck-gallery-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 18px;
+        }
+    }
+
 {% endblock style %}
 
 {% block content %}
-    <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #eee; margin-bottom: 5px;">EDH Armory</h1>
-        <p style="color: #bbb;">Select a commander to view deck inventory and stats.</p>
-    </div>
+<div class="edh-gallery-page">
 
-    <div class="card-container">
+    <section class="edh-hero">
+        <p class="edh-kicker">Commander Deck Gallery</p>
+        <h1 class="edh-title">The Barracks</h1>
+        <p class="edh-subtitle">
+            Select a commander to view deck inventory, card stats, and collection details.
+        </p>
+    </section>
+
+    {% if decks %}
+    <div class="deck-gallery-grid">
         {% for deck in decks %}
-        <div class="card_class">
-            <div class="admin-card collection-card" 
-                onclick="location.href='{{ url_for('edh.edh_view', deck_name=deck.deck_name) }}'"
-                style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
-                onmouseover="this.style.borderColor='#ffca28'"
-                onmouseout="this.style.borderColor='transparent'">
-                
+        <div class="deck-card-shell">
+            <a class="admin-card collection-card deck-gallery-card"
+               href="{{ url_for('edh.edh_view', deck_name=deck.deck_name) }}">
+
                 <div class="image_wrapper">
-                    <img src="{{ url_for('serve_card_image', filename = deck['image_url'] ) }}" 
-                        alt="{{ deck.commander_name }}" 
-                        class="card_img"
-                        style="width: 100%; border-radius: 4.75% / 3.5%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"
-                    >
+                    <img src="{{ url_for('serve_card_image', filename=deck.image_url) }}"
+                         alt="{{ deck.commander_name }}"
+                         class="card_img deck-card-image"
+                         loading="lazy">
                 </div>
 
                 <div class="card_label">
-                    <strong style="font-size: 1.2em; color: #eee;">{{ deck.deck_name }}</strong><br/>
-                    <span style="font-size: 0.9em; color: #bbb;">{{ deck.commander_name }}</span>
+                    <strong class="deck-name">{{ deck.deck_name }}</strong>
+                    <span class="commander-name">{{ deck.commander_name }}</span>
                 </div>
-                
-            </div> 
-        </div> 
+
+            </a>
+        </div>
         {% endfor %}
     </div>
-
-    {% if not decks %}
-    <div class="admin-card" style="text-align: center; padding: 40px;">
+    {% else %}
+    <div class="admin-card empty-gallery-message">
         <h3 class="text-muted">No decks found.</h3>
-        <p>Head over to the import page to add your first EDH deck!</p>
-        <a href="{{ url_for('edh.import_deck') }}" class="btn btn-primary" style="margin-top: 10px;">Import Deck</a>
+        <p>Head over to the import page to add your first EDH deck.</p>
+        <a href="{{ url_for('edh.import_deck') }}" class="btn btn-primary">Import Deck</a>
     </div>
     {% endif %}
-{% endblock %}
+
+</div>
+{% endblock %} 
