@@ -103,8 +103,7 @@
                 </div>
             </form>
         {% else %}
-            <form action="{{ url_for('inventory.inventory') }}" method="GET" class="site-search-form site-search-form--open site-accent-teal" id="searchForm">
-                <input type="hidden" name="drawer_state" id="drawer_state_open" value="open">
+            <form action="{{ request.path }}" method="GET" class="site-search-form site-search-form--open site-accent-teal" id="searchForm">                <input type="hidden" name="drawer_state" id="drawer_state_open" value="open">
                 <input type="hidden" name="view_mode" id="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
                 <input type="hidden" name="q" id="compiledSearchQuery" value="{{ request.args.get('q', '') }}">
 
@@ -219,7 +218,13 @@
                             {% endif %}
 
                             <button type="submit" class="site-button site-button--accent">
-                                Search Inventory
+                                {% if view_mode == "trades" %}
+                                    Search Trade Binder
+                                {% elif view_mode == "wishlist" %}
+                                    Search Wishlist
+                                {% else %}
+                                    Search Inventory
+                                {% endif %}
                             </button>
                         </div>
                     </div>

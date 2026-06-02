@@ -107,6 +107,18 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
 
                 const baseDeleteUrl = "{{ url_for('adder.delete_card', inventory_id=0) }}";
 
+                const finishOptions = [
+                        ["nonfoil", "Nonfoil"],
+                        ["foil", "Foil"],
+                        ["rainbow foil", "Rainbow Foil"],
+                        ["surge foil", "Surge Foil"],
+                        ["etched foil", "Etched Foil"],
+                        ["galaxy foil", "Galaxy Foil"],
+                        ["textured foil", "Textured Foil"]
+                    ].map(([value, label]) =>
+                        `<option value="${value}" ${value === inst.finish ? "selected" : ""}>${label}</option>`
+                    ).join("");
+
                 row.innerHTML = `
                     <div class="inventory-field inventory-field-location">
                         <label class="inventory-label">Location</label>
@@ -128,6 +140,28 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
                                 onchange="updateCard('${inst.instance_id}', null, this.checked, this)"
                             >
                         </div>
+                    </div>
+
+                    <div class="inventory-field inventory-field-finish">
+                        <label class="inventory-label">Finish</label>
+                        <select
+                            class="inventory-select"
+                            onchange="updateCard('${inst.instance_id}', null, null, this, '${inst.scryfall_id}')"
+                            data-update-type="finish"
+                        >
+                            ${finishOptions}
+                        </select>
+                    </div>
+
+                    <div class="inventory-field inventory-field-special-price">
+                        <label class="inventory-label">Special Price</label>
+                        <button
+                            type="button"
+                            class="site-button site-button--secondary"
+                            onclick="findSpecialFinishPrice('${inst.scryfall_id}', '${inst.instance_id}')"
+                        >
+                            Map
+                        </button>
                     </div>
 
                     <div class="inventory-field inventory-field-remove">
@@ -165,6 +199,11 @@ function updateCard(instanceId, newLocation, isTradeable, inputElement) {
         formData.append("is_tradeable", isTradeable ? "1" : "0");
     }
 
+    if (inputElement && inputElement.dataset.updateType === "finish") {
+        formData.append("finish", inputElement.value);
+    }
+
+
     fetch(`/edit_instance/${instanceId}`, {
         method: "POST",
         body: formData
@@ -193,6 +232,79 @@ function updateCard(instanceId, newLocation, isTradeable, inputElement) {
             }
         }
     });
+}
+
+function findSpecialFinishPrice(scryfallId, instanceId) {
+    const button = document.querySelector(`button[onclick*="${instanceId}"]`);
+    const row = button ? button.closest(".inventory-instance-row") : null;
+    const finishSelect = row ? row.querySelector('[data-update-type="finish"]') : null;
+    const finish = finishSelect ? finishSelect.value : "";
+
+    if (!finish) {
+        alert("Choose a finish first.");
+        return;
+    }
+
+    fetch(`/api/tcgcsv/special-finish-candidates?scryfall_id=${encodeURIComponent(scryfallId)}&finish=${encodeURIComponent(finish)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                alert(data.error || "Could not search TCGCSV products.");
+                return null;
+            }
+
+            if (!data.candidates || data.candidates.length === 0) {
+                alert("No matching TCGplayer products found.");
+                return null;
+            }
+
+            const candidateText = data.candidates
+                .map((candidate, index) => `${index + 1}. ${candidate.name} [${candidate.productId}]`)
+                .join("\n");
+
+            const selected = prompt(
+                `Choose the matching product number:\n\n${candidateText}`,
+                "1"
+            );
+
+            const selectedIndex = parseInt(selected, 10) - 1;
+            const candidate = data.candidates[selectedIndex];
+
+            if (!candidate) {
+                alert("Invalid selection.");
+                return null;
+            }
+
+            return fetch("/api/tcgcsv/price-override", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    scryfall_id: scryfallId,
+                    finish: finish,
+                    tcgplayer_id: candidate.productId,
+                    tcgcsv_group_id: candidate.groupId,
+                    note: `Mapped ${finish} to ${candidate.name}`
+                })
+            });
+        })
+        .then(response => response ? response.json() : null)
+        .then(data => {
+            if (!data) return;
+
+            if (data.success) {
+                if (data.warning) {
+                    alert(data.warning);
+                } else {
+                    alert("Special finish price mapping saved.");
+                }
+            }
+        })
+        .catch(error => {
+            console.error("Special finish mapping failed:", error);
+            alert("Special finish mapping failed.");
+        });
 }
 
 function closeModal() {

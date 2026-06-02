@@ -221,12 +221,25 @@ class CardDB:
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
             );
         ''')
+        
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS planeswalker_tracker (
                 oracle_id TEXT PRIMARY KEY,
                 default_scryfall_id TEXT NOT NULL,
                 name TEXT NOT NULL,
                 release_date DATE NOT NULL
+            );
+        ''')
+        
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tcgplayer_price_overrides (
+                override_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scryfall_id TEXT NOT NULL,
+                finish TEXT NOT NULL,
+                tcgplayer_id INTEGER NOT NULL,
+                tcgcsv_group_id INTEGER,
+                note TEXT,
+                UNIQUE (scryfall_id, finish)
             );
         ''')
         

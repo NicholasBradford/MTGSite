@@ -3,6 +3,7 @@ from flask_login import login_required
 from db.db_manager import CardDB
 from search import search
 import sqlite3, ScryfallFetcher, db.db_manager, re
+from services.tcgcsv_prices import search_tcgcsv_products_for_finish, update_single_card_price_from_tcgcsv, normalize_finish
 
 sort_options = {
         'name': """
@@ -19,7 +20,15 @@ sort_options = {
             ) ASC
         """,
         'set': 'cp.set_code ASC, cd.name ASC',
-        'price': 'cp.current_price DESC',
+        'price': """
+            CASE 
+                WHEN LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%foil%'
+                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%etched%'
+                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%rainbow%'
+                THEN cp.current_price_foil
+                ELSE cp.current_price 
+            END DESC
+        """,
         'added': 'i.added DESC'
     }
 
@@ -83,8 +92,10 @@ def inventory():
             cd.mana_cost,
             COUNT(i.instance_id) as qty,
             CASE 
-                WHEN i.finish = 'foil' THEN cp.current_price_foil
-                WHEN i.finish = 'etched' THEN cp.current_price_foil 
+                WHEN LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%foil%'
+                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%etched%'
+                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%rainbow%'
+                THEN cp.current_price_foil
                 ELSE cp.current_price 
             END as price,
             i.finish, COUNT(*) as qty 
@@ -141,28 +152,33 @@ def inventory():
 @login_required
 def edit_instance(instance_id):
     manager = CardDB()
-    # Get values from the fetch request
+
     new_loc = request.form.get('location_id')
     new_trade = request.form.get('is_tradeable')
+    new_finish = request.form.get("finish")
 
-    # Update Location if provided
     if new_loc is not None:
         manager.cursor.execute(
             "UPDATE inventory SET location_id = ? WHERE instance_id = ?",
             (new_loc, instance_id)
         )
 
-    # Update Trade Status if provided
     if new_trade is not None:
-        # Convert JS 'true'/'false' or '1'/'0' to integer 1 or 0
         trade_val = 1 if new_trade in ['1', 'true'] else 0
         manager.cursor.execute(
             "UPDATE inventory SET is_tradeable = ? WHERE instance_id = ?",
             (trade_val, instance_id)
         )
 
+    if new_finish is not None:
+        manager.cursor.execute(
+            "UPDATE inventory SET finish = ? WHERE instance_id = ?",
+            (normalize_finish(new_finish), instance_id)
+        )
+
     manager.commit()
     manager.close()
+
     return {"status": "success"}, 200
 
 @inventory_bp.route('/get_instances/<scryfall_id>/<finish>')
@@ -288,3 +304,88 @@ def get_instances(scryfall_id, finish):
 #                         page=page,
 #                         total_pages=total_pages,
 #                         search_query=search_query)
+
+@inventory_bp.route("/api/tcgcsv/special-finish-candidates")
+@login_required
+def special_finish_candidates():
+    scryfall_id = request.args.get("scryfall_id", "").strip()
+    finish = request.args.get("finish", "").strip()
+
+    if not scryfall_id or not finish:
+        return jsonify({"success": False, "error": "Missing scryfall_id or finish."}), 400
+
+    manager = CardDB()
+
+    try:
+        candidates = search_tcgcsv_products_for_finish(manager, scryfall_id, finish)
+        return jsonify({"success": True, "candidates": candidates})
+    except Exception as error:
+        return jsonify({"success": False, "error": str(error)}), 500
+    finally:
+        manager.close()
+        
+@inventory_bp.route("/api/tcgcsv/price-override", methods=["POST"])
+@login_required
+def save_price_override():
+    data = request.get_json() or {}
+
+    scryfall_id = (data.get("scryfall_id") or "").strip()
+    finish = (data.get("finish") or "").strip()
+    tcgplayer_id = data.get("tcgplayer_id")
+    tcgcsv_group_id = data.get("tcgcsv_group_id")
+    note = data.get("note") or "Manual special-finish price mapping"
+
+    if not scryfall_id or not finish or not tcgplayer_id:
+        return jsonify({"success": False, "error": "Missing required override data."}), 400
+
+    manager = CardDB()
+
+    try:
+        manager.cursor.execute("""
+            INSERT INTO tcgplayer_price_overrides (
+                scryfall_id,
+                finish,
+                tcgplayer_id,
+                tcgcsv_group_id,
+                note
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, finish) DO UPDATE SET
+                tcgplayer_id = excluded.tcgplayer_id,
+                tcgcsv_group_id = excluded.tcgcsv_group_id,
+                note = excluded.note
+        """, (
+            scryfall_id,
+            normalize_finish(finish),
+            int(tcgplayer_id),
+            tcgcsv_group_id,
+            note
+        ))
+
+        manager.commit()
+
+        price_refreshed = False
+        price_warning = None
+
+        try:
+            price_refreshed = update_single_card_price_from_tcgcsv(manager, scryfall_id)
+            manager.commit()
+        except Exception as error:
+            price_warning = (
+                "Override saved, but TCGCSV did not respond for immediate price refresh. "
+                "Run the market sync later."
+            )
+            print(f"{price_warning} Details: {error}")
+
+        return jsonify({
+            "success": True,
+            "price_refreshed": price_refreshed,
+            "warning": price_warning
+        })
+
+    except Exception as error:
+        manager.conn.rollback()
+        return jsonify({"success": False, "error": str(error)}), 500
+
+    finally:
+        manager.close()

@@ -34,6 +34,18 @@ MIN_DOLLAR_MOVE = 1.00
 MIN_PERCENT_MOVE = 25.0
 MIN_OWNED_IMPACT = 3.00
 
+FOIL_LIKE_FINISH_SQL = """
+    LOWER(REPLACE(COALESCE({finish_column}, ''), '_', ' ')) IN (
+        'foil',
+        'etched foil',
+        'rainbow foil',
+        'surge foil',
+        'galaxy foil',
+        'textured foil',
+        'double rainbow foil'
+    )
+"""
+
 def movement_threshold_params():
     return (
         MIN_CURRENT_PRICE,
@@ -169,77 +181,92 @@ def get_market_filter_sql(market_filter):
 def get_wishlist_drops(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
 
+    wishlist_is_foil_sql = """
+        LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%foil%'
+        OR LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%etched%'
+        OR LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%rainbow%'
+    """
+
     query = f"""
-        {PRICE_PAIR_CTE}
+        {PRICE_PAIR_CTE},
 
-        SELECT
-            NULL AS instance_id,
-            w.scryfall_id,
-            w.finish,
-            NULL AS location_id,
-            0 AS qty,
-            0 AS is_tradeable,
-            0 AS is_surplus,
+        WishlistRows AS (
+            SELECT
+                NULL AS instance_id,
+                w.scryfall_id,
+                w.finish,
+                NULL AS location_id,
+                0 AS qty,
+                0 AS is_tradeable,
+                0 AS is_surplus,
 
-            cp.image_url,
-            cp.set_code,
-            cp.collector_number,
-            cd.name,
+                cp.image_url,
+                cp.set_code,
+                cp.collector_number,
+                cd.name,
 
-            CASE
-                WHEN w.finish = 'foil' THEN pp.old_price_foil
-                ELSE pp.old_price_usd
-            END AS old_price,
-
-            CASE
-                WHEN w.finish = 'foil' THEN pp.new_price_foil
-                ELSE pp.new_price_usd
-            END AS new_price,
-
-            ROUND(
                 CASE
-                    WHEN w.finish = 'foil' THEN pp.new_price_foil - pp.old_price_foil
-                    ELSE pp.new_price_usd - pp.old_price_usd
-                END,
-                2
-            ) AS price_delta,
+                    WHEN {wishlist_is_foil_sql}
+                    THEN pp.old_price_foil
+                    ELSE pp.old_price_usd
+                END AS old_price,
 
-            ROUND(
                 CASE
-                    WHEN w.finish = 'foil'
-                        AND pp.old_price_foil IS NOT NULL
-                        AND pp.old_price_foil > 0
-                    THEN ((pp.new_price_foil - pp.old_price_foil) / pp.old_price_foil) * 100
+                    WHEN {wishlist_is_foil_sql}
+                    THEN pp.new_price_foil
+                    ELSE pp.new_price_usd
+                END AS new_price,
 
-                    WHEN w.finish != 'foil'
-                        AND pp.old_price_usd IS NOT NULL
-                        AND pp.old_price_usd > 0
-                    THEN ((pp.new_price_usd - pp.old_price_usd) / pp.old_price_usd) * 100
+                ROUND(
+                    CASE
+                        WHEN {wishlist_is_foil_sql}
+                        THEN pp.new_price_foil - pp.old_price_foil
+                        ELSE pp.new_price_usd - pp.old_price_usd
+                    END,
+                    2
+                ) AS price_delta,
 
-                    ELSE 0
-                END,
-                1
-            ) AS percent_delta,
+                ROUND(
+                    CASE
+                        WHEN {wishlist_is_foil_sql}
+                            AND pp.old_price_foil IS NOT NULL
+                            AND pp.old_price_foil > 0
+                        THEN ((pp.new_price_foil - pp.old_price_foil) / pp.old_price_foil) * 100
 
-            ROUND(
-                CASE
-                    WHEN w.finish = 'foil' THEN pp.new_price_foil - pp.old_price_foil
-                    ELSE pp.new_price_usd - pp.old_price_usd
-                END,
-                2
-            ) AS owned_impact,
+                        WHEN NOT ({wishlist_is_foil_sql})
+                            AND pp.old_price_usd IS NOT NULL
+                            AND pp.old_price_usd > 0
+                        THEN ((pp.new_price_usd - pp.old_price_usd) / pp.old_price_usd) * 100
 
-            pp.latest_scraped_at,
-            pp.previous_scraped_at,
-            w.priority,
-            w.notes
-        FROM wishlist w
-        JOIN PricePairs pp
-            ON w.scryfall_id = pp.scryfall_id
-        LEFT JOIN card_printings cp
-            ON w.scryfall_id = cp.scryfall_id
-        LEFT JOIN card_definitions cd
-            ON cp.oracle_id = cd.oracle_id
+                        ELSE 0
+                    END,
+                    1
+                ) AS percent_delta,
+
+                ROUND(
+                    CASE
+                        WHEN {wishlist_is_foil_sql}
+                        THEN pp.new_price_foil - pp.old_price_foil
+                        ELSE pp.new_price_usd - pp.old_price_usd
+                    END,
+                    2
+                ) AS owned_impact,
+
+                pp.latest_scraped_at,
+                pp.previous_scraped_at,
+                w.priority,
+                w.notes
+            FROM wishlist w
+            JOIN PricePairs pp
+                ON w.scryfall_id = pp.scryfall_id
+            LEFT JOIN card_printings cp
+                ON w.scryfall_id = cp.scryfall_id
+            LEFT JOIN card_definitions cd
+                ON cp.oracle_id = cd.oracle_id
+        )
+
+        SELECT *
+        FROM WishlistRows
         WHERE
             old_price IS NOT NULL
             AND new_price IS NOT NULL
@@ -594,13 +621,23 @@ def get_purchase_gain_loss_alerts(manager, limit=24):
     return cards
 
 def get_price_quality_flags(manager, limit=24):
-    query = """
+    foil_like_sql = FOIL_LIKE_FINISH_SQL.format(finish_column="i.finish")
+
+    query = f"""
+        WITH PriceHistoryCounts AS (
+            SELECT
+                scryfall_id,
+                COUNT(*) AS price_history_count
+            FROM price_history
+            GROUP BY scryfall_id
+        )
+
         SELECT
             MIN(i.instance_id) AS instance_id,
             i.scryfall_id,
             i.finish,
             MAX(i.location_id) AS location_id,
-            COUNT(*) AS qty,
+            COUNT(DISTINCT i.instance_id) AS qty,
 
             cp.image_url,
             cp.set_code,
@@ -610,18 +647,22 @@ def get_price_quality_flags(manager, limit=24):
             cp.current_price,
             cp.current_price_foil,
 
-            COUNT(ph.price_id) AS price_history_count,
+            COALESCE(phc.price_history_count, 0) AS price_history_count,
 
             CASE
-                WHEN i.finish = 'foil'
+                WHEN {foil_like_sql}
                     AND (cp.current_price_foil IS NULL OR cp.current_price_foil = '')
-                THEN 'Foil copy missing foil price'
+                    AND (
+                        cp.tcgplayer_etched_id IS NOT NULL
+                        OR o.tcgplayer_id IS NOT NULL
+                    )
+                THEN 'Mapped foil-like copy missing foil price'
 
-                WHEN i.finish != 'foil'
+                WHEN NOT ({foil_like_sql})
                     AND (cp.current_price IS NULL OR cp.current_price = '')
                 THEN 'Nonfoil copy missing price'
 
-                WHEN COUNT(ph.price_id) < 2
+                WHEN COALESCE(phc.price_history_count, 0) < 2
                 THEN 'Needs at least two price snapshots'
 
                 ELSE 'Review price data'
@@ -631,20 +672,32 @@ def get_price_quality_flags(manager, limit=24):
             ON i.scryfall_id = cp.scryfall_id
         LEFT JOIN card_definitions cd
             ON cp.oracle_id = cd.oracle_id
-        LEFT JOIN price_history ph
-            ON i.scryfall_id = ph.scryfall_id
-        GROUP BY i.scryfall_id, i.finish
+        LEFT JOIN PriceHistoryCounts phc
+            ON i.scryfall_id = phc.scryfall_id
+        LEFT JOIN tcgplayer_price_overrides o
+            ON i.scryfall_id = o.scryfall_id
+            AND LOWER(REPLACE(i.finish, '_', ' ')) = LOWER(REPLACE(o.finish, '_', ' '))
+        GROUP BY
+            i.scryfall_id,
+            i.finish,
+            cp.image_url,
+            cp.set_code,
+            cp.collector_number,
+            cd.name,
+            cp.current_price,
+            cp.current_price_foil,
+            phc.price_history_count
         HAVING
             (
-                i.finish = 'foil'
+                {foil_like_sql}
                 AND (cp.current_price_foil IS NULL OR cp.current_price_foil = '')
             )
             OR
             (
-                i.finish != 'foil'
+                NOT ({foil_like_sql})
                 AND (cp.current_price IS NULL OR cp.current_price = '')
             )
-            OR COUNT(ph.price_id) < 2
+            OR COALESCE(phc.price_history_count, 0) < 2
         ORDER BY cd.name ASC
         LIMIT ?
     """
@@ -723,12 +776,18 @@ MarketRows AS (
         cd.name,
 
         CASE
-            WHEN ig.finish = 'foil' THEN pp.old_price_foil
+            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%foil%'
+                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%etched%'
+                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%rainbow%'
+            THEN pp.old_price_foil
             ELSE pp.old_price_usd
         END AS old_price,
 
         CASE
-            WHEN ig.finish = 'foil' THEN pp.new_price_foil
+            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%foil%'
+                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%etched%'
+                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%rainbow%'
+            THEN pp.new_price_foil
             ELSE pp.new_price_usd
         END AS new_price,
 
@@ -977,14 +1036,16 @@ def get_trade_alerts(
     return cards
 
 def get_missing_price_count(manager):
-    query = """
+    foil_like_sql = FOIL_LIKE_FINISH_SQL.format(finish_column="i.finish")
+
+    query = f"""
         SELECT COUNT(*) AS missing_count
         FROM inventory i
         JOIN card_printings cp
             ON i.scryfall_id = cp.scryfall_id
         WHERE
             CASE
-                WHEN i.finish = 'foil'
+                WHEN {foil_like_sql}
                 THEN cp.current_price_foil IS NULL OR cp.current_price_foil = ''
                 ELSE cp.current_price IS NULL OR cp.current_price = ''
             END
@@ -995,7 +1056,9 @@ def get_missing_price_count(manager):
 
 
 def get_missing_price_cards(manager, limit=MARKET_MISSING_PRICE_LIMIT):
-    query = """
+    foil_like_sql = FOIL_LIKE_FINISH_SQL.format(finish_column="i.finish")
+
+    query = f"""
         SELECT
             MIN(i.instance_id) AS instance_id,
             i.scryfall_id,
@@ -1017,7 +1080,7 @@ def get_missing_price_cards(manager, limit=MARKET_MISSING_PRICE_LIMIT):
             ON cp.oracle_id = cd.oracle_id
         WHERE
             CASE
-                WHEN i.finish = 'foil'
+                WHEN {foil_like_sql}
                 THEN cp.current_price_foil IS NULL OR cp.current_price_foil = ''
                 ELSE cp.current_price IS NULL OR cp.current_price = ''
             END
@@ -1364,7 +1427,10 @@ def update_prices():
                 if product_id and selected_price is not None:
                     prices_by_product_id[product_id][finish] = selected_price
 
-            for scryfall_id, target in targets_by_scryfall_id.items():
+            for target_key, target in targets_by_scryfall_id.items():
+                scryfall_id = target["scryfall_id"]
+                inventory_finish = target.get("finish")
+                has_price_override = target.get("has_price_override", False)
                 normal_product_id = target.get("normal_product_id")
                 etched_product_id = target.get("etched_product_id")
 
@@ -1373,8 +1439,13 @@ def update_prices():
 
                 if normal_product_id:
                     product_prices = prices_by_product_id.get(normal_product_id, {})
-                    nonfoil_price = product_prices.get("nonfoil")
-                    foil_price = product_prices.get("foil")
+
+                    if has_price_override and is_foil_like_finish(inventory_finish):
+                        # Product itself is the alt-finish product, even if TCGCSV subtype says Normal.
+                        foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
+                    else:
+                        nonfoil_price = product_prices.get("nonfoil")
+                        foil_price = product_prices.get("foil")
 
                 if etched_product_id:
                     etched_prices = prices_by_product_id.get(etched_product_id, {})

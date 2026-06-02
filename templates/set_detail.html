@@ -32,6 +32,30 @@
         filter: grayscale(100%) brightness(0.5);
     }
 
+    .binder_incomplete {
+        filter: grayscale(65%) brightness(0.7);
+    }
+
+    .count_pill.complete {
+        color: #76ff9f;
+        border-color: #76ff9f;
+    }
+
+    .count_pill.completable {
+        color: #64d8ff;
+        border-color: #64d8ff;
+    }
+
+    .count_pill.partial {
+        color: #ffca28;
+        border-color: #ffca28;
+    }
+
+    .count_pill.missing {
+        color: #ff8a80;
+        border-color: #ff8a80;
+    }
+
     /* Centered Badge matching your screenshot */
     .count_pill {
         position: absolute;
@@ -60,32 +84,61 @@
 {% block content %}
 <div class="set-checklist">
     {% for card in cards %}
-        {% if set.standard_legal or ((not set.standard_legal) and card.owned_count > 0) %}
+        {% set binder_count = card.binder_count|default(0) %}
+        {% set total_owned = card.total_owned|default(0) %}
+
+        {% if set.standard_legal or ((not set.standard_legal) and total_owned > 0) %}
         <div class="card_item">
             <div class="image_wrapper">
-                {# If you own at least one, use your rainbow effect #}
-                
-                    <div class="{% if card.owned_count > 0 %}rainbow_image{% endif %}">
-                        <img src="{{ url_for('serve_card_image', filename=card.image_url) }}" 
-                            class="card_img {% if card.owned_count == 0 %}uncollected{% endif %}" 
+
+                {% if set.standard_legal %}
+                    <div title="{{ 'Copies available outside binder: ' ~ card.location_tooltip if card.location_tooltip else 'Binder playset complete' if binder_count >= 4 else 'No extra copies found outside this binder' }}">                        
+                        <img src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                            class="card_img {% if binder_count == 0 %}uncollected{% elif binder_count < 4 %}binder_incomplete{% endif %}"
                             alt="{{ card.name }}"
                             loading="lazy">
                     </div>
-                    {% if set.standard_legal %}
-                        <div class="count_pill">
-                            {{ card.owned_count if card.owned_count < 4 else 4 }}/4
-                        </div>
-                        {% else%}
-                        <div class="count_pill">
-                            {{ card.owned_count }}
-                        </div>
-                    {% endif %}
-                
+
+                    <div class="count_pill
+                        {% if binder_count >= 4 %}
+                            complete
+                        {% elif card.can_complete_from_elsewhere %}
+                            completable
+                        {% elif binder_count > 0 %}
+                            partial
+                        {% else %}
+                            missing
+                        {% endif %}"
+                        title="{{ card.location_tooltip if card.location_tooltip else 'No copies outside this binder' }}">
+                        {{ binder_count if binder_count < 4 else 4 }}/4
+                    </div>
+
+                {% else %}
+                    <div>
+                        <img src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                            class="card_img {% if total_owned == 0 %}uncollected{% endif %}"
+                            alt="{{ card.name }}"
+                            loading="lazy">
+                    </div>
+
+                    <div class="count_pill">
+                        {{ total_owned }}
+                    </div>
+                {% endif %}
+
             </div>
-        
+
             <div class="card_label">
                 <strong>{{ card.name }}</strong><br>
                 <span style="opacity: 0.6;">#{{ card.collector_number }}</span>
+
+                {% if set.standard_legal and binder_count < 4 and card.can_complete_from_elsewhere %}
+                    <br>
+                    <span title="{{ card.location_tooltip }}"
+                        style="opacity: 0.75; color: #64d8ff; font-size: 0.85em;">
+                        {{ card.elsewhere_count }} elsewhere
+                    </span>
+                {% endif %}
             </div>
         </div>
         {% endif %}
