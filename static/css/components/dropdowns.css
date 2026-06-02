@@ -1,0 +1,120 @@
+/* =========================================================
+   MTGSite Navigation Dropdowns
+   ---------------------------------------------------------
+   Defensive version during legacy main.css migration.
+   This intentionally uses stronger specificity because
+   main.css still has global ul / li / a rules.
+   ========================================================= */
+
+/* Keep the nav/dropdown layer above page hero images, cards, and carousels */
+.site-nav {
+    position: relative;
+    z-index: 9998;
+}
+
+.site-nav__bar,
+.site-nav__list {
+    position: relative;
+    z-index: 9998;
+}
+
+.site-dropdown {
+    position: relative;
+}
+
+.site-dropdown__trigger {
+    cursor: default;
+}
+
+/* Dropdown panel */
+.site-nav .site-dropdown .site-dropdown__content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+
+    min-width: 210px;
+    z-index: 9999;
+
+    background: var(--site-surface-2) !important;
+    background-color: var(--site-surface-2) !important;
+
+    border: 1px solid var(--site-border);
+    border-radius: var(--site-radius-md);
+    box-shadow: var(--site-shadow-dropdown);
+
+    padding: var(--site-space-md) 0;
+    margin-top: 0;
+
+    overflow: visible;
+    isolation: isolate;
+}
+
+/* Hard background layer behind dropdown links */
+.site-nav .site-dropdown .site-dropdown__content::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    background: var(--site-surface-2);
+    border-radius: inherit;
+
+    z-index: -1;
+}
+
+/* Show dropdown on hover/focus */
+.site-nav .site-dropdown:hover .site-dropdown__content,
+.site-nav .site-dropdown:focus-within .site-dropdown__content {
+    display: block;
+}
+
+/* Dropdown links */
+.site-nav .site-dropdown .site-dropdown__content a {
+    display: block;
+
+    padding: 12px 16px !important;
+
+    color: var(--site-text) !important;
+    background: var(--site-surface-2) !important;
+    background-color: var(--site-surface-2) !important;
+
+    text-align: left !important;
+    text-decoration: none;
+    white-space: nowrap;
+
+    font-size: 0.95rem;
+    line-height: 1.2;
+
+    position: relative;
+    z-index: 1;
+
+    transition:
+        background-color var(--site-transition-normal),
+        color var(--site-transition-normal);
+}
+
+.site-nav .site-dropdown .site-dropdown__content a:hover,
+.site-nav .site-dropdown .site-dropdown__content a:focus {
+    background: var(--site-border) !important;
+    background-color: var(--site-border) !important;
+    color: var(--site-accent-blue-soft) !important;
+    outline: none;
+}
+
+/* Dropdown divider */
+.site-nav .site-dropdown .site-dropdown__content hr {
+    border: 0;
+    border-top: 1px solid var(--site-border-strong);
+    margin: var(--site-space-sm) 0;
+}
+
+/* Mobile safety */
+@media (max-width: 768px) {
+    .site-nav .site-dropdown .site-dropdown__content {
+        min-width: 190px;
+    }
+
+    .site-nav .site-dropdown .site-dropdown__content a {
+        padding: 10px 14px !important;
+    }
+}

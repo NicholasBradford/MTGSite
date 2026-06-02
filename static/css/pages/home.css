@@ -1,0 +1,436 @@
+/* =========================================================
+   MTGSite Home Page
+   ---------------------------------------------------------
+   Home-specific layout and presentation styles.
+
+   Depends on:
+   - foundation/tokens.css
+   - foundation/base.css
+   - foundation/layout.css
+   - components/cards.css
+   - components/buttons.css
+   ========================================================= */
+
+
+/* =========================================================
+   Home Page Container
+   ========================================================= */
+
+.home-container {
+    padding: var(--site-space-page-y, 28px) 0 var(--site-space-page-bottom, 56px);
+}
+
+
+/* =========================================================
+   Hero / Spotlight
+   ========================================================= */
+
+.hero-spotlight {
+    background: var(--site-surface-2, #1f1f1f);
+    color: var(--site-text-heading, #eee);
+
+    padding: var(--site-space-6xl, 40px);
+    margin-bottom: var(--site-space-6xl, 40px);
+
+    border: 1px solid var(--site-border, #333);
+    border-left: var(--site-accent-border-width, 4px) solid var(--site-accent-gold, #ffca28);
+    border-radius: var(--site-radius-xl, 12px);
+
+    box-shadow: var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3));
+}
+
+.spotlight-card {
+    display: flex;
+    align-items: center;
+    gap: var(--site-space-6xl, 40px);
+    flex-wrap: wrap;
+}
+
+.featured-img {
+    display: block;
+    max-width: 280px;
+
+    border-radius: var(--site-radius-xl, 12px);
+    box-shadow: var(--site-shadow-card-image, 0 8px 18px rgba(0, 0, 0, 0.62));
+
+    transition: transform var(--site-transition-slow, 0.3s ease);
+}
+
+.featured-img:hover {
+    transform: scale(1.03);
+}
+
+.spotlight-text {
+    flex: 1;
+    min-width: 260px;
+}
+
+.spotlight-text h1 {
+    margin: 0 0 var(--site-space-lg, 10px);
+
+    color: var(--site-text-strong, #f3efe3);
+    font-size: clamp(2rem, 4vw, 2.5rem);
+    line-height: var(--site-line-height-tight, 1.1);
+    letter-spacing: var(--site-letter-spacing-heading, -0.04em);
+}
+
+
+.spotlight-text h2 {
+    margin: 0 0 var(--site-space-lg, 10px);
+
+    color: var(--site-text-strong, #f3efe3);
+    font-size: clamp(2rem, 4vw, 2.5rem);
+    line-height: var(--site-line-height-tight, 1.1);
+    letter-spacing: var(--site-letter-spacing-heading, -0.04em);
+}
+
+.spotlight-text p {
+    margin: 0 0 var(--site-space-4xl, 25px);
+
+    color: var(--site-text-soft, #aaa);
+    font-size: var(--site-font-size-lg, 1.1rem);
+}
+
+
+/* Spotlight button follows the shared accent-button model */
+.btn-spotlight {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: var(--site-surface-3, #222);
+    color: var(--site-accent-gold, #ffca28);
+
+    border: 1px solid var(--site-accent-gold, #ffca28);
+    border-radius: var(--site-radius-control, 6px);
+
+    padding: 10px 24px;
+
+    text-decoration: none;
+    font-weight: var(--site-font-weight-semibold, 600);
+
+    transition:
+        background-color var(--site-transition-normal, 0.2s ease),
+        border-color var(--site-transition-normal, 0.2s ease),
+        color var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease),
+        transform var(--site-transition-fast, 0.15s ease);
+}
+
+.btn-spotlight:hover {
+    background-color: var(--site-accent-gold, #ffca28);
+    border-color: var(--site-accent-gold, #ffca28);
+    color: var(--site-text-inverse, #111);
+    box-shadow: 0 0 15px var(--site-glow-gold, rgba(255, 202, 40, 0.22));
+}
+
+.btn-spotlight:active {
+    transform: scale(0.97);
+}
+
+
+/* =========================================================
+   Hero Placeholder
+   ========================================================= */
+
+.hero-placeholder {
+    text-align: center;
+    padding: var(--site-space-6xl, 40px) 0;
+}
+
+.hero-placeholder h1 {
+    margin: 0 0 var(--site-space-lg, 10px);
+    color: var(--site-text-heading, #eee);
+}
+
+.hero-placeholder p {
+    margin: 0;
+    color: var(--site-text-soft, #aaa);
+}
+
+
+/* =========================================================
+   Stats Dashboard
+   ========================================================= */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--site-space-4xl, 25px);
+
+    margin-bottom: 50px;
+}
+
+.stat-item {
+    background: var(--site-surface-2, #1f1f1f);
+    color: var(--site-text-heading, #eee);
+
+    padding: 25px 20px;
+
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-card, 8px);
+
+    text-align: center;
+
+    box-shadow: var(--site-shadow-soft, 0 4px 8px rgba(0, 0, 0, 0.2));
+    transition:
+        transform var(--site-transition-normal, 0.2s ease),
+        border-color var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease);
+}
+
+.stat-item:hover {
+    transform: translateY(-4px);
+    border-color: var(--site-border-bright, #555);
+    box-shadow: var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3));
+}
+
+.stat-item h3 {
+    margin: 0 0 var(--site-space-2xl, 15px);
+
+    color: var(--site-text-soft, #aaa);
+    font-size: 1.1em;
+    font-weight: var(--site-font-weight-bold, 700);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    margin: 0;
+
+    font-size: 2.5rem;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: var(--site-line-height-tight, 1.1);
+}
+
+/* Stat-specific colors */
+.val-cards {
+    color: var(--site-accent-teal, #17a2b8);
+}
+
+.val-art {
+    color: var(--site-accent-blue, #007bff);
+}
+
+.val-money {
+    color: var(--site-accent-green-soft, #2ecc71);
+}
+
+
+/* =========================================================
+   Recent Additions
+   ========================================================= */
+
+.recent-additions {
+    margin-bottom: var(--site-space-5xl, 30px);
+}
+
+.recent-additions h2 {
+    margin: 0 0 var(--site-space-3xl, 20px);
+    padding-bottom: var(--site-space-lg, 10px);
+
+    color: var(--site-text-heading, #eee);
+    border-bottom: 2px solid var(--site-border, #333);
+
+    font-size: 1.8em;
+    line-height: var(--site-line-height-tight, 1.1);
+}
+
+.recent-additions h2 i {
+    color: var(--site-accent-red-soft, #e74c3c);
+    margin-right: var(--site-space-md, 8px);
+}
+
+
+/* =========================================================
+   Recent Cards Carousel
+   ========================================================= */
+
+.carousel-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Edge fades */
+.carousel-container::before,
+.carousel-container::after {
+    content: "";
+    position: absolute;
+    top: 0;
+
+    width: 60px;
+    height: 100%;
+
+    z-index: 2;
+    pointer-events: none;
+}
+
+.carousel-container::before {
+    left: 0;
+    background: linear-gradient(
+        to right,
+        var(--site-bg, #121212) 0%,
+        transparent 100%
+    );
+}
+
+.carousel-container::after {
+    right: 0;
+    background: linear-gradient(
+        to left,
+        var(--site-bg, #121212) 0%,
+        transparent 100%
+    );
+}
+
+.recent-scroll {
+    display: flex;
+    gap: var(--site-space-2xl, 15px);
+
+    overflow-x: hidden;
+    padding: var(--site-space-2xl, 15px) 0;
+
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.recent-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.recent-card {
+    flex: 0 0 auto;
+}
+
+.recent-card img {
+    display: block;
+    height: 240px;
+
+    border-radius: var(--site-radius-xl, 12px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+
+    scroll-snap-align: start;
+
+    transition:
+        transform var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease),
+        filter var(--site-transition-normal, 0.2s ease);
+}
+
+.recent-card img:hover {
+    transform: translateY(-5px) scale(1.02);
+    filter: brightness(1.04);
+    box-shadow: 0 8px 20px var(--site-glow-gold, rgba(255, 202, 40, 0.22));
+}
+
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 800px) {
+    .hero-spotlight {
+        padding: var(--site-space-4xl, 25px);
+    }
+
+    .spotlight-card {
+        gap: var(--site-space-4xl, 25px);
+        justify-content: center;
+        text-align: center;
+    }
+
+    .featured-img {
+        max-width: 240px;
+    }
+
+    .spotlight-text {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 600px) {
+    .home-container {
+        padding-top: var(--site-space-3xl, 20px);
+    }
+
+    .hero-spotlight {
+        padding: var(--site-space-3xl, 20px);
+        margin-bottom: var(--site-space-5xl, 30px);
+    }
+
+    .spotlight-text h1 {
+        font-size: 1rem;
+    }
+
+    .spotlight-text h2 {
+        font-size: 2rem;
+    }
+
+    .spotlight-text p {
+        font-size: var(--site-font-size-base, 1rem);
+    }
+
+    .stats-grid {
+        gap: var(--site-space-3xl, 20px);
+        margin-bottom: var(--site-space-6xl, 40px);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .recent-additions h2 {
+        font-size: 1.45em;
+    }
+
+    .recent-card img {
+        height: 200px;
+    }
+
+    .carousel-container::before,
+    .carousel-container::after {
+        width: 36px;
+    }
+}
+.spotlight-image-wrap {
+    flex: 0 0 auto;
+}
+
+.spotlight-kicker {
+    margin: 0 0 var(--site-space-sm, 6px);
+
+    color: var(--site-accent-gold, #ffca28);
+    font-size: 1rem;
+    font-weight: var(--site-font-weight-heavy, 800);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+
+.spotlight-meta {
+    margin: 0 0 var(--site-space-4xl, 25px);
+
+    color: var(--site-text-soft, #aaa);
+    font-size: var(--site-font-size-lg, 1.1rem);
+}
+
+.stat-item h2 {
+    margin: 0 0 var(--site-space-2xl, 15px);
+
+    color: var(--site-text-soft, #aaa);
+    font-size: 1.1em;
+    font-weight: var(--site-font-weight-bold, 700);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.recent-additions-header h2 i {
+    color: var(--site-accent-red-soft, #e74c3c);
+    margin-right: var(--site-space-md, 8px);
+}
+
+.empty-recent-card {
+    text-align: center;
+    color: var(--site-text-muted, #bbb);
+}

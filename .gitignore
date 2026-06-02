@@ -18,3 +18,30 @@ sort_card.py
 ROBOT_IDEA.md
 IDEAS.md
 /static/images
+
+# Python/cache/test artifacts
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# SQLite sidecar files
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Local environment / IDE
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local temp exports/imports
+*.log
+*.tmp
+*.bak

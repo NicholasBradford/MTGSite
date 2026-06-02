@@ -124,13 +124,13 @@
         <div class="metric-row">
             <span>Price Spikes (Today):</span>
             <span class="metric-value">
-                {% if change[0] > 0 %}<a href="/admin/tracker" class="text-green">+{{ change[0] }}</a>{% else %} 0 {% endif %}
+                {% if change[0] > 0 %}<a href="/market/dashboard" class="text-green">+{{ change[0] }}</a>{% else %} 0 {% endif %}
             </span>
         </div>
         <div class="metric-row">
             <span>Price Drops (Today):</span>
             <span class="metric-value">
-                {% if change[1] > 0 %}<a href="/admin/tracker" class="text-red">-{{ change[1] }}</a>{% else %} 0 {% endif %}
+                {% if change[1] > 0 %}<a href="/market/dashboard" class="text-red">-{{ change[1] }}</a>{% else %} 0 {% endif %}
             </span>
         </div>
         <div class="card-footer">Tracks value shifts crossing $2 threshold</div>

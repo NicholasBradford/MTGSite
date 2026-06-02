@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}Market{% endblock title %}
+{% block body_class %}market-page{% endblock %}
+
+{% block content %}
+
+<div class="site-market-page">
+
+    <header class="site-market-header">
+        <div class="site-market-kicker">Market</div>
+        <h2>Market Dashboard</h2>
+        <p>
+            Track collection value, price movement, trade opportunities, wishlist drops,
+            and cards that may need review after each market sync.
+        </p>
+    </header>
+
+    <section class="site-card site-card--left-accent site-accent-teal site-market-sync-panel">
+        <div class="site-market-sync-main">
+            <button
+                id="market-sync-button"
+                class="site-button site-button--accent"
+                type="button"
+                data-sync-url="{{ url_for('markets.run_price_update') }}"
+            >
+                <i class="fas fa-sync-alt" aria-hidden="true"></i>
+                <span>Run Market Price Sync</span>
+            </button>
+
+            <div class="site-market-sync-meta">
+                Last sync:
+                <strong>
+                    {{ market_summary.last_sync if market_summary and market_summary.last_sync else "Not yet synced" }}
+                </strong>
+            </div>
+        </div>
+
+        <div id="market-progress-container" class="site-market-progress" hidden>
+            <div class="site-progress-track">
+                <progress id="market-progress-bar" value="0" max="100"></progress>
+            </div>
+            <span id="market-progress-status" class="site-market-progress-status">
+                Initializing connection...
+            </span>
+        </div>
+    </section>
+
+    <section class="site-market-summary-grid" aria-label="Market summary">
+        <article class="site-card site-card--top-accent site-accent-gold site-market-metric">
+            <div class="site-market-metric-label">Collection Value</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.collection_value if market_summary and market_summary.collection_value else "$0.00" }}
+            </div>
+            <div class="site-market-metric-note">Total estimated market value</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-green site-market-metric">
+            <div class="site-market-metric-label">Total Gains</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.total_gains if market_summary and market_summary.total_gains else "$0.00" }}
+            </div>
+            <div class="site-market-metric-note">Tracked upward movement</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-red site-market-metric">
+            <div class="site-market-metric-label">Total Losses</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.total_losses if market_summary and market_summary.total_losses else "$0.00" }}
+            </div>
+            <div class="site-market-metric-note">Tracked downward movement</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-amber site-market-metric">
+            <div class="site-market-metric-label">Alerts</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.alert_count if market_summary and market_summary.alert_count is defined else 0 }}
+            </div>
+            <div class="site-market-metric-note">Cards needing review</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-teal site-market-metric">
+            <div class="site-market-metric-label">Trade Binder Value</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.trade_value if market_summary and market_summary.trade_value else "$0.00" }}
+            </div>
+            <div class="site-market-metric-note">Estimated tradeable value</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-purple site-market-metric">
+            <div class="site-market-metric-label">Wishlist Drops</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.wishlist_drop_count if market_summary and market_summary.wishlist_drop_count is defined else 0 }}
+            </div>
+            <div class="site-market-metric-note">Targets moving down</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-gold site-market-metric">
+            <div class="site-market-metric-label">Missing Prices</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.missing_price_count if market_summary and market_summary.missing_price_count is defined else 0 }}
+            </div>
+            <div class="site-market-metric-note">Cards needing manual review</div>
+        </article>
+
+        <article class="site-card site-card--top-accent site-accent-teal site-market-metric">
+            <div class="site-market-metric-label">Tracked Cards</div>
+            <div class="site-market-metric-value">
+                {{ market_summary.tracked_count if market_summary and market_summary.tracked_count is defined else 0 }}
+            </div>
+            <div class="site-market-metric-note">Unique cards checked</div>
+        </article>
+    </section>
+
+    <section class="site-market-toolbar" aria-label="Market filters">
+        <div class="site-market-filter-group">
+            <span class="site-market-filter-label">View</span>
+            <button class="site-filter-pill {% if market_filter == 'all' %}is-active{% endif %}" type="button" data-market-filter="all">All</button>
+            <button class="site-filter-pill {% if market_filter == 'owned' %}is-active{% endif %}" type="button" data-market-filter="owned">Owned</button>
+            <button class="site-filter-pill {% if market_filter == 'tradeable' %}is-active{% endif %}" type="button" data-market-filter="tradeable">Tradeable</button>
+            <button class="site-filter-pill {% if market_filter == 'wishlist' %}is-active{% endif %}" type="button" data-market-filter="wishlist">Wishlist</button>
+            <button class="site-filter-pill {% if market_filter == 'decks' %}is-active{% endif %}" type="button" data-market-filter="decks">Decks</button>
+            <button class="site-filter-pill {% if market_filter == 'planeswalkers' %}is-active{% endif %}" type="button" data-market-filter="planeswalkers">Planeswalkers</button>
+        </div>
+
+        <label class="site-market-sort-control" for="market-sort">
+            <span class="site-market-filter-label">Sort</span>
+            <select id="market-sort" class="site-select site-market-select">
+                <option value="dollar_change" {% if market_sort == "dollar_change" %}selected{% endif %}>
+                    Largest Dollar Change
+                </option>
+                <option value="percent_change" {% if market_sort == "percent_change" %}selected{% endif %}>
+                    Largest Percent Change
+                </option>
+                <option value="current_value" {% if market_sort == "current_value" %}selected{% endif %}>
+                    Highest Current Value
+                </option>
+                <option value="owned_impact" {% if market_sort == "owned_impact" %}selected{% endif %}>
+                    Highest Collection Impact
+                </option>
+                <option value="newest" {% if market_sort == "newest" %}selected{% endif %}>
+                    Newest Movement
+                </option>
+            </select>
+        </label>
+    </section>
+
+    <section class="site-card site-card--left-accent site-accent-amber site-market-section">
+        <div class="site-market-section-header">
+            <div>
+                <h3>Market Opportunities</h3>
+                <p>Cards that may be worth buying, trading, protecting, moving, or manually reviewing.</p>
+            </div>
+            <span
+                class="site-market-count"
+                title="Recommended market actions based on notable price movement, tradeability, wishlist drops, missing prices, or other review signals."
+            >
+                {{ opportunities|length if opportunities else 0 }}
+            </span>
+        </div>
+
+        {% if opportunities %}
+            <div class="site-market-opportunity-grid">
+                {% for item in opportunities %}
+                    <article class="site-market-opportunity">
+                        <div class="site-market-opportunity-type">{{ item.type }}</div>
+                        <h4>{{ item.title }}</h4>
+                        <p>{{ item.description }}</p>
+
+                        {% if item.action %}
+                            <div class="site-market-opportunity-action">{{ item.action }}</div>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="site-empty-state">
+                <strong>No market opportunities yet.</strong>
+                <span>Run a sync after routes are connected to surface collection-specific recommendations.</span>
+            </div>
+        {% endif %}
+    </section>
+
+    {% if section_visibility.show_owned_sections %}
+        <section class="site-card site-card--left-accent site-accent-green site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Market Gainers</h3>
+                    <p>Cards in your collection with notable upward price movement.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Owned cards whose latest tracked price is higher than the previous snapshot and passed the dashboard movement threshold."
+                >
+                    {{ spikes|length if spikes else 0 }}
+                </span>
+            </div>
+
+            {% if spikes %}
+                <div id="card-grid-spikes" class="site-card-grid card-container">
+                    {% with cards=spikes %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No gainers found.</strong>
+                    <span>Once price history is available, this section will show cards that spiked.</span>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="site-card site-card--left-accent site-accent-red site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Market Losers</h3>
+                    <p>Cards in your collection with notable downward price movement.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Owned cards whose latest tracked price is lower than the previous snapshot and passed the dashboard movement threshold."
+                >
+                    {{ drops|length if drops else 0 }}
+                </span>
+            </div>
+
+            {% if drops %}
+                <div id="card-grid-drops" class="site-card-grid card-container">
+                    {% with cards=drops %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No losers found.</strong>
+                    <span>Once price history is available, this section will show cards that dropped.</span>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="site-card site-card--left-accent site-accent-amber site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Purchase Gain/Loss Watch</h3>
+                    <p>Cards whose current value differs from recorded purchase price.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Owned cards whose current estimated value differs meaningfully from the recorded purchase price."
+                >
+                    {{ purchase_alerts|length if purchase_alerts else 0 }}
+                </span>
+            </div>
+
+            {% if purchase_alerts %}
+                <div class="site-card-grid card-container">
+                    {% with cards=purchase_alerts %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No purchase gain/loss alerts yet.</strong>
+                    <span>Cards with recorded purchase prices will appear here when movement is meaningful.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+
+        {% if section_visibility.show_wishlist_sections %}
+        <section class="site-card site-card--left-accent site-accent-purple site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Wishlist and Missing Card Watch</h3>
+                    <p>Cards you do not own yet that dropped, stabilized, or entered a target range.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Wishlist cards that dropped in price enough to meet the dashboard alert threshold."
+                >
+                    {{ wishlist_drops|length if wishlist_drops else 0 }}
+                </span>
+            </div>
+
+            {% if wishlist_drops %}
+                <div id="card-grid-wishlist-drops" class="site-card-grid card-container">
+                    {% with cards=wishlist_drops %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No wishlist drops yet.</strong>
+                    <span>This will become useful once wishlist, missing set cards, or planeswalker targets are connected.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+
+        {% if section_visibility.show_trade_sections %}
+        <section class="site-card site-card--left-accent site-accent-teal site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Trade Binder Watch</h3>
+                    <p>Tradeable cards with meaningful price movement, surplus value, or possible move-now signals.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Cards marked tradeable that had meaningful price movement since the previous price snapshot."
+                >
+                    {{ trade_alerts|length if trade_alerts else 0 }}
+                </span>
+            </div>
+
+            {% if trade_alerts %}
+                <div id="card-grid-trade-alerts" class="site-card-grid card-container">
+                    {% with cards=trade_alerts %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No trade binder alerts yet.</strong>
+                    <span>This section can eventually focus on cards marked as tradeable or surplus.</span>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="site-card site-card--left-accent site-accent-green site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Surplus Gain Alerts</h3>
+                    <p>Extra copies that gained value and may be worth reviewing.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Surplus copies that increased in price enough to be worth reviewing for trade or sale decisions."
+                >
+                    {{ surplus_alerts|length if surplus_alerts else 0 }}
+                </span>
+            </div>
+
+            {% if surplus_alerts %}
+                <div class="site-card-grid card-container">
+                    {% with cards=surplus_alerts %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No surplus gain alerts yet.</strong>
+                    <span>Surplus cards with notable gains will appear here.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+
+        {% if section_visibility.show_deck_sections %}
+        <section class="site-card site-card--left-accent site-accent-gold site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Deck Market Alerts</h3>
+                    <p>Deck cards with meaningful price movement.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Cards used in EDH decks that had meaningful price movement since the previous price snapshot."
+                >
+                    {{ deck_alerts|length if deck_alerts else 0 }}
+                </span>
+            </div>
+
+            {% if deck_alerts %}
+                <div class="site-card-grid card-container">
+                    {% with cards=deck_alerts %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No deck market alerts yet.</strong>
+                    <span>Deck cards with notable price movement will appear here.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+
+        {% if section_visibility.show_planeswalker_sections %}
+        <section class="site-card site-card--left-accent site-accent-purple site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Planeswalker Market Watch</h3>
+                    <p>Tracked planeswalkers with meaningful price movement.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Tracked planeswalkers with meaningful price movement, including owned and unowned tracked planeswalker printings."
+                >
+                    {{ planeswalker_alerts|length if planeswalker_alerts else 0 }}
+                </span>
+            </div>
+
+            {% if planeswalker_alerts %}
+                <div class="site-card-grid card-container">
+                    {% with cards=planeswalker_alerts %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No planeswalker alerts yet.</strong>
+                    <span>Tracked planeswalkers with notable movement will appear here.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+
+        {% if section_visibility.show_data_quality_sections %}
+        <section class="site-card site-card--left-accent site-accent-gold site-market-section">
+            <div class="site-market-section-header">
+                <div>
+                    <h3>Price Data Quality</h3>
+                    <p>Cards with missing prices or too little price history for reliable movement tracking.</p>
+                </div>
+                <span
+                    class="site-market-count"
+                    title="Cards with missing price data or too few price snapshots for reliable market movement tracking."
+                >
+                    {{ price_quality_flags|length if price_quality_flags else 0 }}
+                </span>
+            </div>
+
+            {% if price_quality_flags %}
+                <div class="site-card-grid card-container">
+                    {% with cards=price_quality_flags %}
+                        {% include '_card_items.html' %}
+                    {% endwith %}
+                </div>
+            {% else %}
+                <div class="site-empty-state">
+                    <strong>No price data issues found.</strong>
+                    <span>Cards with missing prices or incomplete price history will appear here.</span>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+</div>
+
+<script src="{{ url_for('static', filename='js/market.js') }}" defer></script>
+
+{% endblock content %}

@@ -1,0 +1,113 @@
+/* =========================================================
+   MTGSite Navigation
+   ========================================================= */
+
+.site-nav {
+    max-width: var(--site-content-width);
+    margin: 0 auto;
+    padding: 0 var(--site-space-3xl);
+}
+
+.site-nav__bar {
+    background-color: var(--site-surface-2);
+    border-bottom: 1px solid var(--site-border);
+    padding: var(--site-space-lg) var(--site-space-3xl);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.site-nav__list {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0;
+
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    background: transparent;
+    border-bottom: none;
+}
+
+.site-nav__item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.site-nav__link,
+.site-nav__user,
+.site-nav__highlight {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    color: var(--site-text-strong);
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.site-nav__link:hover {
+    background-color: var(--site-border-strong);
+}
+
+.site-nav__right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--site-space-2xl);
+}
+
+.site-nav__highlight {
+    background-color: var(--site-accent-green);
+    color: white;
+    padding: 6px 12px;
+    border-radius: var(--site-radius-xs);
+    font-weight: var(--site-font-weight-bold);
+    transition: background-color var(--site-transition-slow);
+}
+
+.site-nav__highlight:hover {
+    background-color: var(--site-accent-green-soft);
+    text-decoration: none;
+}
+
+.site-nav__link,
+.site-nav__user,
+.site-nav__highlight {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Mobile */
+
+@media (max-width: 768px) {
+    .site-nav {
+        padding: 0;
+    }
+
+    .site-nav__bar {
+        padding: var(--site-space-md);
+    }
+
+    .site-nav__list {
+        flex-wrap: wrap;
+    }
+
+    .site-nav__right {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+        gap: var(--site-space-lg);
+    }
+
+    .site-nav__link,
+    .site-nav__user,
+    .site-nav__highlight {
+        padding: 10px 12px;
+    }
+}

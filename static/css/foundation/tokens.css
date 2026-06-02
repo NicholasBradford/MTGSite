@@ -1,0 +1,397 @@
+/* =========================================================
+   MTGSite Design Tokens
+   ---------------------------------------------------------
+   Purpose:
+   Central source of truth for colors, spacing, borders,
+   shadows, typography, and reusable accent meanings.
+
+   Usage:
+   Other CSS files should use these variables instead of
+   hardcoded colors, spacing, shadows, or radius values.
+   ========================================================= */
+
+:root {
+    /* =====================================================
+       Core Surfaces
+       ===================================================== */
+
+    --site-bg: #121212;
+    --site-bg-elevated: #171717;
+
+    --site-surface: #1a1a1a;
+    --site-surface-2: #1f1f1f;
+    --site-surface-3: #222222;
+    --site-surface-input: #111111;
+
+    --site-surface-hover: rgba(255, 255, 255, 0.045);
+    --site-surface-subtle: rgba(255, 255, 255, 0.02);
+
+    /* =====================================================
+       Borders / Dividers
+       ===================================================== */
+
+    --site-border: #333333;
+    --site-border-soft: rgba(255, 255, 255, 0.08);
+    --site-border-muted: rgba(255, 255, 255, 0.12);
+    --site-border-strong: #444444;
+    --site-border-bright: #555555;
+
+    --site-divider: #333333;
+    --site-divider-strong: #444444;
+
+    /* =====================================================
+       Text
+       ===================================================== */
+
+    --site-text: #e0e0e0;
+    --site-text-strong: #f3efe3;
+    --site-text-heading: #eeeeee;
+    --site-text-muted: #bbbbbb;
+    --site-text-soft: #aaaaaa;
+    --site-text-faint: #888888;
+    --site-text-disabled: #666666;
+    --site-text-inverse: #111111;
+
+    /* =====================================================
+       Accent Colors
+       -----------------------------------------------------
+       These are identity colors, not necessarily semantic.
+       Use them for section identity, borders, headers,
+       progress bars, and controlled hover effects.
+       ===================================================== */
+
+    --site-accent-gold: #ffca28;
+    --site-accent-gold-soft: #ffdf73;
+    --site-accent-gold-strong: #ffd700;
+
+    --site-accent-teal: #17a2b8;
+    --site-accent-teal-soft: #38d5e8;
+    --site-accent-teal-strong: #28d8ff;
+
+    --site-accent-blue: #007bff;
+    --site-accent-blue-soft: #66b2ff;
+
+    --site-accent-green: #28a745;
+    --site-accent-green-soft: #2ecc71;
+    --site-accent-green-bright: #44d06b;
+
+    --site-accent-red: #dc3545;
+    --site-accent-red-soft: #e74c3c;
+    --site-accent-red-bright: #ff6b6b;
+
+    --site-accent-amber: #ffc107;
+    --site-accent-purple: #9b59b6;
+
+    /* =====================================================
+       Semantic Colors
+       -----------------------------------------------------
+       Use these when the color communicates meaning.
+       ===================================================== */
+
+    --site-success: var(--site-accent-green);
+    --site-success-soft: var(--site-accent-green-soft);
+
+    --site-danger: var(--site-accent-red);
+    --site-danger-soft: var(--site-accent-red-soft);
+
+    --site-warning: var(--site-accent-amber);
+    --site-info: var(--site-accent-teal);
+
+    --site-owned: var(--site-accent-green);
+    --site-missing: var(--site-accent-red);
+    --site-tradeable: var(--site-accent-green-soft);
+
+    /* =====================================================
+       Accent Glow / Transparent Color Tokens
+       -----------------------------------------------------
+       Used for hover states, focus rings, shadows, and
+       subtle panel effects.
+       ===================================================== */
+
+    --site-glow-gold-subtle: rgba(255, 202, 40, 0.12);
+    --site-glow-gold: rgba(255, 202, 40, 0.22);
+
+    --site-glow-teal-subtle: rgba(23, 162, 184, 0.15);
+    --site-glow-teal: rgba(23, 162, 184, 0.40);
+
+    --site-glow-blue-subtle: rgba(102, 178, 255, 0.15);
+    --site-glow-blue: rgba(0, 123, 255, 0.35);
+
+    --site-glow-green-subtle: rgba(40, 167, 69, 0.18);
+    --site-glow-green: rgba(40, 167, 69, 0.45);
+
+    --site-glow-red-subtle: rgba(220, 53, 69, 0.18);
+    --site-glow-red: rgba(220, 53, 69, 0.38);
+
+    --site-glow-purple-subtle: rgba(155, 89, 182, 0.15);
+    --site-glow-purple: rgba(155, 89, 182, 0.35);
+
+    /* =====================================================
+       Local Accent Defaults
+       -----------------------------------------------------
+       Components can set --site-local-accent to inherit
+       a section/card-specific accent.
+       ===================================================== */
+
+    --site-local-accent: var(--site-border-strong);
+    --site-local-accent-soft: rgba(255, 255, 255, 0.12);
+    --site-local-accent-glow: rgba(255, 255, 255, 0.10);
+
+    /* =====================================================
+       Typography
+       ===================================================== */
+
+    --site-font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --site-font-ui: var(--site-font-body);
+
+    --site-font-size-xs: 0.70rem;
+    --site-font-size-sm: 0.78rem;
+    --site-font-size-md: 0.90rem;
+    --site-font-size-base: 1rem;
+    --site-font-size-lg: 1.1rem;
+    --site-font-size-xl: 1.4rem;
+    --site-font-size-page-title: clamp(2rem, 4vw, 3.2rem);
+
+    --site-line-height-tight: 1.1;
+    --site-line-height-normal: 1.4;
+    --site-line-height-readable: 1.55;
+
+    --site-letter-spacing-tight: -0.025em;
+    --site-letter-spacing-heading: -0.04em;
+    --site-letter-spacing-label: 0.08em;
+    --site-letter-spacing-kicker: 0.16em;
+
+    --site-font-weight-normal: 400;
+    --site-font-weight-medium: 500;
+    --site-font-weight-semibold: 600;
+    --site-font-weight-bold: 700;
+    --site-font-weight-heavy: 800;
+    --site-font-weight-black: 900;
+
+    /* =====================================================
+       Spacing
+       ===================================================== */
+
+    --site-space-2xs: 2px;
+    --site-space-xs: 4px;
+    --site-space-sm: 6px;
+    --site-space-md: 8px;
+    --site-space-lg: 10px;
+    --site-space-xl: 12px;
+    --site-space-2xl: 15px;
+    --site-space-3xl: 20px;
+    --site-space-4xl: 25px;
+    --site-space-5xl: 30px;
+    --site-space-6xl: 40px;
+    --site-space-page-y: 28px;
+    --site-space-page-bottom: 56px;
+
+    /* =====================================================
+       Sizing / Layout Widths
+       ===================================================== */
+
+    --site-content-width: 1200px;
+    --site-content-width-wide: 1450px;
+    --site-search-width: 900px;
+    --site-control-width: 450px;
+
+    --site-card-grid-min: 200px;
+    --site-deck-grid-min: 210px;
+    --site-admin-grid-min: 280px;
+    --site-admin-grid-min-wide: 300px;
+
+    --site-sidebar-width: 320px;
+    --site-sidebar-width-compact: 290px;
+
+    /* =====================================================
+       Border Radius
+       ===================================================== */
+
+    --site-radius-xs: 4px;
+    --site-radius-sm: 6px;
+    --site-radius-md: 8px;
+    --site-radius-lg: 10px;
+    --site-radius-xl: 12px;
+    --site-radius-2xl: 18px;
+    --site-radius-pill: 999px;
+
+    --site-radius-card-image: 4.75% / 3.5%;
+
+    /* Preferred defaults */
+    --site-radius-control: var(--site-radius-sm);
+    --site-radius-card: var(--site-radius-md);
+    --site-radius-panel: var(--site-radius-lg);
+
+    /* =====================================================
+       Shadows
+       ===================================================== */
+
+    --site-shadow-soft: 0 4px 8px rgba(0, 0, 0, 0.20);
+    --site-shadow-card: 0 4px 15px rgba(0, 0, 0, 0.30);
+    --site-shadow-panel: 0 4px 15px rgba(0, 0, 0, 0.30);
+    --site-shadow-panel-strong: 0 10px 24px rgba(0, 0, 0, 0.32);
+    --site-shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.50);
+    --site-shadow-modal: 0 12px 28px rgba(0, 0, 0, 0.55);
+    --site-shadow-card-image: 0 8px 18px rgba(0, 0, 0, 0.62);
+
+    --site-shadow-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --site-shadow-progress-inset: inset 0 1px 3px rgba(0, 0, 0, 0.40);
+
+    /* =====================================================
+       Borders / Accent Edge Widths
+       ===================================================== */
+
+    --site-border-width: 1px;
+    --site-accent-border-width: 4px;
+
+    /* =====================================================
+       Controls
+       ===================================================== */
+
+    --site-control-height-sm: 26px;
+    --site-control-height-md: 36px;
+    --site-control-padding-y: 8px;
+    --site-control-padding-x: 16px;
+
+    --site-input-padding-y: 9px;
+    --site-input-padding-x: 12px;
+
+    --site-button-padding-y: 8px;
+    --site-button-padding-x: 16px;
+
+    --site-icon-button-size: 26px;
+
+    /* =====================================================
+       Transitions
+       ===================================================== */
+
+    --site-transition-fast: 0.15s ease;
+    --site-transition-normal: 0.2s ease;
+    --site-transition-slow: 0.3s ease;
+
+    --site-transition-transform: transform var(--site-transition-normal);
+    --site-transition-colors:
+        color var(--site-transition-normal),
+        background-color var(--site-transition-normal),
+        border-color var(--site-transition-normal),
+        box-shadow var(--site-transition-normal);
+
+    /* =====================================================
+       Z-Index
+       ===================================================== */
+
+    --site-z-dropdown: 1000;
+    --site-z-tooltip: 1100;
+    --site-z-modal: 2000;
+
+    /* =====================================================
+       Component Defaults
+       ===================================================== */
+
+    --site-card-bg: var(--site-surface-2);
+    --site-card-border: var(--site-border-soft);
+    --site-card-text: var(--site-text);
+    --site-card-heading: var(--site-text-heading);
+
+    --site-panel-bg: var(--site-surface-2);
+    --site-panel-border: var(--site-border-soft);
+
+    --site-input-bg: var(--site-surface-input);
+    --site-input-border: var(--site-border-strong);
+    --site-input-text: var(--site-text-heading);
+    --site-input-placeholder: var(--site-text-faint);
+
+    --site-button-bg: var(--site-surface-3);
+    --site-button-border: var(--site-border-bright);
+    --site-button-text: var(--site-text-heading);
+
+    --site-progress-track: var(--site-border);
+    --site-progress-fill: var(--site-accent-teal);
+
+    /* =====================================================
+       Page Identity Defaults
+       ===================================================== */
+
+    --site-page-accent: var(--site-accent-gold);
+    --site-page-accent-glow: var(--site-glow-gold-subtle);
+}
+
+/* =========================================================
+   Accent Utility Hooks
+   ---------------------------------------------------------
+   These do not style layout by themselves. They set local
+   accent variables for cards, panels, buttons, progress bars,
+   and other child components to consume.
+   ========================================================= */
+
+.site-accent-gold {
+    --site-local-accent: var(--site-accent-gold);
+    --site-local-accent-soft: rgba(255, 202, 40, 0.22);
+    --site-local-accent-glow: var(--site-glow-gold-subtle);
+}
+
+.site-accent-teal {
+    --site-local-accent: var(--site-accent-teal);
+    --site-local-accent-soft: rgba(23, 162, 184, 0.25);
+    --site-local-accent-glow: var(--site-glow-teal-subtle);
+}
+
+.site-accent-blue {
+    --site-local-accent: var(--site-accent-blue);
+    --site-local-accent-soft: rgba(0, 123, 255, 0.25);
+    --site-local-accent-glow: var(--site-glow-blue-subtle);
+}
+
+.site-accent-green {
+    --site-local-accent: var(--site-accent-green);
+    --site-local-accent-soft: rgba(40, 167, 69, 0.25);
+    --site-local-accent-glow: var(--site-glow-green-subtle);
+}
+
+.site-accent-red {
+    --site-local-accent: var(--site-accent-red);
+    --site-local-accent-soft: rgba(220, 53, 69, 0.25);
+    --site-local-accent-glow: var(--site-glow-red-subtle);
+}
+
+.site-accent-amber {
+    --site-local-accent: var(--site-accent-amber);
+    --site-local-accent-soft: rgba(255, 193, 7, 0.25);
+    --site-local-accent-glow: rgba(255, 193, 7, 0.14);
+}
+
+.site-accent-purple {
+    --site-local-accent: var(--site-accent-purple);
+    --site-local-accent-soft: rgba(155, 89, 182, 0.25);
+    --site-local-accent-glow: var(--site-glow-purple-subtle);
+}
+
+/* =========================================================
+   Semantic Utility Hooks
+   ---------------------------------------------------------
+   These are for meaning, not decoration.
+   ========================================================= */
+
+.site-status-success {
+    --site-local-accent: var(--site-success);
+    --site-local-accent-soft: rgba(40, 167, 69, 0.25);
+    --site-local-accent-glow: var(--site-glow-green-subtle);
+}
+
+.site-status-danger {
+    --site-local-accent: var(--site-danger);
+    --site-local-accent-soft: rgba(220, 53, 69, 0.25);
+    --site-local-accent-glow: var(--site-glow-red-subtle);
+}
+
+.site-status-warning {
+    --site-local-accent: var(--site-warning);
+    --site-local-accent-soft: rgba(255, 193, 7, 0.25);
+    --site-local-accent-glow: rgba(255, 193, 7, 0.14);
+}
+
+.site-status-info {
+    --site-local-accent: var(--site-info);
+    --site-local-accent-soft: rgba(23, 162, 184, 0.25);
+    --site-local-accent-glow: var(--site-glow-teal-subtle);
+}

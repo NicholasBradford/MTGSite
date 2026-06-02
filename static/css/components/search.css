@@ -1,0 +1,722 @@
+/* =========================================================
+   MTGSite Card Display
+   ---------------------------------------------------------
+   Search, grid cards, foil treatment, table shell,
+   tracking data, and infinite-scroll helpers.
+   ========================================================= */
+
+
+/* =========================================================
+   Utility Text / Alignment
+   ========================================================= */
+
+.center-align {
+    text-align: center;
+}
+
+.right-align {
+    text-align: right;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+.capitalize {
+    text-transform: capitalize;
+}
+
+.font-bold {
+    font-weight: var(--site-font-weight-semibold, 600);
+}
+
+.text-muted {
+    color: var(--site-text-faint, #888);
+    font-size: 0.85rem;
+}
+
+.text-accent {
+    color: var(--site-accent-green-soft, #2ecc71);
+    font-weight: var(--site-font-weight-semibold, 600);
+}
+
+
+/* =========================================================
+   Search Shell
+   ========================================================= */
+
+.site-search-section {
+    margin: var(--site-space-3xl, 20px) 0 var(--site-space-5xl, 30px);
+}
+
+.site-search-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.site-search-form--closed {
+    max-width: 980px;
+    margin: 0 auto 22px;
+}
+
+.site-search-form--open {
+    max-width: 1220px;
+    margin: 0 auto 24px;
+}
+
+
+/* =========================================================
+   Simple Search Bar
+   ========================================================= */
+
+.site-search-bar {
+    width: 100%;
+
+    display: flex;
+    align-items: stretch;
+    gap: var(--site-space-lg, 10px);
+
+    padding: var(--site-space-lg, 10px);
+    box-sizing: border-box;
+
+    background: var(--site-surface-2, #1f1f1f);
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-xl, 12px);
+
+    box-shadow:
+        var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3)),
+        var(--site-shadow-inset-soft, inset 0 1px 0 rgba(255, 255, 255, 0.04));
+}
+
+.site-search-input,
+.site-input,
+.site-select {
+    width: 100%;
+    height: 40px;
+
+    padding: 0 12px;
+    box-sizing: border-box;
+
+    color: var(--site-input-text, #eee);
+    background-color: var(--site-input-bg, #111);
+
+    border: 1px solid var(--site-input-border, #444);
+    border-radius: var(--site-radius-md, 8px);
+
+    font-family: inherit;
+    font-size: 0.9rem;
+
+    transition:
+        background-color var(--site-transition-normal, 0.2s ease),
+        border-color var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease);
+}
+
+.site-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 44px;
+    padding: 0 16px;
+    line-height: 44px;
+}
+
+.site-search-input::placeholder,
+.site-input::placeholder {
+    color: var(--site-input-placeholder, #888);
+}
+
+.site-search-input:focus,
+.site-input:focus,
+.site-select:focus {
+    outline: none;
+    background-color: var(--site-bg-elevated, #171717);
+    border-color: var(--site-accent-teal, #17a2b8);
+    box-shadow: 0 0 0 3px var(--site-glow-teal-subtle, rgba(23, 162, 184, 0.15));
+}
+
+.site-select {
+    cursor: pointer;
+    appearance: none;
+    padding-right: 34px;
+
+    background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.site-search-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--site-space-md, 8px);
+    flex: 0 0 auto;
+}
+
+
+/* =========================================================
+   Icon Button Variants For Search
+   ========================================================= */
+
+.site-icon-button--search {
+    color: #fff;
+    background-color: #117a8b;
+    border-color: #1594a9;
+}
+
+.site-icon-button--search:hover {
+    background-color: var(--site-accent-teal, #17a2b8);
+    border-color: var(--site-accent-teal-soft, #38d5e8);
+    box-shadow: 0 0 14px var(--site-glow-teal, rgba(23, 162, 184, 0.40));
+}
+
+.site-icon-button--neutral:hover {
+    color: var(--site-accent-blue-soft, #66b2ff);
+    background-color: var(--site-surface-3, #222);
+    border-color: var(--site-border-bright, #555);
+}
+
+.site-icon-button--accent:hover {
+    color: var(--site-accent-gold-soft, #ffdf73);
+    border-color: var(--site-accent-gold, #ffca28);
+    box-shadow: 0 0 10px var(--site-glow-gold-subtle, rgba(255, 202, 40, 0.12));
+}
+
+
+/* =========================================================
+   Advanced Search Drawer
+   ========================================================= */
+
+.site-search-drawer {
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 18px;
+
+    background: var(--site-surface-2, #1f1f1f);
+    border: 1px solid var(--site-border, #333);
+    border-left: var(--site-accent-border-width, 4px) solid var(--site-local-accent, #17a2b8);
+    border-radius: var(--site-radius-xl, 12px);
+
+    box-shadow:
+        var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3)),
+        var(--site-shadow-inset-soft, inset 0 1px 0 rgba(255, 255, 255, 0.04));
+}
+
+.site-advanced-search {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.site-search-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.site-search-group {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.site-search-group--wide {
+    grid-column: span 2;
+}
+
+.site-search-group > label {
+    color: var(--site-text-soft, #aaa);
+
+    font-size: 0.7rem;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+}
+
+
+/* =========================================================
+   Checkbox Pills
+   ========================================================= */
+
+.site-checkbox-group {
+    width: 100%;
+    min-height: 40px;
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+
+    padding: 7px;
+    box-sizing: border-box;
+
+    background-color: var(--site-input-bg, #111);
+    border: 1px solid var(--site-input-border, #444);
+    border-radius: var(--site-radius-md, 8px);
+
+    transition:
+        background-color var(--site-transition-normal, 0.2s ease),
+        border-color var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease);
+}
+
+.site-checkbox-group:focus-within {
+    background-color: var(--site-bg-elevated, #171717);
+    border-color: var(--site-accent-teal, #17a2b8);
+    box-shadow: 0 0 0 3px var(--site-glow-teal-subtle, rgba(23, 162, 184, 0.15));
+}
+
+.site-checkbox-pill {
+    position: relative;
+
+    min-width: 58px;
+    height: 26px;
+    padding: 0 9px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    box-sizing: border-box;
+
+    color: var(--site-text-soft, #aaa);
+    background-color: var(--site-surface, #1a1a1a);
+
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-pill, 999px);
+
+    font-size: 0.68rem;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+
+    cursor: pointer;
+    user-select: none;
+
+    transition:
+        background-color var(--site-transition-fast, 0.15s ease),
+        border-color var(--site-transition-fast, 0.15s ease),
+        box-shadow var(--site-transition-fast, 0.15s ease),
+        color var(--site-transition-fast, 0.15s ease),
+        transform 0.08s ease;
+}
+
+.site-checkbox-pill:hover {
+    color: var(--site-text-heading, #eee);
+    background-color: var(--site-surface-3, #222);
+    border-color: var(--site-border-bright, #555);
+}
+
+.site-checkbox-pill input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.site-checkbox-pill:has(input[type="checkbox"]:checked) {
+    color: #fff;
+    background-color: #12333a;
+    border-color: var(--site-accent-teal, #17a2b8);
+    box-shadow:
+        var(--site-shadow-inset-soft, inset 0 1px 0 rgba(255, 255, 255, 0.04)),
+        0 0 8px var(--site-glow-teal-subtle, rgba(23, 162, 184, 0.15));
+}
+
+.site-checkbox-pill:has(input[type="checkbox"]:focus-visible) {
+    outline: 2px solid var(--site-accent-teal, #17a2b8);
+    outline-offset: 2px;
+}
+
+.site-checkbox-pill:active {
+    transform: scale(0.96);
+}
+
+
+/* =========================================================
+   Search Action Row
+   ========================================================= */
+
+.site-search-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--site-space-lg, 10px);
+
+    margin-top: 2px;
+    padding-top: 16px;
+
+    border-top: 1px solid var(--site-border-soft, rgba(255, 255, 255, 0.08));
+}
+
+
+/* =========================================================
+   Card Grid Tiles
+   ========================================================= */
+
+.site-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--site-card-grid-min, 200px), 1fr));
+    gap: var(--site-space-3xl, 20px);
+
+    padding: var(--site-space-3xl, 20px);
+    max-width: var(--site-content-width, 1200px);
+    margin: 0 auto;
+}
+
+.site-card-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+
+    color: var(--site-text, #e0e0e0);
+}
+
+.site-card-image-wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+.site-card-image {
+    display: block;
+    width: 100%;
+    height: auto;
+
+    border: 2px solid transparent;
+    border-radius: var(--site-radius-lg, 10px);
+
+    box-shadow: var(--site-shadow-soft, 0 4px 8px rgba(0, 0, 0, 0.2));
+
+    transition:
+        border-color var(--site-transition-normal, 0.2s ease),
+        transform var(--site-transition-normal, 0.2s ease),
+        box-shadow var(--site-transition-normal, 0.2s ease);
+}
+
+.site-card-image:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3));
+}
+
+.site-card-image--editable {
+    cursor: pointer;
+}
+
+.site-card-image--editable:hover {
+    border-color: var(--site-accent-gold, #ffca28);
+}
+
+.site-card-no-image {
+    width: 100%;
+    min-height: 280px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: var(--site-text-faint, #888);
+    background: var(--site-surface-2, #1f1f1f);
+
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-lg, 10px);
+}
+
+.site-card-label {
+    margin-top: var(--site-space-md, 8px);
+    color: var(--site-text, #e0e0e0);
+    line-height: 1.35;
+}
+
+.site-card-name {
+    color: var(--site-text-heading, #eee);
+    font-weight: var(--site-font-weight-semibold, 600);
+}
+
+.site-card-meta {
+    color: var(--site-text-faint, #888);
+    font-size: 0.85rem;
+}
+
+.site-qty-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-left: 5px;
+    padding: 2px 6px;
+
+    color: #fff;
+    background-color: var(--site-border-strong, #444);
+    border: 1px solid var(--site-border-bright, #555);
+    border-radius: var(--site-radius-pill, 999px);
+
+    font-size: 0.8em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+.site-foil-marker {
+    color: var(--site-accent-gold, #ffca28);
+}
+
+
+/* =========================================================
+   Foil / Rainbow Treatment
+   ========================================================= */
+
+.rainbow_image {
+    position: relative;
+    display: inline-block;
+    border-radius: var(--site-radius-card-image, 4.75% / 3.5%);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    line-height: 0;
+    overflow: hidden;
+}
+
+.rainbow_image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+
+    background: repeating-linear-gradient(
+        115deg,
+        transparent 0%,
+        rgba(255, 0, 0, 0.4) 25%,
+        rgba(255, 255, 0, 0.4) 35%,
+        rgba(0, 255, 0, 0.4) 50%,
+        rgba(0, 255, 255, 0.4) 65%,
+        rgba(0, 0, 255, 0.4) 75%,
+        rgba(255, 0, 255, 0.4) 80%,
+        transparent 100%
+    );
+
+    background-size: 300% 200%;
+    animation: foil-shimmer 8s ease infinite;
+    mix-blend-mode: color-dodge;
+    opacity: 0.5;
+}
+
+@keyframes foil-shimmer {
+    0% {
+        background-position: 0% 0%;
+    }
+
+    100% {
+        background-position: 100% 100%;
+    }
+}
+
+
+/* =========================================================
+   Tracking / Price Shift Data
+   ========================================================= */
+
+.site-price-shift {
+    margin-top: var(--site-space-xl, 12px);
+    padding-top: var(--site-space-md, 8px);
+
+    border-top: 1px solid var(--site-border, #333);
+
+    line-height: 1.4;
+}
+
+.site-price-shift__value {
+    font-weight: var(--site-font-weight-bold, 700);
+}
+
+.site-price-shift__value--up {
+    color: var(--site-success-soft, #2ecc71);
+}
+
+.site-price-shift__value--down {
+    color: var(--site-danger-soft, #e74c3c);
+}
+
+.site-price-shift__value--flat {
+    color: var(--site-text-soft, #aaa);
+}
+
+.site-card-location {
+    margin-top: var(--site-space-md, 8px);
+
+    color: var(--site-text-faint, #888);
+    font-size: 0.85em;
+}
+
+.site-card-location i {
+    margin-right: var(--site-space-xs, 4px);
+}
+
+
+/* =========================================================
+   Table View
+   ========================================================= */
+
+.site-table-container {
+    width: 100%;
+    overflow-x: auto;
+
+    margin-top: var(--site-space-3xl, 20px);
+
+    background-color: var(--site-surface-2, #1f1f1f);
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-md, 8px);
+}
+
+.site-table {
+    width: 100%;
+
+    color: var(--site-text, #e0e0e0);
+
+    border-collapse: collapse;
+
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.site-table th,
+.site-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--site-border, #333);
+    vertical-align: middle;
+}
+
+.site-table th {
+    color: var(--site-text-faint, #888);
+    background-color: var(--site-bg-elevated, #171717);
+
+    border-bottom: 2px solid var(--site-border, #333);
+
+    font-size: 0.75rem;
+    font-weight: var(--site-font-weight-semibold, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.site-table tbody tr {
+    transition: background-color var(--site-transition-fast, 0.15s ease);
+}
+
+.site-table tbody tr:hover {
+    background-color: var(--site-surface-3, #222);
+}
+
+.site-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+
+/* =========================================================
+   Loading / Empty States
+   ========================================================= */
+
+.site-scroll-sentinel {
+    height: 20px;
+}
+
+.site-loading-indicator {
+    display: none;
+
+    padding: var(--site-space-3xl, 20px);
+
+    color: var(--site-text-soft, #aaa);
+    text-align: center;
+}
+
+.site-empty-state {
+    grid-column: 1 / -1;
+
+    width: 100%;
+    padding: var(--site-space-3xl, 20px);
+
+    color: var(--site-text-soft, #aaa);
+    text-align: center;
+}
+
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 1100px) {
+    .site-search-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .site-search-group--wide {
+        grid-column: span 3;
+    }
+}
+
+@media (max-width: 900px) {
+    .site-search-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .site-search-group--wide {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 760px) {
+    .site-search-form--closed,
+    .site-search-form--open {
+        max-width: 100%;
+    }
+
+    .site-search-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .site-search-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .site-search-actions .site-icon-button {
+        width: auto;
+        flex: 1 1 0;
+    }
+
+    .site-search-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .site-search-group--wide {
+        grid-column: span 1;
+    }
+
+    .site-search-actions-row {
+        justify-content: stretch;
+    }
+
+    .site-search-actions-row .site-button {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 460px) {
+    .site-search-drawer {
+        padding: 14px;
+        border-radius: var(--site-radius-xl, 12px);
+    }
+
+    .site-checkbox-pill {
+        min-width: calc(50% - 4px);
+    }
+
+    .site-search-actions-row .site-button {
+        width: 100%;
+    }
+}

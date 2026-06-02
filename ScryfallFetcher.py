@@ -1,5 +1,6 @@
 import requests, time, shutil, os
 from datetime import timedelta,datetime
+from services.tcgcsv_prices import update_single_card_price_from_tcgcsv
 
 # Global headers for Scryfall API compliance
 headers = {'User-Agent': 'Mozilla/5.0 (MTG-Collection-Tracker/1.0)'}
@@ -111,6 +112,8 @@ class ScryfallFetcher:
                 cmc = card.get('cmc', 0.0)
                 color = "".join(card.get('colors', []))
                 color_identity = "".join(card.get('color_identity', []))
+                tcgplayer_id = card.get("tcgplayer_id")
+                tcgplayer_etched_id = card.get("tcgplayer_etched_id")
                 
                 # These often go missing on double-faced cards
                 mana_cost = card.get('mana_cost')
@@ -148,12 +151,35 @@ class ScryfallFetcher:
                 # 3. B. Populate card_printings with the LOCAL path
                 self.db.cursor.execute("""
                     INSERT OR IGNORE INTO card_printings 
-                    (scryfall_id, oracle_id, set_code, collector_number, rarity, image_url)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    scryfall_id, oracle_id, set_code,
-                    card.get('collector_number'), card.get('rarity'), local_img_path
-                ))
+                        (
+                            scryfall_id,
+                            oracle_id,
+                            set_code,
+                            collector_number,
+                            rarity,
+                            image_url,
+                            tcgplayer_id,
+                            tcgplayer_etched_id
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(scryfall_id) DO UPDATE SET
+                            oracle_id = excluded.oracle_id,
+                            set_code = excluded.set_code,
+                            collector_number = excluded.collector_number,
+                            rarity = excluded.rarity,
+                            image_url = excluded.image_url,
+                            tcgplayer_id = COALESCE(excluded.tcgplayer_id, card_printings.tcgplayer_id),
+                            tcgplayer_etched_id = COALESCE(excluded.tcgplayer_etched_id, card_printings.tcgplayer_etched_id)
+                    """, (
+                        scryfall_id,
+                        oracle_id,
+                        set_code,
+                        card.get("collector_number"),
+                        card.get("rarity"),
+                        local_img_path,
+                        tcgplayer_id,
+                        tcgplayer_etched_id
+                    ))
 
             search_url = cards_data.get('next_page')
             if search_url:
@@ -199,13 +225,15 @@ class ScryfallFetcher:
                 with open(full_img_fs_path, 'wb') as f:
                     shutil.copyfileobj(img_res.raw, f)
          
-        prices = data.get('prices', {})        
-        non_foil_price = prices.get("usd")
-        foil_price = prices.get("usd_foil")
+        # prices = data.get('prices', {})        
+        # non_foil_price = prices.get("usd")
+        # foil_price = prices.get("usd_foil")
         name = data.get('name')
         cmc = data.get('cmc', 0.0)
         color = "".join(data.get('colors', []))
         color_identity = "".join(data.get('color_identity', []))
+        tcgplayer_id = data.get("tcgplayer_id")
+        tcgplayer_etched_id = data.get("tcgplayer_etched_id")
         
         # These often go missing on double-faced cards
         mana_cost = data.get('mana_cost')
@@ -237,21 +265,37 @@ class ScryfallFetcher:
                 oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity
             ))
             
-            self.db.cursor.execute('''
-                INSERT INTO price_history (scryfall_id, price_usd, price_foil)
-                VALUES (?, ?, ?)
-            ''', (scryfall_id, non_foil_price, foil_price))
 
-            self.db.cursor.execute('''
-                INSERT OR REPLACE INTO card_printings (scryfall_id, oracle_id, set_code, collector_number, rarity, image_url, flavor_text, current_price, current_price_foil)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                scryfall_id, oracle_id, set_code, 
-                collector_number, data.get('rarity'), local_img_path, data.get('flavor_text'),
-                non_foil_price, foil_price
+            self.db.cursor.execute("""
+                INSERT OR IGNORE INTO card_printings 
+                (
+                    scryfall_id,
+                    oracle_id,
+                    set_code,
+                    collector_number,
+                    rarity,
+                    image_url,
+                    tcgplayer_id,
+                    tcgplayer_etched_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                scryfall_id,
+                oracle_id,
+                set_code,
+                data.get("collector_number"),
+                data.get("rarity"),
+                local_img_path,
+                tcgplayer_id,
+                tcgplayer_etched_id
             ))
 
-            self.db.commit()
+            try:
+                update_single_card_price_from_tcgcsv(self.db, scryfall_id)
+                self.db.commit()
+            except Exception as e:
+                print(f"TCGCSV price update skipped for {scryfall_id}: {e}")
+
             time.sleep(0.1)
             return scryfall_id
 

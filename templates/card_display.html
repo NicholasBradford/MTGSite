@@ -1,950 +1,99 @@
 {% extends "base.html" %}
-{% block style %}
-    {{ super() }}
-        /* =========================================================
-        MTG Vault UI Styles
-        Cleaned and consolidated from the existing CSS source.
 
-        Notes:
-        - Search bar + advanced drawer selectors are preserved.
-        - Duplicate search styles were consolidated into one source of truth.
-        - Obsolete overrides were removed or folded into the final rules.
-        ========================================================= */
+{% block body_class %}card-display-page{% endblock %}
 
-
-        /* =========================================================
-        Foil / Rainbow Card Image Treatment
-        ========================================================= */
-
-        .rainbow_image {
-            position: relative;
-            display: inline-block;
-            border-radius: 4.75% / 3.5%;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-            line-height: 0;
-        }
-
-        .rainbow_image::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            z-index: 998;
-            pointer-events: none;
-
-            background: repeating-linear-gradient(
-                115deg,
-                transparent 0%,
-                rgba(255, 0, 0, 0.4) 25%,
-                rgba(255, 255, 0, 0.4) 35%,
-                rgba(0, 255, 0, 0.4) 50%,
-                rgba(0, 255, 255, 0.4) 65%,
-                rgba(0, 0, 255, 0.4) 75%,
-                rgba(255, 0, 255, 0.4) 80%,
-                transparent 100%
-            );
-
-            background-size: 300% 200%;
-            animation: foil-shimmer 8s ease infinite;
-            mix-blend-mode: color-dodge;
-            opacity: 0.5;
-        }
-
-        @keyframes foil-shimmer {
-            0% {
-                background-position: 0% 0%;
-            }
-
-            100% {
-                background-position: 100% 100%;
-            }
-        }
-
-
-        /* =========================================================
-        Badges / Small Helpers
-        ========================================================= */
-
-        .qty-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            margin-left: 5px;
-            padding: 2px 6px;
-
-            color: #fff;
-            background-color: #444;
-            border: 1px solid #666;
-            border-radius: 10px;
-
-            font-size: 0.8em;
-            line-height: 1.2;
-            vertical-align: middle;
-        }
-
-        .center-align {
-            text-align: center;
-        }
-
-        .right-align {
-            text-align: right;
-        }
-
-        .uppercase {
-            text-transform: uppercase;
-        }
-
-        .capitalize {
-            text-transform: capitalize;
-        }
-
-        .font-bold {
-            font-weight: 600;
-        }
-
-        .text-muted {
-            color: #888;
-            font-size: 0.85rem;
-        }
-
-        .text-accent {
-            color: #81c784;
-            font-weight: 600;
-        }
-
-
-        /* =========================================================
-        Search Form: Shared Shell
-        ========================================================= */
-
-        .advanced-search-form {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .advanced-search-form.closed {
-            max-width: 980px;
-            margin: 0 auto 22px;
-        }
-
-        .advanced-search-form.open {
-            max-width: 1220px;
-            margin: 0 auto 24px;
-        }
-
-
-        /* =========================================================
-        Simple Search Bar
-        ========================================================= */
-
-        .search-inputs {
-            width: 100%;
-            display: flex;
-            align-items: stretch;
-            gap: 10px;
-
-            padding: 10px;
-            box-sizing: border-box;
-
-            background:
-                linear-gradient(180deg, rgba(35, 35, 35, 0.96), rgba(20, 20, 20, 0.96));
-            border: 1px solid #333;
-            border-radius: 14px;
-
-            box-shadow:
-                0 10px 28px rgba(0, 0, 0, 0.38),
-                inset 0 1px 0 rgba(255, 255, 255, 0.04);
-        }
-
-        .main-query-input,
-        input[name="q"] {
-            flex: 1 1 auto;
-            min-width: 0;
-            height: 44px;
-
-            padding: 0 16px;
-            box-sizing: border-box;
-
-            color: #f2f2f2;
-            background-color: #101010;
-
-            border: 1px solid #2f2f2f;
-            border-radius: 10px;
-
-            font-family: inherit;
-            font-size: 0.96rem;
-            line-height: 44px;
-
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-
-            transition:
-                background-color 0.18s ease,
-                border-color 0.18s ease,
-                box-shadow 0.18s ease;
-        }
-
-        .main-query-input::placeholder,
-        input[name="q"]::placeholder {
-            color: #777;
-        }
-
-        .main-query-input:focus,
-        input[name="q"]:focus {
-            outline: none;
-            background-color: #151515;
-            border-color: #17a2b8;
-            box-shadow:
-                0 0 0 3px rgba(23, 162, 184, 0.18),
-                inset 0 1px 0 rgba(255, 255, 255, 0.03);
-        }
-
-
-        /* =========================================================
-        Search Buttons / Icon Actions
-        ========================================================= */
-
-        .search-actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            flex: 0 0 auto;
-        }
-
-        .btn-search,
-        .btn-toggle,
-        .btn-clear,
-        .help-icon-link,
-        #toggleViewBtn {
-            width: 44px;
-            height: 44px;
-            padding: 0;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            box-sizing: border-box;
-
-            color: #b9b9b9;
-            background-color: #181818;
-
-            border: 1px solid #333;
-            border-radius: 10px;
-
-            cursor: pointer;
-            text-decoration: none;
-
-            transition:
-                background-color 0.16s ease,
-                border-color 0.16s ease,
-                box-shadow 0.16s ease,
-                color 0.16s ease,
-                transform 0.08s ease;
-        }
-
-        .btn-search {
-            color: #fff;
-            background-color: #117a8b;
-            border-color: #1594a9;
-        }
-
-        .btn-search:hover {
-            background-color: #17a2b8;
-            border-color: #1dc5dd;
-            box-shadow: 0 0 14px rgba(23, 162, 184, 0.28);
-        }
-
-        .btn-toggle:hover,
-        #toggleViewBtn:hover,
-        .help-icon-link:hover {
-            color: #66d9ef;
-            background-color: #202020;
-            border-color: #4c4c4c;
-            box-shadow: 0 0 10px rgba(102, 217, 239, 0.12);
-        }
-
-        .btn-toggle.advanced-toggle-btn:hover {
-            color: #f0d58c;
-            border-color: rgba(240, 213, 140, 0.45);
-            box-shadow: 0 0 10px rgba(240, 213, 140, 0.14);
-        }
-
-        .btn-clear {
-            color: #ff6565;
-            background-color: #241818;
-            border-color: #5a2c2c;
-        }
-
-        .btn-clear:hover {
-            color: #ff8a8a;
-            background-color: #331d1d;
-            border-color: #823d3d;
-            box-shadow: 0 0 10px rgba(255, 82, 82, 0.2);
-        }
-
-        .btn-search:active,
-        .btn-toggle:active,
-        .btn-clear:active,
-        .help-icon-link:active,
-        #toggleViewBtn:active {
-            transform: scale(0.96);
-        }
-
-        .btn-search:focus-visible,
-        .btn-toggle:focus-visible,
-        .btn-clear:focus-visible,
-        .help-icon-link:focus-visible,
-        #toggleViewBtn:focus-visible {
-            outline: 2px solid rgba(23, 162, 184, 0.75);
-            outline-offset: 2px;
-        }
-
-        #toggleViewBtn.active-state {
-            color: #66d9ef;
-        }
-
-
-        /* =========================================================
-        Advanced Search Drawer
-        ========================================================= */
-
-        .advanced-search-form.open > .search-container,
-        #advancedSearchDrawer {
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        #advancedSearchDrawer {
-            padding: 18px;
-
-            background:
-                radial-gradient(circle at top left, rgba(23, 162, 184, 0.1), transparent 34%),
-                linear-gradient(180deg, rgba(34, 34, 34, 0.98), rgba(18, 18, 18, 0.98));
-
-            border: 1px solid #333;
-            border-radius: 16px;
-
-            box-shadow:
-                0 14px 36px rgba(0, 0, 0, 0.42),
-                inset 0 1px 0 rgba(255, 255, 255, 0.04);
-        }
-
-        .vault-advanced-search {
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-        }
-
-        .search-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 16px;
-        }
-
-        .search-group {
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-        }
-
-        .search-group > label {
-            color: #aeb4b8;
-
-            font-size: 0.7rem;
-            font-weight: 700;
-            line-height: 1;
-            text-transform: uppercase;
-            letter-spacing: 0.075em;
-        }
-
-        /* Gives color and identity checkbox groups more room without changing HTML. */
-        .search-group:has(.vault-checkbox-group) {
-            grid-column: span 2;
-        }
-
-
-        /* =========================================================
-        Inputs / Dropdowns
-        ========================================================= */
-
-        .vault-input,
-        .vault-dropdown {
-            width: 100%;
-            height: 40px;
-            padding: 0 12px;
-
-            box-sizing: border-box;
-
-            color: #eee;
-            background-color: #101010;
-
-            border: 1px solid #303030;
-            border-radius: 9px;
-
-            font-family: inherit;
-            font-size: 0.88rem;
-
-            transition:
-                background-color 0.18s ease,
-                border-color 0.18s ease,
-                box-shadow 0.18s ease;
-        }
-
-        .vault-input::placeholder {
-            color: #6f6f6f;
-        }
-
-        .vault-dropdown {
-            cursor: pointer;
-            appearance: none;
-
-            padding-right: 34px;
-
-            background-image:
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-        }
-
-        .vault-input:focus,
-        .vault-dropdown:focus {
-            outline: none;
-            background-color: #151515;
-            border-color: #17a2b8;
-            box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.16);
-        }
-
-
-        /* =========================================================
-        Checkbox Groups
-        ========================================================= */
-
-        .vault-checkbox-group {
-            width: 100%;
-            min-height: 40px;
-
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 6px;
-
-            padding: 7px;
-            box-sizing: border-box;
-
-            background-color: #101010;
-            border: 1px solid #303030;
-            border-radius: 9px;
-
-            transition:
-                background-color 0.18s ease,
-                border-color 0.18s ease,
-                box-shadow 0.18s ease;
-        }
-
-        .vault-checkbox-group:focus-within {
-            background-color: #151515;
-            border-color: #17a2b8;
-            box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.13);
-        }
-
-        .vault-checkbox {
-            position: relative;
-
-            min-width: 58px;
-            height: 26px;
-            padding: 0 9px;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            box-sizing: border-box;
-
-            color: #a9a9a9;
-            background-color: #1a1a1a;
-
-            border: 1px solid #363636;
-            border-radius: 999px;
-
-            font-size: 0.68rem;
-            font-weight: 700;
-            line-height: 1;
-            letter-spacing: 0.035em;
-            text-transform: uppercase;
-
-            cursor: pointer;
-            user-select: none;
-
-            transition:
-                background-color 0.15s ease,
-                border-color 0.15s ease,
-                box-shadow 0.15s ease,
-                color 0.15s ease,
-                transform 0.08s ease;
-        }
-
-        .vault-checkbox:hover {
-            color: #eee;
-            background-color: #232323;
-            border-color: #4f4f4f;
-        }
-
-        .vault-checkbox input[type="checkbox"] {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .vault-checkbox:has(input[type="checkbox"]:checked) {
-            color: #fff;
-            background-color: #12333a;
-            border-color: #17a2b8;
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.05),
-                0 0 8px rgba(23, 162, 184, 0.18);
-        }
-
-        .vault-checkbox:has(input[type="checkbox"]:focus-visible) {
-            outline: 2px solid rgba(23, 162, 184, 0.75);
-            outline-offset: 2px;
-        }
-
-        .vault-checkbox:active {
-            transform: scale(0.96);
-        }
-
-
-        /* =========================================================
-        Advanced Search Action Buttons
-        ========================================================= */
-
-        .advanced-search-form.open .search-actions {
-            margin-top: 2px;
-            padding-top: 16px;
-
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: flex-end;
-
-            gap: 10px;
-
-            border-top: 1px solid rgba(255, 255, 255, 0.07);
-        }
-
-        .search-actions-row {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-
-            margin-top: 20px;
-            padding-top: 16px;
-
-            border-top: 1px solid #282828;
-        }
-
-        .btn-menu {
-            min-height: 38px;
-            padding: 0 16px;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            box-sizing: border-box;
-
-            border-radius: 9px;
-
-            font-family: inherit;
-            font-size: 0.84rem;
-            font-weight: 700;
-            text-decoration: none;
-
-            cursor: pointer;
-
-            transition:
-                background-color 0.16s ease,
-                border-color 0.16s ease,
-                box-shadow 0.16s ease,
-                color 0.16s ease,
-                transform 0.08s ease;
-        }
-
-        .btn-menu.advanced-toggle-btn {
-            color: #c8c8c8;
-            background-color: #181818;
-            border: 1px solid #444;
-        }
-
-        .btn-menu.advanced-toggle-btn:hover {
-            color: #f0d58c;
-            background-color: #222;
-            border-color: rgba(240, 213, 140, 0.45);
-        }
-
-        .btn-menu.clear-btn {
-            color: #ff6565;
-            background-color: #241818;
-            border: 1px solid #5a2c2c;
-        }
-
-        .btn-menu.clear-btn:hover {
-            color: #ff8a8a;
-            background-color: #331d1d;
-            border-color: #823d3d;
-            box-shadow: 0 0 10px rgba(255, 82, 82, 0.2);
-        }
-
-        .btn-menu.search-btn {
-            color: #fff;
-            background-color: #117a8b;
-            border: 1px solid #1594a9;
-        }
-
-        .btn-menu.search-btn:hover {
-            background-color: #17a2b8;
-            border-color: #1dc5dd;
-            box-shadow: 0 0 14px rgba(23, 162, 184, 0.28);
-        }
-
-        .btn-menu:active {
-            transform: scale(0.97);
-        }
-
-        .btn-menu:focus-visible {
-            outline: 2px solid rgba(23, 162, 184, 0.75);
-            outline-offset: 2px;
-        }
-
-
-        /* =========================================================
-        Legacy Extra Fields Support
-        Kept in case older templates still use .extra-fields.
-        ========================================================= */
-
-        .extra-fields {
-            width: 100%;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-
-            padding: 15px;
-            box-sizing: border-box;
-
-            background: rgba(0, 0, 0, 0.2);
-            border-top: 1px solid rgba(255, 215, 0, 0.2);
-            border-radius: 8px;
-        }
-
-        .extra-fields.hidden {
-            display: none;
-        }
-
-        .extra-fields input,
-        .extra-fields select {
-            flex: 1 1 150px;
-            min-width: 120px;
-        }
-
-        .extra-fields .short-input {
-            flex: 0 1 100px;
-        }
-
-
-        /* =========================================================
-        Vault Table
-        ========================================================= */
-
-        .vault-table-container {
-            width: 100%;
-            overflow-x: auto;
-
-            margin-top: 20px;
-
-            background-color: #1f1f1f;
-            border: 1px solid #333;
-            border-radius: 8px;
-        }
-
-        .vault-table {
-            width: 100%;
-
-            color: #e0e0e0;
-
-            border-collapse: collapse;
-
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-
-        .vault-table th,
-        .vault-table td {
-            padding: 12px 16px;
-
-            border-bottom: 1px solid #333;
-
-            vertical-align: middle;
-        }
-
-        .vault-table th {
-            color: #888;
-            background-color: #181818;
-
-            border-bottom: 2px solid #333;
-
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .vault-table tbody tr {
-            transition: background-color 0.15s ease;
-        }
-
-        .vault-table tbody tr:hover {
-            background-color: #262626;
-        }
-
-        .vault-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-
-        /* =========================================================
-        Generic Vault Button
-        ========================================================= */
-
-        .vault-btn {
-            padding: 5px 12px;
-
-            color: #e0e0e0;
-            background-color: #2a2a2a;
-
-            border: 1px solid #444;
-            border-radius: 4px;
-
-            font-size: 0.8rem;
-            font-weight: 600;
-
-            cursor: pointer;
-
-            transition:
-                background-color 0.2s ease,
-                border-color 0.2s ease,
-                box-shadow 0.2s ease,
-                color 0.2s ease;
-        }
-
-        .vault-btn:hover {
-            color: #fff;
-            background-color: #ff5252;
-            border-color: #ff5252;
-            box-shadow: 0 0 8px rgba(255, 82, 82, 0.3);
-        }
-
-
-        /* =========================================================
-        Delete Button
-        ========================================================= */
-
-        .delete-form {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            margin: 0;
-        }
-
-        .delete-btn {
-            width: 30px;
-            height: 30px;
-            padding: 0;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            color: #ff5252;
-            background-color: #2a1d1d;
-
-            border: 1px solid #5a2c2c;
-            border-radius: 6px;
-
-            font-family: inherit;
-            font-size: 1.25rem;
-            font-weight: 700;
-            line-height: 1;
-
-            cursor: pointer;
-            user-select: none;
-
-            transition:
-                background-color 0.15s ease,
-                border-color 0.15s ease,
-                box-shadow 0.15s ease,
-                color 0.15s ease,
-                transform 0.1s ease;
-        }
-
-        .delete-btn:hover {
-            color: #ff6e6e;
-            background-color: #3d2323;
-            border-color: #823d3d;
-            box-shadow: 0 0 8px rgba(255, 82, 82, 0.25);
-        }
-
-        .delete-btn:active {
-            transform: scale(0.95);
-        }
-
-        .delete-btn:focus-visible {
-            outline: 2px solid rgba(255, 82, 82, 0.65);
-            outline-offset: 2px;
-        }
-
-
-        /* =========================================================
-        Responsive Layout
-        ========================================================= */
-
-        @media (max-width: 1100px) {
-            .search-grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
-
-            .search-group:has(.vault-checkbox-group) {
-                grid-column: span 3;
-            }
-        }
-
-        @media (max-width: 900px) {
-            .search-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .search-group:has(.vault-checkbox-group) {
-                grid-column: span 2;
-            }
-        }
-
-        @media (max-width: 760px) {
-            .advanced-search-form.closed,
-            .advanced-search-form.open {
-                max-width: 100%;
-            }
-
-            .search-inputs {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .search-actions {
-                width: 100%;
-                justify-content: stretch;
-            }
-
-            .btn-search,
-            .btn-toggle,
-            .btn-clear,
-            .help-icon-link,
-            #toggleViewBtn {
-                width: auto;
-                flex: 1 1 0;
-            }
-
-            .search-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .search-group:has(.vault-checkbox-group) {
-                grid-column: span 1;
-            }
-
-            .advanced-search-form.open .search-actions {
-                justify-content: stretch;
-            }
-
-            .btn-menu {
-                flex: 1 1 auto;
-            }
-        }
-
-        @media (max-width: 460px) {
-            #advancedSearchDrawer {
-                padding: 14px;
-                border-radius: 12px;
-            }
-
-            .vault-checkbox {
-                min-width: calc(50% - 4px);
-            }
-
-            .btn-menu {
-                width: 100%;
-            }
-        }
-
-{% endblock %}
 {% block content %}
-    <br />
-    <div class="search-container">
-        {# Check the URL parameter. If it's empty or 'closed', show the simple bar #}
+    <section class="site-search-section">
         {% if request.args.get('drawer_state', 'closed') == 'closed' %}
-            <form action="" method="GET" class="advanced-search-form closed" id="searchForm">
-            
-            <input type="hidden" name="drawer_state" id="drawer_state" value="closed">
-            <input type="hidden" name="view_mode" id="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
+            <form action="" method="GET" class="site-search-form site-search-form--closed" id="searchForm">
+                <input type="hidden" name="drawer_state" id="drawer_state" value="closed">
+                <input type="hidden" name="view_mode" id="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
 
-                <div class="search-inputs" id="powerSearchContainer">
-                    <input type="text" name="q" placeholder="Search... (e.g. set:uma loc:binder qty>3)" 
-                        value="{{ request.args.get('q', '') }}" class="main-query-input">
-                    <div class="search-actions">
-                        
-                        <button type="submit" class="btn-search" title="Submit Search">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <div class="site-search-bar" id="powerSearchContainer">
+                    <input
+                        type="text"
+                        name="q"
+                        class="site-search-input main-query-input"
+                        placeholder="Search... (e.g. set:uma loc:binder qty>3)"
+                        value="{{ request.args.get('q', '') }}"
+                    >
+
+                    <div class="site-search-actions">
+                        <button type="submit" class="site-icon-button site-icon-button--search" title="Submit Search" aria-label="Submit Search">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
                         </button>
 
-                        <button type="button" id="toggleViewBtn" class="btn-toggle" title="Toggle View">
+                        <button type="button" id="toggleViewBtn" class="site-icon-button site-icon-button--neutral" title="Toggle View" aria-label="Toggle View">
                             {% if request.args.get('view_mode') == 'table' %}
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
                             {% else %}
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
                             {% endif %}
                         </button>
 
-                        {# If they click this, we want to set the hidden input to 'open' and submit the form #}
-                        <button type="button" class="btn-toggle advanced-toggle-btn" title="Toggle Filtered Search" onclick="document.getElementById('drawer_state').value='open'; this.form.submit();">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
-                                <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
-                                <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
-                                <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line>
+                        <button
+                            type="button"
+                            class="site-icon-button site-icon-button--accent advanced-toggle-btn"
+                            title="Toggle Filtered Search"
+                            aria-label="Toggle Filtered Search"
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="21" x2="4" y2="14"></line>
+                                <line x1="4" y1="10" x2="4" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12" y2="3"></line>
+                                <line x1="20" y1="21" x2="20" y2="16"></line>
+                                <line x1="20" y1="12" x2="20" y2="3"></line>
+                                <line x1="1" y1="14" x2="7" y2="14"></line>
+                                <line x1="9" y1="8" x2="15" y2="8"></line>
                                 <line x1="17" y1="16" x2="23" y2="16"></line>
                             </svg>
                         </button>
 
                         {% set has_search_terms = false %}
                         {% for key in request.args.keys() %}
-                            {% if key not in ['view_mode', 'drawer_state'] %}
+                            {% if key not in ['view_mode', 'drawer_state'] and request.args.get(key) != '' %}
                                 {% set has_search_terms = true %}
                             {% endif %}
                         {% endfor %}
 
                         {% if has_search_terms %}
-                            <a href="{{ request.path }}{% if request.args.get('view_mode') %}?view_mode={{ request.args.get('view_mode') }}{% endif %}" class="btn-clear" title="Clear Search Filters">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            <a
+                                href="{{ request.path }}{% if request.args.get('view_mode') %}?view_mode={{ request.args.get('view_mode') }}{% endif %}"
+                                class="site-icon-button site-icon-button--danger"
+                                title="Clear Search Filters"
+                                aria-label="Clear Search Filters"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
                             </a>
                         {% endif %}
-                        <a href="/search_api" class="help-icon-link" title="View Search Syntax Guide">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+                        <a href="/search_api" class="site-icon-button site-icon-button--neutral" title="View Search Syntax Guide" aria-label="View Search Syntax Guide">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -953,172 +102,82 @@
                     </div>
                 </div>
             </form>
-
-        {# If the drawer state is 'open', show the advanced grid #}
         {% else %}
-            <form action="{{ url_for('inventory.inventory') }}" method="GET" class="advanced-search-form open" id="searchForm">
-
+            <form action="{{ url_for('inventory.inventory') }}" method="GET" class="site-search-form site-search-form--open site-accent-teal" id="searchForm">
                 <input type="hidden" name="drawer_state" id="drawer_state_open" value="open">
                 <input type="hidden" name="view_mode" id="view_mode" value="{{ request.args.get('view_mode', 'grid') }}">
-
-                {# This is the actual search value your Flask route reads #}
                 <input type="hidden" name="q" id="compiledSearchQuery" value="{{ request.args.get('q', '') }}">
 
-                <div class="search-container" id="advancedSearchDrawer">
-                    <div class="vault-advanced-search">
-
-                        <div class="search-grid">
-                            <div class="search-group">
-                                <label>Card Name</label>
-                                <input 
-                                    type="text" 
-                                    name="name_query" 
-                                    id="name_query"
-                                    class="vault-input" 
-                                    placeholder="e.g. Lotus" 
-                                    value="{{ request.args.get('name_query', '') }}"
-                                >
+                <div class="site-search-drawer" id="advancedSearchDrawer">
+                    <div class="site-advanced-search">
+                        <div class="site-search-grid">
+                            <div class="site-search-group">
+                                <label for="name_query">Card Name</label>
+                                <input type="text" name="name_query" id="name_query" class="site-input" placeholder="e.g. Lotus" value="{{ request.args.get('name_query', '') }}">
                             </div>
 
-                            <div class="search-group">
-                                <label>Oracle Text</label>
-                                <input 
-                                    type="text" 
-                                    name="oracle" 
-                                    id="oracle"
-                                    class="vault-input" 
-                                    placeholder="e.g. draw a card" 
-                                    value="{{ request.args.get('oracle', '') }}"
-                                >
+                            <div class="site-search-group">
+                                <label for="oracle">Oracle Text</label>
+                                <input type="text" name="oracle" id="oracle" class="site-input" placeholder="e.g. draw a card" value="{{ request.args.get('oracle', '') }}">
                             </div>
 
-                            <div class="search-group">
-                                <label>Type Line</label>
-                                <input 
-                                    type="text" 
-                                    name="type" 
-                                    id="type"
-                                    class="vault-input" 
-                                    placeholder="e.g. Legendary Artifact" 
-                                    value="{{ request.args.get('type', '') }}"
-                                >
+                            <div class="site-search-group">
+                                <label for="type">Type Line</label>
+                                <input type="text" name="type" id="type" class="site-input" placeholder="e.g. Legendary Artifact" value="{{ request.args.get('type', '') }}">
                             </div>
 
-                            <div class="search-group">
-                                <label>Set Code</label>
-                                <input 
-                                    type="text" 
-                                    name="set" 
-                                    id="set"
-                                    class="vault-input" 
-                                    placeholder="e.g. MH3" 
-                                    value="{{ request.args.get('set', '') }}"
-                                >
+                            <div class="site-search-group">
+                                <label for="set">Set Code</label>
+                                <input type="text" name="set" id="set" class="site-input" placeholder="e.g. MH3" value="{{ request.args.get('set', '') }}">
                             </div>
 
-                            <div class="search-group">
-                                <label>Collector Number</label>
-                                <input 
-                                    type="text" 
-                                    name="cn" 
-                                    id="cn"
-                                    class="vault-input" 
-                                    placeholder="e.g. 284" 
-                                    value="{{ request.args.get('cn', '') }}"
-                                >
+                            <div class="site-search-group">
+                                <label for="cn">Collector Number</label>
+                                <input type="text" name="cn" id="cn" class="site-input" placeholder="e.g. 284" value="{{ request.args.get('cn', '') }}">
                             </div>
 
-                            <div class="search-group">
-                                <label>Price Value</label>
-                                <input 
-                                    type="text" 
-                                    name="usd" 
-                                    id="usd"
-                                    class="vault-input" 
-                                    placeholder="e.g. >5.00" 
-                                    value="{{ request.args.get('usd', '') }}"
-                                >
+                            <div class="site-search-group">
+                                <label for="usd">Price Value</label>
+                                <input type="text" name="usd" id="usd" class="site-input" placeholder="e.g. >5.00" value="{{ request.args.get('usd', '') }}">
                             </div>
 
-                            <div class="search-group">
-                            <label>Exact Color</label>
-
-                            <div class="vault-checkbox-group" data-color-group="color">
-                                {% set selected_colors = request.args.get('color', '') %}
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="W" {% if 'W' in selected_colors %}checked{% endif %}>
-                                    White
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="U" {% if 'U' in selected_colors %}checked{% endif %}>
-                                    Blue
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="B" {% if 'B' in selected_colors %}checked{% endif %}>
-                                    Black
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="R" {% if 'R' in selected_colors %}checked{% endif %}>
-                                    Red
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="G" {% if 'G' in selected_colors %}checked{% endif %}>
-                                    Green
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="color_box" value="C" {% if selected_colors == 'C' %}checked{% endif %}>
-                                    Colorless
-                                </label>
+                            <div class="site-search-group site-search-group--wide">
+                                <label>Exact Color</label>
+                                <div class="site-checkbox-group" data-color-group="color">
+                                    {% set selected_colors = request.args.get('color', '') %}
+                                    {% for symbol, label in [('W', 'White'), ('U', 'Blue'), ('B', 'Black'), ('R', 'Red'), ('G', 'Green')] %}
+                                        <label class="site-checkbox-pill">
+                                            <input type="checkbox" name="color_box" value="{{ symbol }}" {% if symbol in selected_colors %}checked{% endif %}>
+                                            {{ label }}
+                                        </label>
+                                    {% endfor %}
+                                    <label class="site-checkbox-pill">
+                                        <input type="checkbox" name="color_box" value="C" {% if selected_colors == 'C' %}checked{% endif %}>
+                                        Colorless
+                                    </label>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="search-group">
-                            <label>Color Identity</label>
-
-                            <div class="vault-checkbox-group" data-color-group="identity">
-                                {% set selected_identity = request.args.get('identity', '') %}
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="W" {% if 'W' in selected_identity %}checked{% endif %}>
-                                    White
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="U" {% if 'U' in selected_identity %}checked{% endif %}>
-                                    Blue
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="B" {% if 'B' in selected_identity %}checked{% endif %}>
-                                    Black
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="R" {% if 'R' in selected_identity %}checked{% endif %}>
-                                    Red
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="G" {% if 'G' in selected_identity %}checked{% endif %}>
-                                    Green
-                                </label>
-
-                                <label class="vault-checkbox">
-                                    <input type="checkbox" name="identity_box" value="C" {% if selected_identity == 'C' %}checked{% endif %}>
-                                    Colorless
-                                </label>
+                            <div class="site-search-group site-search-group--wide">
+                                <label>Color Identity</label>
+                                <div class="site-checkbox-group" data-color-group="identity">
+                                    {% set selected_identity = request.args.get('identity', '') %}
+                                    {% for symbol, label in [('W', 'White'), ('U', 'Blue'), ('B', 'Black'), ('R', 'Red'), ('G', 'Green')] %}
+                                        <label class="site-checkbox-pill">
+                                            <input type="checkbox" name="identity_box" value="{{ symbol }}" {% if symbol in selected_identity %}checked{% endif %}>
+                                            {{ label }}
+                                        </label>
+                                    {% endfor %}
+                                    <label class="site-checkbox-pill">
+                                        <input type="checkbox" name="identity_box" value="C" {% if selected_identity == 'C' %}checked{% endif %}>
+                                        Colorless
+                                    </label>
+                                </div>
                             </div>
-                        </div>
 
-                            <div class="search-group">
-                                <label>Location</label>
-                                <select name="loc" id="loc" class="vault-dropdown">
+                            <div class="site-search-group">
+                                <label for="loc">Location</label>
+                                <select name="loc" id="loc" class="site-select">
                                     <option value="">All Locations</option>
                                     {% if locations %}
                                         {% for loc in locations %}
@@ -1130,9 +189,9 @@
                                 </select>
                             </div>
 
-                            <div class="search-group">
-                                <label>Sort Results</label>
-                                <select name="sort" id="sort" class="vault-dropdown">
+                            <div class="site-search-group">
+                                <label for="sort">Sort Results</label>
+                                <select name="sort" id="sort" class="site-select">
                                     <option value="name" {% if request.args.get('sort', 'name') == 'name' %}selected{% endif %}>Name (A-Z)</option>
                                     <option value="usd" {% if request.args.get('sort') == 'usd' %}selected{% endif %}>Price (High to Low)</option>
                                     <option value="set" {% if request.args.get('sort') == 'set' %}selected{% endif %}>Set / Number</option>
@@ -1148,33 +207,31 @@
                             {% endif %}
                         {% endfor %}
 
-                        <div class="search-actions"> 
-                            <button 
-                                type="button" 
-                                class="btn-menu advanced-toggle-btn" 
-                                style="background: transparent; border-color: #555;" 
-                                onclick="document.getElementById('drawer_state_open').value='closed'; document.getElementById('searchForm').requestSubmit();"
-                            >
-                               Query Search
+                        <div class="site-search-actions-row">
+                            <button type="button" class="site-button site-button--secondary advanced-toggle-btn">
+                                Query Search
                             </button>
 
                             {% if has_search_terms %}
-                                <a href="{{ request.path }}?view_mode={{ request.args.get('view_mode', 'grid') }}&drawer_state=open" class="btn-menu clear-btn">
+                                <a href="{{ request.path }}?view_mode={{ request.args.get('view_mode', 'grid') }}&drawer_state=open" class="site-button site-button--danger">
                                     Clear Filters
                                 </a>
                             {% endif %}
 
-                            <button type="submit" class="btn-menu search-btn">Search Inventory</button>
+                            <button type="submit" class="site-button site-button--accent">
+                                Search Inventory
+                            </button>
                         </div>
                     </div>
                 </div>
             </form>
         {% endif %}
-    </div>
-    </div> {% block display_area %}
+    </section>
+
+    {% block display_area %}
         {% if request.args.get('view_mode') == 'table' %}
-            <div class="vault-table-container">
-                <table class="vault-table">
+            <div class="site-table-container">
+                <table class="site-table">
                     <thead>
                         <tr>
                             <th class="center-align">Qty</th>
@@ -1187,281 +244,243 @@
                             <th>Finish</th>
                             <th class="right-align">Price</th>
                             {% if current_user.is_authenticated and current_user.role == 'admin' and view_mode != 'wishlist' %}
-                            <th class="center-align">Actions</th>
-                            {%endif%}
+                                <th class="center-align">Actions</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody id="card-table-body">
-                        {% include '_table_rows.html' %} 
+                        {% include '_table_rows.html' %}
                     </tbody>
                 </table>
             </div>
         {% else %}
-            <div id="card-grid" class="card-container">
+            <div id="card-grid" class="site-card-grid card-container">
                 {% include '_card_items.html' %}
             </div>
         {% endif %}
 
-    <div id="scroll-sentinel" style="height: 20px;"></div>
-    <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #aaa;">
-        <p>Fetching more cards...</p>
-    </div>
+        <div id="scroll-sentinel" class="site-scroll-sentinel"></div>
+
+        <div id="loading-indicator" class="site-loading-indicator">
+            <p>Fetching more cards...</p>
+        </div>
+    {% endblock %}
 {% endblock %}
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const searchForm = document.getElementById('searchForm');
-        const viewToggleBtn = document.getElementById('toggleViewBtn');
-        const viewInput = document.getElementById('view_mode');
-        const drawerStateInput = document.getElementById('drawer_state');
-        const compiledSearchInput = document.getElementById('compiledSearchQuery');
 
-        const sentinel = document.getElementById('scroll-sentinel');
-        const loader = document.getElementById('loading-indicator');
 
-        let page = {{ page | default(1) }};
-        const totalPages = {{ total_pages | default(1) }};
+{% block script %}
+{{ super() }}
 
-        const getValue = (id) => {
-            const el = document.getElementById(id);
-            return el ? el.value.trim() : "";
-        };
-        
-        const getCheckedValues = (name) => {
-            return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
-                .map(input => input.value)
-                .join("");
-        };
+document.addEventListener("DOMContentLoaded", () => {
+    const searchForm = document.getElementById("searchForm");
+    const viewToggleBtn = document.getElementById("toggleViewBtn");
+    const viewInput = document.getElementById("view_mode");
+    const drawerStateInput =
+        document.getElementById("drawer_state") ||
+        document.getElementById("drawer_state_open");
+    const compiledSearchInput = document.getElementById("compiledSearchQuery");
 
-        const quoteIfNeeded = (value) => {
-            if (!value) return "";
-            return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
-        };
+    const sentinel = document.getElementById("scroll-sentinel");
+    const loader = document.getElementById("loading-indicator");
 
-        function syncDrawerState() {
-            if (!searchForm || !drawerStateInput) return;
+    let page = {{ page | default(1) }};
+    const totalPages = {{ total_pages | default(1) }};
 
-            drawerStateInput.value = searchForm.classList.contains('open')
-                ? 'open'
-                : 'closed';
-        }
+    const getValue = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : "";
+    };
 
-        function enforceColorlessExclusivity(groupName) {
-            const checkboxes = document.querySelectorAll(`input[name="${groupName}"]`);
+    const getCheckedValues = (name) => {
+        return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
+            .map(input => input.value)
+            .join("");
+    };
 
-            checkboxes.forEach(checkbox => {
-                checkbox.addEventListener("change", () => {
-                    const colorlessBox = document.querySelector(`input[name="${groupName}"][value="C"]`);
-                    const coloredBoxes = Array.from(checkboxes).filter(box => box.value !== "C");
+    const quoteIfNeeded = (value) => {
+        if (!value) return "";
+        return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
+    };
 
-                    if (checkbox.value === "C" && checkbox.checked) {
-                        coloredBoxes.forEach(box => box.checked = false);
-                    }
+    function syncDrawerState() {
+        if (!searchForm || !drawerStateInput) return;
 
-                    if (checkbox.value !== "C" && checkbox.checked && colorlessBox) {
-                        colorlessBox.checked = false;
-                    }
-                });
+        drawerStateInput.value = searchForm.classList.contains("site-search-form--open")
+            ? "open"
+            : "closed";
+    }
+
+    function enforceColorlessExclusivity(groupName) {
+        const checkboxes = document.querySelectorAll(`input[name="${groupName}"]`);
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener("change", () => {
+                const colorlessBox = document.querySelector(`input[name="${groupName}"][value="C"]`);
+                const coloredBoxes = Array.from(checkboxes).filter(box => box.value !== "C");
+
+                if (checkbox.value === "C" && checkbox.checked) {
+                    coloredBoxes.forEach(box => box.checked = false);
+                }
+
+                if (checkbox.value !== "C" && checkbox.checked && colorlessBox) {
+                    colorlessBox.checked = false;
+                }
             });
-        }
-
-        enforceColorlessExclusivity("color_box");
-        enforceColorlessExclusivity("identity_box");
-
-        function buildCompiledSearchQuery() {
-            if (!compiledSearchInput) return;
-
-            const parts = [];
-
-            const nameQuery = getValue("name_query");
-            const oracle = getValue("oracle");
-            const typeLine = getValue("type");
-            const setCode = getValue("set");
-            const collectorNumber = getValue("cn");
-            const usd = getValue("usd");
-            const color = getCheckedValues("color_box");
-            const identity = getCheckedValues("identity_box");
-            const loc = getValue("loc");
-            const sort = getValue("sort");
-
-            if (nameQuery) {
-                parts.push(nameQuery);
-            }
-
-            if (oracle) {
-                parts.push(`oracle:${quoteIfNeeded(oracle)}`);
-            }
-
-            if (typeLine) {
-                parts.push(`type:${quoteIfNeeded(typeLine)}`);
-            }
-
-            if (setCode) {
-                parts.push(`set:${setCode.toLowerCase()}`);
-            }
-
-            if (collectorNumber) {
-                parts.push(`cn:${collectorNumber}`);
-            }
-
-            if (usd) {
-                if (/^[<>=]/.test(usd)) {
-                    parts.push(`usd${usd}`);
-                } else {
-                    parts.push(`usd=${usd}`);
-                }
-            }
-
-            if (color) {
-                parts.push(`color:${color}`);
-            }
-
-            if (identity) {
-                parts.push(`identity:${identity}`);
-            }
-
-            if (loc) {
-                parts.push(`loc:${quoteIfNeeded(loc)}`);
-            }
-
-            if (sort) {
-                parts.push(`sort:${sort}`);
-            }
-
-            compiledSearchInput.value = parts.join(" ");
-        }
-
-        function cleanEmptyFormFields() {
-            if (!searchForm) return;
-
-            const formElements = searchForm.elements;
-
-            for (let i = 0; i < formElements.length; i++) {
-                const el = formElements[i];
-
-                if (!el.name) continue;
-
-                if (el.value.trim() === '') {
-                    el.disabled = true;
-                }
-
-                if (el.name === 'drawer_state' && el.value === 'closed') {
-                    el.disabled = true;
-                }
-            }
-        }
-
-        function toggleAdvancedSearch(e) {
-            e.preventDefault();
-
-            if (!searchForm || !drawerStateInput) return;
-
-            if (searchForm.classList.contains('closed')) {
-                searchForm.classList.remove('closed');
-                searchForm.classList.add('open');
-                drawerStateInput.value = 'open';
-            } else {
-                searchForm.classList.remove('open');
-                searchForm.classList.add('closed');
-                drawerStateInput.value = 'closed';
-            }
-        }
-
-        function loadMore() {
-            if (!loader) return;
-
-            page++;
-            loader.style.display = 'block';
-
-            const endpoint = window.location.pathname;
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('page', page);
-
-            const currentViewMode =
-                viewInput?.value ||
-                urlParams.get('view_mode') ||
-                'grid';
-
-            urlParams.set('view_mode', currentViewMode);
-
-            fetch(`${endpoint}?${urlParams.toString()}`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-View-Mode': currentViewMode
-                }
-            })
-            .then(res => res.text())
-            .then(html => {
-                
-                const targetContainer = currentViewMode === 'table'
-                    ? document.getElementById('card-table-body')
-                    : document.getElementById('card-grid');
-
-                if (targetContainer) {
-                    targetContainer.insertAdjacentHTML('beforeend', html);
-                }
-
-                loader.style.display = 'none';
-
-                if (page >= totalPages && observer && sentinel) {
-                    observer.unobserve(sentinel);
-                }
-            })
-            .catch(err => {
-                console.error('Failed to load more inventory items:', err);
-                loader.style.display = 'none';
-            });
-        }
-
-        if (viewToggleBtn && viewInput && searchForm) {
-            viewToggleBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-
-                viewInput.value = viewInput.value === 'table' ? 'grid' : 'table';
-
-                syncDrawerState();
-                buildCompiledSearchQuery();
-
-                searchForm.submit();
-            });
-        }
-
-        const toggleBtns = document.querySelectorAll('.advanced-toggle-btn');
-        toggleBtns.forEach(btn => {
-            btn.addEventListener('click', toggleAdvancedSearch);
         });
+    }
 
-        const locationDropdown = document.querySelector('select[name="loc"]');
-        if (locationDropdown) {
-            locationDropdown.addEventListener('change', syncDrawerState);
+    enforceColorlessExclusivity("color_box");
+    enforceColorlessExclusivity("identity_box");
+
+    function buildCompiledSearchQuery() {
+        if (!compiledSearchInput) return;
+
+        const parts = [];
+
+        const nameQuery = getValue("name_query");
+        const oracle = getValue("oracle");
+        const typeLine = getValue("type");
+        const setCode = getValue("set");
+        const collectorNumber = getValue("cn");
+        const usd = getValue("usd");
+        const color = getCheckedValues("color_box");
+        const identity = getCheckedValues("identity_box");
+        const loc = getValue("loc");
+        const sort = getValue("sort");
+
+        if (nameQuery) parts.push(nameQuery);
+        if (oracle) parts.push(`oracle:${quoteIfNeeded(oracle)}`);
+        if (typeLine) parts.push(`type:${quoteIfNeeded(typeLine)}`);
+        if (setCode) parts.push(`set:${setCode.toLowerCase()}`);
+        if (collectorNumber) parts.push(`cn:${collectorNumber}`);
+
+        if (usd) {
+            parts.push(/^[<>=]/.test(usd) ? `usd${usd}` : `usd=${usd}`);
         }
 
-        if (searchForm) {
-            searchForm.addEventListener('submit', function() {
-                syncDrawerState();
+        if (color) parts.push(`color:${color}`);
+        if (identity) parts.push(`identity:${identity}`);
+        if (loc) parts.push(`loc:${quoteIfNeeded(loc)}`);
+        if (sort) parts.push(`sort:${sort}`);
 
-                /*
-                    Build q BEFORE disabling empty fields.
-                    Your Flask route reads q, so compiledSearchQuery must survive cleanup.
-                */
-                buildCompiledSearchQuery();
+        compiledSearchInput.value = parts.join(" ");
+    }
 
-                cleanEmptyFormFields();
-            });
+    function cleanEmptyFormFields() {
+        if (!searchForm) return;
+
+        Array.from(searchForm.elements).forEach(el => {
+            if (!el.name) return;
+
+            if (el.value.trim() === "") {
+                el.disabled = true;
+            }
+
+            if (el.name === "drawer_state" && el.value === "closed") {
+                el.disabled = true;
+            }
+        });
+    }
+
+    function toggleAdvancedSearch(event) {
+        event.preventDefault();
+
+        if (!searchForm || !drawerStateInput) return;
+
+        if (searchForm.classList.contains("site-search-form--closed")) {
+            drawerStateInput.value = "open";
+        } else {
+            drawerStateInput.value = "closed";
         }
 
-        let observer = null;
+        searchForm.submit();
+    }
 
-        if (sentinel) {
-            observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting && page < totalPages) {
-                    loadMore();
-                }
-            }, { threshold: 0.1 });
+    function loadMore() {
+        if (!loader) return;
 
-            observer.observe(sentinel);
-        }
+        page++;
+        loader.style.display = "block";
+
+        const endpoint = window.location.pathname;
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set("page", page);
+
+        const currentViewMode =
+            viewInput?.value ||
+            urlParams.get("view_mode") ||
+            "grid";
+
+        urlParams.set("view_mode", currentViewMode);
+
+        fetch(`${endpoint}?${urlParams.toString()}`, {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "X-View-Mode": currentViewMode
+            }
+        })
+        .then(res => res.text())
+        .then(html => {
+            const targetContainer = currentViewMode === "table"
+                ? document.getElementById("card-table-body")
+                : document.getElementById("card-grid");
+
+            if (targetContainer) {
+                targetContainer.insertAdjacentHTML("beforeend", html);
+            }
+
+            loader.style.display = "none";
+
+            if (page >= totalPages && observer && sentinel) {
+                observer.unobserve(sentinel);
+            }
+        })
+        .catch(err => {
+            console.error("Failed to load more inventory items:", err);
+            loader.style.display = "none";
+        });
+    }
+
+    if (viewToggleBtn && viewInput && searchForm) {
+        viewToggleBtn.addEventListener("click", event => {
+            event.preventDefault();
+
+            viewInput.value = viewInput.value === "table" ? "grid" : "table";
+
+            syncDrawerState();
+            buildCompiledSearchQuery();
+
+            searchForm.submit();
+        });
+    }
+
+    document.querySelectorAll(".advanced-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", toggleAdvancedSearch);
     });
-</script>
+
+    const locationDropdown = document.querySelector('select[name="loc"]');
+    if (locationDropdown) {
+        locationDropdown.addEventListener("change", syncDrawerState);
+    }
+
+    if (searchForm) {
+        searchForm.addEventListener("submit", () => {
+            syncDrawerState();
+            buildCompiledSearchQuery();
+            cleanEmptyFormFields();
+        });
+    }
+
+    let observer = null;
+
+    if (sentinel) {
+        observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && page < totalPages) {
+                loadMore();
+            }
+        }, { threshold: 0.1 });
+
+        observer.observe(sentinel);
+    }
+});
 {% endblock %}
-{% block extra_content%}
-{%endblock%}

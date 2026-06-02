@@ -54,18 +54,25 @@ class CardDB:
         ''')
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS card_printings (
-                scryfall_id TEXT PRIMARY KEY,
-                oracle_id TEXT,
-                set_code TEXT,
-                collector_number TEXT,
-                rarity TEXT,
-                image_url TEXT,
-                flavor_text TEXT,
-                current_price REAL,
-                current_price_foil REAL,
-                last_updated DATE DEFAULT (CURRENT_DATE),
-                FOREIGN KEY (oracle_id) REFERENCES card_definitions (oracle_id)
-            )
+            scryfall_id TEXT PRIMARY KEY,
+            oracle_id TEXT,
+            set_code TEXT,
+            collector_number TEXT,
+            rarity TEXT,
+            image_url TEXT,
+            flavor_text TEXT,
+
+            current_price REAL,
+            current_price_foil REAL,
+
+            tcgplayer_id INTEGER,
+            tcgplayer_etched_id INTEGER,
+            tcgcsv_group_id INTEGER,
+            tcgcsv_last_price_sync TEXT,
+            tcgplayer_id_missing INTEGER DEFAULT 0,
+
+            FOREIGN KEY (oracle_id) REFERENCES card_definitions (oracle_id)
+        );
         ''')
 
         self.cursor.execute('''
@@ -102,7 +109,8 @@ class CardDB:
                 price_usd REAL,
                 price_foil REAL,
                 scraped_at DATE DEFAULT (CURRENT_DATE),
-                UNIQUE(scryfall_id, scraped_at) ON CONFLICT REPLACE
+                source TEXT DEFAULT 'scryfall',
+                UNIQUE(scryfall_id, scraped_at) ON CONFLICT REPLACE,
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
             )
         ''')

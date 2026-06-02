@@ -1,458 +1,221 @@
-{% extends "card_display.html"%}
-    {% block title %}Collection{% endblock %}
-{% block style %}
-{{ super() }}
-    /* The Modal (background) */
-    .modal {
-        display: none; 
-        position: fixed; 
-        z-index: 1000; 
-        left: 0;
-        top: 0;
-        width: 100%; 
-        height: 100%;
-        overflow: auto; 
-        background-color: rgba(0,0,0,0.8); /* Black w/ opacity */
-        backdrop-filter: blur(5px);
-    }
+{% extends "card_display.html" %}
 
-    /* Modal Content Box */
-    .modal-content {
-        background-color: #1f1f1f;
-        margin: 10% auto; 
-        padding: 22px 24px;
-        max-width: 250px;
-        border-radius: 10px;
-        border: 1px solid #333;
-        width: 80%;
-        position: relative;
-        
-    }
+{% block title %}Collection{% endblock %}
+{% block body_class %}inventory-page{% endblock %}
 
-    /* The Close Button */
-    .close-btn {
-        position: absolute;
-        right: 16px;
-        top: 10px;
-        color: #aaa;
-        font-size: 24px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .close-btn:hover {
-        color: #ff5252;
-    }
-
-    /* =========================
-    Edit Modal Instance Rows
-    ========================= */
-
-    #modalTitle {
-        margin: 0 0 14px 0;
-        font-size: 1.25rem;
-        line-height: 1.2;
-    }
-
-    #instance-settings-container {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .inventory-value-row {
-        width: 100%;
-        margin-bottom: 4px;
-
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-
-        color: #020202;
-        font-size: 1rem;
-        font-weight: 500;
-    }
-
-    .inventory-value-label {
-        color: #e5e5e5;
-    }
-
-    .inventory-value-amount {
-        color: #f0d58c;
-        font-size: 1.1rem;
-        font-weight: 700;
-    }
-
-    .inventory-instance-row {
-         display: grid;
-        grid-template-columns: minmax(180px, 1fr) 92px 58px;
-        gap: 12px;
-        align-items: end;
-
-        padding: 12px 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.075);
-    }
-
-    .inventory-field {
-        min-width: 0;
-
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .inventory-label {
-        margin: 0;
-
-        color: #aaa;
-        font-size: 0.64rem;
-        font-weight: 700;
-        line-height: 1;
-        letter-spacing: 0.065em;
-        text-transform: uppercase;
-    }
-
-    .inventory-select {
-        width: 100%;
-        height: 34px;
-        padding: 0 30px 0 10px;
-
-        color: #f2f2f2;
-        background-color: #2a2a2a;
-
-        border: 1px solid #444;
-        border-radius: 8px;
-
-        font-family: inherit;
-        font-size: 0.82rem;
-        line-height: 34px;
-
-        box-sizing: border-box;
-        cursor: pointer;
-        appearance: none;
-
-        background-image:
-            url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23dddddd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
-        background-repeat: no-repeat;
-        background-position: right 10px center;
-        background-size: 13px 13px;
-
-        transition:
-            background-color 0.16s ease,
-            border-color 0.16s ease,
-            box-shadow 0.16s ease;
-    }
-
-    .inventory-select:hover {
-        background-color: #303030;
-        border-color: #505050;
-    } 
-
-    .inventory-select:focus {
-        outline: none;
-        background-color: #303030;
-        border-color: #66b2ff;
-        box-shadow: 0 0 0 2px rgba(102, 178, 255, 0.18);
-    }
-
-    .inventory-checkbox-wrap {
-        height: 34px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        background-color: #2a2a2a;
-        border: 1px solid #444;
-        border-radius: 8px;
-
-        box-sizing: border-box;
-    }
-
-    .inventory-checkbox-wrap:hover {
-        background-color: #303030;
-        border-color: #505050;
-    }
-
-    .inventory-checkbox {
-        width: 17px;
-        height: 17px;
-        margin: 0;
-
-        accent-color: #1e88e5;
-        cursor: pointer;
-    }
-
-    .inventory-field-remove .delete-form {
-        height: 34px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        margin: 0;
-    }
-
-    .inventory-field-remove .delete-btn {
-        width: 34px;
-        height: 34px;
-        padding: 0;
-
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-
-        color: #ff6565;
-        background-color: #2a1d1d;
-
-        border: 1px solid #6b2f2f;
-        border-radius: 8px;
-
-        font-family: inherit;
-        font-size: 1.15rem;
-        font-weight: 700;
-        line-height: 1;
-
-        cursor: pointer;
-
-        transition:
-            background-color 0.16s ease,
-            border-color 0.16s ease,
-            color 0.16s ease,
-            box-shadow 0.16s ease,
-            transform 0.08s ease;
-    }
-
-    .inventory-field-remove .delete-btn:hover {
-        color: #ff8383;
-        background-color: #3a2222;
-        border-color: #8b3a3a;
-        box-shadow: 0 0 8px rgba(255, 82, 82, 0.22);
-    }
-
-    .inventory-field-remove .delete-btn:active {
-        transform: scale(0.95);
-    }
-
-    .inventory-field-remove .delete-btn:focus-visible,
-    .inventory-checkbox:focus-visible {
-        outline: 2px solid rgba(102, 178, 255, 0.65);
-        outline-offset: 2px;
-    }
-
-    @media (max-width: 700px) {
-        .modal-content {
-            width: calc(100% - 32px);
-            max-width: none;
-            padding: 20px;
-            margin: 8% auto;
-        }
-
-        .inventory-instance-row {
-            grid-template-columns: 1fr;
-            gap: 10px;
-            padding: 12px 0;
-        }
-
-        .inventory-checkbox-wrap {
-            justify-content: flex-start;
-            padding-left: 10px;
-        }
-
-        .inventory-field-remove .delete-form {
-            justify-content: flex-start;
-        }
-
-        .inventory-field-remove .delete-btn {
-            width: 42px;
-        }
-    }
-    
-    .instance-value-container {
-        padding-bottom: 8px;
-    }
-{% endblock  %}
 {% block content %}
     {{ super() }}
-    
+
     {% if current_user.is_authenticated %}
-    <div id="editModal" class="modal">
-        <div class="modal-content login-card" style="max-width: 500px;"> 
-            <span class="close-btn" onclick="closeModal()">&times;</span>
-            <h2 id="modalTitle">Manage Copies</h2>
-            <hr style="border: 0; border-top: 1px solid #444; margin-bottom: 20px;">
-            
-            <div id="instance-settings-container">
-                <p style="text-align: center;">Loading copies...</p>
+        <div id="editModal" class="site-modal inventory-modal" aria-hidden="true">
+            <div class="site-modal__content inventory-modal__content login-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+                <button type="button" class="site-modal__close" onclick="closeModal()" aria-label="Close modal">
+                    &times;
+                </button>
+
+                <h2 id="modalTitle" class="inventory-modal__title">Manage Copies</h2>
+
+                <hr class="inventory-modal__divider">
+
+                <div id="instance-settings-container" class="inventory-instance-container">
+                    <p class="inventory-empty-message">Loading copies...</p>
+                </div>
             </div>
-
-            </div>
-    </div>
-
-
+        </div>
     {% endif %}
 {% endblock %}
+
+
 {% block script %}
-    const allLocations = {{ locations|tojson }};
-    const viewMode = "{{ request.args.get('view_mode', '') }}";
-    
-    // We'll track the active card elements globally so we can update them dynamically
-    let activeCardElement = null;
+{{ super() }}
 
-    function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, triggerElement) {
-        document.getElementById('editModal').style.display = "block";
+const allLocations = {{ locations|tojson }};
+const viewMode = "{{ request.args.get('view_mode', '') }}";
 
-        const container = document.getElementById('instance-settings-container');
-        container.innerHTML = "<p style='text-align: center;'>Loading copies...</p>";
+let activeCardElement = null;
 
-        if (triggerElement) {
-            activeCardElement =
-                triggerElement.closest('.card-container') ||
-                triggerElement.closest('tr') ||
-                triggerElement.closest('.card-item');
-        }
+function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, triggerElement) {
+    const modal = document.getElementById("editModal");
+    const container = document.getElementById("instance-settings-container");
 
-        fetch(`/get_instances/${scryfallId}/${finish}`)
-            .then(response => response.json())
-            .then(data => {
-                container.innerHTML = "";
+    if (!modal || !container) return;
 
-                if (!data.instances || data.instances.length === 0) {
-                    container.innerHTML = "<p style='text-align: center; color: #aaa;'>No copies found.</p>";
-                    return;
-                }
+    modal.style.display = "block";
+    modal.setAttribute("aria-hidden", "false");
 
-                const visibleInstances = viewMode === "trades"
-                    ? data.instances.filter(inst => inst.is_tradeable)
-                    : data.instances;
+    container.innerHTML = `<p class="inventory-empty-message">Loading copies...</p>`;
 
-                if (visibleInstances.length === 0) {
-                    container.innerHTML = "<p style='text-align: center; color: #aaa;'>No tradeable copies found.</p>";
-                    return;
-                }
-
-                const firstInstance = visibleInstances[0];
-                const valueRow = document.createElement('div');
-                valueRow.className = "instance-value-container";
-
-                if (firstInstance.finish === "nonfoil") {
-                    const price = parseFloat(firstInstance.current_price || 0).toFixed(2);
-                    valueRow.innerHTML = `
-                        <div class="inventory-value-row">
-                            <span class="inventory-value-label">Card Value:</span>
-                            <span class="inventory-value-amount">$${price}</span>
-                        </div>
-                    `;
-                } else {
-                    const foilPrice = parseFloat(firstInstance.current_price_foil || 0).toFixed(2);
-                    valueRow.innerHTML = `
-                        <div class="inventory-value-row">
-                            <span class="inventory-value-label">Card Value:</span>
-                            <span class="inventory-value-amount">$${foilPrice}</span>
-                        </div>
-                    `;
-                }
-
-                container.appendChild(valueRow);
-
-                visibleInstances.forEach(inst => {
-                    const row = document.createElement('div');
-                    row.className = "instance-row inventory-instance-row";
-
-                    const locationOptions = allLocations.map(loc =>
-                        `<option value="${loc.id}" ${loc.id == inst.location_id ? 'selected' : ''}>
-                            ${loc.name}
-                        </option>`
-                    ).join('');
-
-                    const baseDeleteUrl = "{{ url_for('adder.delete_card', inventory_id=0) }}";
-
-                    row.innerHTML = `
-                        <div class="inventory-field inventory-field-location">
-                            <label class="inventory-label">Location</label>
-                            <select
-                                class="inventory-select"
-                                onchange="updateCard('${inst.instance_id}', this.value, null, this)"
-                            >
-                                ${locationOptions}
-                            </select>
-                        </div>
-
-                        <div class="inventory-field inventory-field-tradeable">
-                            <label class="inventory-label">Tradeable</label>
-                            <div class="inventory-checkbox-wrap">
-                                <input
-                                    type="checkbox"
-                                    class="inventory-checkbox"
-                                    ${inst.is_tradeable ? 'checked' : ''}
-                                    onchange="updateCard('${inst.instance_id}', null, this.checked, this)"
-                                >
-                            </div>
-                        </div>
-
-                        <div class="inventory-field inventory-field-remove">
-                            <label class="inventory-label">Remove</label>
-                            <form
-                                class="delete-form"
-                                action="${baseDeleteUrl.replace('/0', '/' + inst.instance_id)}"
-                                method="POST"
-                                onsubmit="return confirm('Remove this card?');"
-                            >
-                                <button type="submit" class="delete-btn" aria-label="Remove card">&times;</button>
-                            </form>
-                        </div>
-                    `;
-
-                    container.appendChild(row);
-                });
-            });
+    if (triggerElement) {
+        activeCardElement =
+            triggerElement.closest(".card-container") ||
+            triggerElement.closest("tr") ||
+            triggerElement.closest(".card-item");
     }
 
-    function updateCard(instanceId, newLocation, isTradeable, inputElement) {
-        const formData = new FormData();
-        if (newLocation !== null) formData.append('location_id', newLocation);
-        if (isTradeable !== null) formData.append('is_tradeable', isTradeable ? '1' : '0');
+    fetch(`/get_instances/${scryfallId}/${finish}`)
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = "";
 
-        fetch(`/edit_instance/${instanceId}`, {
-            method: 'POST',
-            body: formData
-        }).then(res => {
-            if (!res.ok) {
-                console.error("Update failed for ID:", instanceId);
+            if (!data.instances || data.instances.length === 0) {
+                container.innerHTML = `<p class="inventory-empty-message">No copies found.</p>`;
                 return;
             }
 
-            // DYNAMIC UPDATE (No Refresh Needed):
-            if (activeCardElement) {
-                // If they changed a location dropdown, update the location text/badge on the parent grid page
-                if (newLocation !== null && inputElement) {
-                    const selectedText = inputElement.options[inputElement.selectedIndex].text;
-                    const locationBadge = activeCardElement.querySelector('.location-badge, .card-location');
-                    if (locationBadge) {
-                        locationBadge.textContent = selectedText;
-                    }
-                }
-                
-                // If they changed a trade status checkbox, toggle a trade badge on the parent page if you have one
-                if (isTradeable !== null) {
-                    const tradeBadge = activeCardElement.querySelector('.trade-badge, .is-tradeable');
-                    if (tradeBadge) {
-                        tradeBadge.style.display = isTradeable ? 'inline-block' : 'none';
-                    }
-                }
+            const visibleInstances = viewMode === "trades"
+                ? data.instances.filter(inst => inst.is_tradeable)
+                : data.instances;
+
+            if (visibleInstances.length === 0) {
+                container.innerHTML = `<p class="inventory-empty-message">No tradeable copies found.</p>`;
+                return;
             }
+
+            const firstInstance = visibleInstances[0];
+            const valueRow = document.createElement("div");
+            valueRow.className = "inventory-value-container";
+
+            if (firstInstance.finish === "nonfoil") {
+                const price = parseFloat(firstInstance.current_price || 0).toFixed(2);
+                valueRow.innerHTML = `
+                    <div class="inventory-value-row">
+                        <span class="inventory-value-label">Card Value:</span>
+                        <span class="inventory-value-amount">$${price}</span>
+                    </div>
+                `;
+            } else {
+                const foilPrice = parseFloat(firstInstance.current_price_foil || 0).toFixed(2);
+                valueRow.innerHTML = `
+                    <div class="inventory-value-row">
+                        <span class="inventory-value-label">Card Value:</span>
+                        <span class="inventory-value-amount">$${foilPrice}</span>
+                    </div>
+                `;
+            }
+
+            container.appendChild(valueRow);
+
+            visibleInstances.forEach(inst => {
+                const row = document.createElement("div");
+                row.className = "inventory-instance-row";
+
+                const locationOptions = allLocations.map(loc =>
+                    `<option value="${loc.id}" ${loc.id == inst.location_id ? "selected" : ""}>
+                        ${loc.name}
+                    </option>`
+                ).join("");
+
+                const baseDeleteUrl = "{{ url_for('adder.delete_card', inventory_id=0) }}";
+
+                row.innerHTML = `
+                    <div class="inventory-field inventory-field-location">
+                        <label class="inventory-label">Location</label>
+                        <select
+                            class="inventory-select"
+                            onchange="updateCard('${inst.instance_id}', this.value, null, this)"
+                        >
+                            ${locationOptions}
+                        </select>
+                    </div>
+
+                    <div class="inventory-field inventory-field-tradeable">
+                        <label class="inventory-label">Tradeable</label>
+                        <div class="inventory-checkbox-wrap">
+                            <input
+                                type="checkbox"
+                                class="inventory-checkbox"
+                                ${inst.is_tradeable ? "checked" : ""}
+                                onchange="updateCard('${inst.instance_id}', null, this.checked, this)"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="inventory-field inventory-field-remove">
+                        <label class="inventory-label">Remove</label>
+                        <form
+                            class="delete-form"
+                            action="${baseDeleteUrl.replace('/0', '/' + inst.instance_id)}"
+                            method="POST"
+                            onsubmit="return confirm('Remove this card?');"
+                        >
+                            <button type="submit" class="inventory-delete-btn" aria-label="Remove card">
+                                &times;
+                            </button>
+                        </form>
+                    </div>
+                `;
+
+                container.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error("Failed to load instances:", error);
+            container.innerHTML = `<p class="inventory-empty-message inventory-empty-message--error">Unable to load copies.</p>`;
         });
+}
+
+function updateCard(instanceId, newLocation, isTradeable, inputElement) {
+    const formData = new FormData();
+
+    if (newLocation !== null) {
+        formData.append("location_id", newLocation);
     }
 
-    function closeModal() {
-        document.getElementById('editModal').style.display = "none";
-        activeCardElement = null; // Reset track pointer
+    if (isTradeable !== null) {
+        formData.append("is_tradeable", isTradeable ? "1" : "0");
     }
 
-    window.onclick = function(event) {
-        const modal = document.getElementById('editModal');
-        if (event.target == modal) {
-            closeModal();
+    fetch(`/edit_instance/${instanceId}`, {
+        method: "POST",
+        body: formData
+    }).then(res => {
+        if (!res.ok) {
+            console.error("Update failed for ID:", instanceId);
+            return;
         }
+
+        if (!activeCardElement) return;
+
+        if (newLocation !== null && inputElement) {
+            const selectedText = inputElement.options[inputElement.selectedIndex].text;
+            const locationBadge = activeCardElement.querySelector(".location-badge, .card-location");
+
+            if (locationBadge) {
+                locationBadge.textContent = selectedText;
+            }
+        }
+
+        if (isTradeable !== null) {
+            const tradeBadge = activeCardElement.querySelector(".trade-badge, .is-tradeable");
+
+            if (tradeBadge) {
+                tradeBadge.style.display = isTradeable ? "inline-block" : "none";
+            }
+        }
+    });
+}
+
+function closeModal() {
+    const modal = document.getElementById("editModal");
+
+    if (!modal) return;
+
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+    activeCardElement = null;
+}
+
+window.addEventListener("click", event => {
+    const modal = document.getElementById("editModal");
+
+    if (modal && event.target === modal) {
+        closeModal();
     }
+});
+
+window.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+        closeModal();
+    }
+});
 {% endblock %}

@@ -1,0 +1,447 @@
+/* =========================================================
+   MTGSite Market Page
+   ---------------------------------------------------------
+   Compact dark dashboard for collection price movement.
+   Uses shared site-* tokens and components.
+========================================================= */
+
+.site-market-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-3xl, 20px);
+
+    padding: var(--site-space-page-y, 28px) 0 var(--site-space-page-bottom, 56px);
+
+    color: var(--site-text, #e0e0e0);
+}
+
+/* =========================================================
+   Header
+========================================================= */
+
+.site-market-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-sm, 6px);
+
+    margin-bottom: var(--site-space-sm, 6px);
+}
+
+.site-market-kicker {
+    color: var(--site-accent-teal, #17a2b8);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-bold, 700);
+    letter-spacing: var(--site-letter-spacing-label, 0.08em);
+    text-transform: uppercase;
+}
+
+.site-market-header h2 {
+    margin: 0;
+
+    color: var(--site-text-heading, #eeeeee);
+
+    font-size: var(--site-font-size-xl, 1.4rem);
+    line-height: var(--site-line-height-tight, 1.1);
+}
+
+.site-market-header p {
+    max-width: 72rem;
+    margin: 0;
+
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-md, 0.9rem);
+    line-height: var(--site-line-height-readable, 1.55);
+}
+
+/* =========================================================
+   Sync Panel
+========================================================= */
+
+.site-market-sync-panel {
+    display: grid;
+    grid-template-columns: minmax(15rem, auto) minmax(16rem, 1fr);
+    gap: var(--site-space-3xl, 20px);
+    align-items: center;
+
+    padding: var(--site-space-3xl, 20px);
+}
+
+.site-market-sync-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-md, 8px);
+}
+
+.site-market-sync-meta {
+    color: var(--site-text-muted, #bbbbbb);
+    font-size: var(--site-font-size-sm, 0.78rem);
+}
+
+.site-market-sync-meta strong {
+    color: var(--site-text-heading, #eeeeee);
+}
+
+.site-market-progress {
+    width: 100%;
+    max-width: 34rem;
+}
+
+.site-progress-track {
+    width: 100%;
+    height: 0.75rem;
+    overflow: hidden;
+
+    background: var(--site-surface-input, #111111);
+    border: 1px solid var(--site-border, #333333);
+    border-radius: var(--site-radius-pill, 999px);
+    box-shadow: var(--site-shadow-progress-inset, inset 0 1px 3px rgba(0, 0, 0, 0.40));
+}
+
+.site-progress-track progress {
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    appearance: none;
+    -webkit-appearance: none;
+
+    border: 0;
+    background: transparent;
+}
+
+.site-progress-track progress::-webkit-progress-bar {
+    background: transparent;
+}
+
+.site-progress-track progress::-webkit-progress-value {
+    background: var(--site-local-accent, var(--site-accent-teal, #17a2b8));
+    border-radius: var(--site-radius-pill, 999px);
+}
+
+.site-progress-track progress::-moz-progress-bar {
+    background: var(--site-local-accent, var(--site-accent-teal, #17a2b8));
+    border-radius: var(--site-radius-pill, 999px);
+}
+
+.site-market-progress-status {
+    display: inline-block;
+
+    margin-top: var(--site-space-md, 8px);
+
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-semibold, 600);
+}
+
+.site-market-progress-status[data-status="success"] {
+    color: var(--site-success, #28a745);
+}
+
+.site-market-progress-status[data-status="error"] {
+    color: var(--site-danger, #dc3545);
+}
+
+/* =========================================================
+   Summary Metrics
+========================================================= */
+
+.site-market-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(10rem, 1fr));
+    gap: var(--site-space-xl, 12px);
+}
+
+.site-market-metric {
+    padding: var(--site-space-xl, 12px);
+}
+
+.site-market-metric-label {
+    margin-bottom: var(--site-space-sm, 6px);
+
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-xs, 0.70rem);
+    font-weight: var(--site-font-weight-bold, 700);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.site-market-metric-value {
+    color: var(--site-text-heading, #eeeeee);
+
+    font-size: var(--site-font-size-lg, 1.1rem);
+    font-weight: var(--site-font-weight-heavy, 800);
+    line-height: var(--site-line-height-tight, 1.1);
+}
+
+.site-market-metric-note {
+    margin-top: var(--site-space-sm, 6px);
+
+    color: var(--site-text-faint, #888888);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+}
+
+/* =========================================================
+   Toolbar
+========================================================= */
+
+.site-market-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--site-space-xl, 12px);
+    flex-wrap: wrap;
+
+    padding: var(--site-space-xl, 12px);
+
+    background: var(--site-surface-2, #1f1f1f);
+    border: 1px solid var(--site-border, #333333);
+    border-radius: var(--site-radius-md, 8px);
+    box-shadow: var(--site-shadow-soft, 0 4px 8px rgba(0, 0, 0, 0.20));
+}
+
+.site-market-filter-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--site-space-md, 8px);
+}
+
+.site-market-filter-label {
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-heavy, 800);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.site-filter-pill {
+    padding: 0.35rem 0.65rem;
+
+    color: var(--site-text-muted, #bbbbbb);
+    background: var(--site-surface-3, #222222);
+
+    border: 1px solid var(--site-border, #333333);
+    border-radius: var(--site-radius-pill, 999px);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        border-color var(--site-transition-fast, 0.15s ease),
+        color var(--site-transition-fast, 0.15s ease),
+        box-shadow var(--site-transition-fast, 0.15s ease),
+        background-color var(--site-transition-fast, 0.15s ease);
+}
+
+.site-filter-pill:hover,
+.site-filter-pill.is-active {
+    color: var(--site-accent-gold, #ffca28);
+    border-color: var(--site-accent-gold, #ffca28);
+    box-shadow: 0 0 0 2px var(--site-glow-gold-subtle, rgba(255, 202, 40, 0.12));
+}
+
+.site-market-sort-control {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--site-space-md, 8px);
+}
+
+.site-market-select {
+    min-height: 2rem;
+    width: auto;
+}
+
+/* =========================================================
+   Sections
+========================================================= */
+
+.site-market-section {
+    padding: var(--site-space-3xl, 20px);
+}
+
+.site-market-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--site-space-xl, 12px);
+
+    padding-bottom: var(--site-space-xl, 12px);
+    margin-bottom: var(--site-space-xl, 12px);
+
+    border-bottom: 1px solid var(--site-border, #333333);
+}
+
+.site-market-section-header h3 {
+    margin: 0 0 var(--site-space-xs, 4px);
+
+    color: var(--site-text-heading, #eeeeee);
+
+    font-size: var(--site-font-size-base, 1rem);
+    line-height: var(--site-line-height-tight, 1.1);
+}
+
+.site-market-section-header p {
+    margin: 0;
+
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    line-height: var(--site-line-height-normal, 1.4);
+}
+
+.site-market-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 1.75rem;
+    padding: 0.2rem 0.5rem;
+
+    color: var(--site-text-heading, #eeeeee);
+
+    border: 1px solid var(--site-local-accent, var(--site-border-strong, #444444));
+    border-radius: var(--site-radius-pill, 999px);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-heavy, 800);
+}
+
+/* Prevent nested card grids from adding too much outer padding inside market sections */
+.site-market-section .site-card-grid,
+.site-market-section .card-container {
+    max-width: none;
+    padding: 0;
+}
+
+/* =========================================================
+   Opportunities
+========================================================= */
+
+.site-market-opportunity-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(14rem, 1fr));
+    gap: var(--site-space-xl, 12px);
+}
+
+.site-market-opportunity {
+    padding: var(--site-space-xl, 12px);
+
+    background: var(--site-surface-3, #222222);
+    border: 1px solid var(--site-border, #333333);
+    border-radius: var(--site-radius-sm, 6px);
+}
+
+.site-market-opportunity-type {
+    margin-bottom: var(--site-space-sm, 6px);
+
+    color: var(--site-local-accent, var(--site-accent-amber, #ffc107));
+
+    font-size: var(--site-font-size-xs, 0.70rem);
+    font-weight: var(--site-font-weight-heavy, 800);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.site-market-opportunity h4 {
+    margin: 0 0 var(--site-space-sm, 6px);
+
+    color: var(--site-text-heading, #eeeeee);
+
+    font-size: var(--site-font-size-md, 0.90rem);
+    line-height: 1.25;
+}
+
+.site-market-opportunity p {
+    margin: 0;
+
+    color: var(--site-text-muted, #bbbbbb);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    line-height: var(--site-line-height-normal, 1.4);
+}
+
+.site-market-opportunity-action {
+    margin-top: var(--site-space-md, 8px);
+
+    color: var(--site-accent-gold, #ffca28);
+
+    font-size: var(--site-font-size-sm, 0.78rem);
+    font-weight: var(--site-font-weight-heavy, 800);
+}
+
+/* =========================================================
+   Empty States
+========================================================= */
+
+.site-empty-state {
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-xs, 4px);
+
+    padding: var(--site-space-3xl, 20px);
+
+    color: var(--site-text-muted, #bbbbbb);
+    background: var(--site-surface-input, #111111);
+
+    border: 1px dashed var(--site-border-strong, #444444);
+    border-radius: var(--site-radius-sm, 6px);
+
+    text-align: center;
+}
+
+.site-empty-state strong {
+    color: var(--site-text-heading, #eeeeee);
+}
+
+.site-empty-state span {
+    font-size: var(--site-font-size-sm, 0.78rem);
+}
+
+/* =========================================================
+   Responsive
+========================================================= */
+
+@media (max-width: 1100px) {
+    .site-market-summary-grid {
+        grid-template-columns: repeat(2, minmax(10rem, 1fr));
+    }
+
+    .site-market-opportunity-grid {
+        grid-template-columns: repeat(2, minmax(14rem, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .site-market-sync-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .site-market-summary-grid,
+    .site-market-opportunity-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .site-market-toolbar,
+    .site-market-section-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .site-market-sort-control {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .site-market-select {
+        width: 100%;
+    }
+}

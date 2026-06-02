@@ -1,0 +1,367 @@
+/* =========================================================
+   MTGSite Inventory Page
+   ---------------------------------------------------------
+   Inventory-specific modal and copy-management controls.
+   Depends on tokens, base, layout, cards, buttons.
+   ========================================================= */
+
+
+/* =========================================================
+   Modal Shell
+   ========================================================= */
+
+.site-modal,
+.inventory-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+
+    z-index: var(--site-z-modal, 2000);
+
+    width: 100%;
+    height: 100%;
+
+    overflow: auto;
+
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.site-modal__content,
+.inventory-modal__content {
+    position: relative;
+
+    width: calc(100% - 32px);
+    max-width: 500px;
+
+    margin: 10% auto;
+    padding: 22px 24px;
+
+    background: var(--site-surface-2, #1f1f1f);
+    color: var(--site-text, #e0e0e0);
+
+    border: 1px solid var(--site-border, #333);
+    border-radius: var(--site-radius-lg, 10px);
+
+    box-shadow: var(--site-shadow-modal, 0 12px 28px rgba(0, 0, 0, 0.55));
+}
+
+.site-modal__close {
+    position: absolute;
+    top: 10px;
+    right: 16px;
+
+    padding: 0;
+
+    color: var(--site-text-soft, #aaa);
+    background: transparent;
+    border: 0;
+
+    font-size: 24px;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        color var(--site-transition-normal, 0.2s ease),
+        transform var(--site-transition-fast, 0.15s ease);
+}
+
+.site-modal__close:hover {
+    color: var(--site-accent-red-bright, #ff6b6b);
+    transform: scale(1.05);
+}
+
+.inventory-modal__title {
+    margin: 0 0 14px;
+
+    color: var(--site-text-heading, #eee);
+    font-size: 1.25rem;
+    line-height: 1.2;
+}
+
+.inventory-modal__divider {
+    border: 0;
+    border-top: 1px solid var(--site-border-strong, #444);
+    margin: 0 0 20px;
+}
+
+
+/* =========================================================
+   Instance Container
+   ========================================================= */
+
+.inventory-instance-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-md, 8px);
+}
+
+.inventory-empty-message {
+    margin: 0;
+    padding: var(--site-space-lg, 10px) 0;
+
+    color: var(--site-text-soft, #aaa);
+    text-align: center;
+}
+
+.inventory-empty-message--error {
+    color: var(--site-danger-soft, #e74c3c);
+}
+
+
+/* =========================================================
+   Value Row
+   ========================================================= */
+
+.inventory-value-container {
+    padding-bottom: var(--site-space-md, 8px);
+}
+
+.inventory-value-row {
+    width: 100%;
+    margin-bottom: var(--site-space-xs, 4px);
+
+    display: flex;
+    align-items: baseline;
+    gap: var(--site-space-md, 8px);
+
+    color: var(--site-text, #e0e0e0);
+    font-size: 1rem;
+    font-weight: var(--site-font-weight-medium, 500);
+}
+
+.inventory-value-label {
+    color: var(--site-text-heading, #eee);
+}
+
+.inventory-value-amount {
+    color: var(--site-accent-gold-soft, #ffdf73);
+    font-size: 1.1rem;
+    font-weight: var(--site-font-weight-bold, 700);
+}
+
+
+/* =========================================================
+   Instance Rows
+   ========================================================= */
+
+.inventory-instance-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 92px 58px;
+    gap: var(--site-space-xl, 12px);
+    align-items: end;
+
+    padding: var(--site-space-xl, 12px) 0;
+
+    border-top: 1px solid var(--site-border-soft, rgba(255, 255, 255, 0.08));
+}
+
+.inventory-field {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--site-space-sm, 6px);
+}
+
+.inventory-label {
+    margin: 0;
+
+    color: var(--site-text-soft, #aaa);
+
+    font-size: 0.64rem;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+}
+
+
+/* =========================================================
+   Select Controls
+   ========================================================= */
+
+.inventory-select {
+    width: 100%;
+    height: 34px;
+
+    padding: 0 30px 0 10px;
+
+    color: var(--site-input-text, #eee);
+    background-color: var(--site-surface-3, #222);
+
+    border: 1px solid var(--site-border-strong, #444);
+    border-radius: var(--site-radius-md, 8px);
+
+    font-family: inherit;
+    font-size: 0.82rem;
+    line-height: 34px;
+
+    box-sizing: border-box;
+    cursor: pointer;
+    appearance: none;
+
+    background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23dddddd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 13px 13px;
+
+    transition:
+        background-color var(--site-transition-fast, 0.15s ease),
+        border-color var(--site-transition-fast, 0.15s ease),
+        box-shadow var(--site-transition-fast, 0.15s ease);
+}
+
+.inventory-select:hover {
+    background-color: #303030;
+    border-color: #505050;
+}
+
+.inventory-select:focus {
+    outline: none;
+    background-color: #303030;
+    border-color: var(--site-accent-blue-soft, #66b2ff);
+    box-shadow: 0 0 0 2px var(--site-glow-blue-subtle, rgba(102, 178, 255, 0.15));
+}
+
+
+/* =========================================================
+   Tradeable Checkbox
+   ========================================================= */
+
+.inventory-checkbox-wrap {
+    height: 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: var(--site-surface-3, #222);
+
+    border: 1px solid var(--site-border-strong, #444);
+    border-radius: var(--site-radius-md, 8px);
+
+    box-sizing: border-box;
+
+    transition:
+        background-color var(--site-transition-fast, 0.15s ease),
+        border-color var(--site-transition-fast, 0.15s ease);
+}
+
+.inventory-checkbox-wrap:hover {
+    background-color: #303030;
+    border-color: #505050;
+}
+
+.inventory-checkbox {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+
+    accent-color: var(--site-accent-blue, #007bff);
+    cursor: pointer;
+}
+
+.inventory-checkbox:focus-visible {
+    outline: 2px solid var(--site-glow-blue, rgba(0, 123, 255, 0.35));
+    outline-offset: 2px;
+}
+
+
+/* =========================================================
+   Remove Button
+   ========================================================= */
+
+.inventory-field-remove .delete-form {
+    height: 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0;
+}
+
+.inventory-delete-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    color: var(--site-accent-red-bright, #ff6b6b);
+    background-color: #2a1d1d;
+
+    border: 1px solid #6b2f2f;
+    border-radius: var(--site-radius-md, 8px);
+
+    font-family: inherit;
+    font-size: 1.15rem;
+    font-weight: var(--site-font-weight-bold, 700);
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        background-color var(--site-transition-fast, 0.15s ease),
+        border-color var(--site-transition-fast, 0.15s ease),
+        color var(--site-transition-fast, 0.15s ease),
+        box-shadow var(--site-transition-fast, 0.15s ease),
+        transform 0.08s ease;
+}
+
+.inventory-delete-btn:hover {
+    color: #ff8383;
+    background-color: #3a2222;
+    border-color: #8b3a3a;
+    box-shadow: 0 0 8px var(--site-glow-red-subtle, rgba(220, 53, 69, 0.18));
+}
+
+.inventory-delete-btn:active {
+    transform: scale(0.95);
+}
+
+.inventory-delete-btn:focus-visible {
+    outline: 2px solid var(--site-glow-blue, rgba(0, 123, 255, 0.35));
+    outline-offset: 2px;
+}
+
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 700px) {
+    .site-modal__content,
+    .inventory-modal__content {
+        width: calc(100% - 32px);
+        max-width: none;
+
+        margin: 8% auto;
+        padding: var(--site-space-3xl, 20px);
+    }
+
+    .inventory-instance-row {
+        grid-template-columns: 1fr;
+        gap: var(--site-space-lg, 10px);
+        padding: var(--site-space-xl, 12px) 0;
+    }
+
+    .inventory-checkbox-wrap {
+        justify-content: flex-start;
+        padding-left: var(--site-space-lg, 10px);
+    }
+
+    .inventory-field-remove .delete-form {
+        justify-content: flex-start;
+    }
+
+    .inventory-delete-btn {
+        width: 42px;
+    }
+}

@@ -1,0 +1,73 @@
+/* =========================================================
+   MTGSite Layout Utilities
+   ========================================================= */
+
+.site-container {
+    width: 100%;
+    max-width: var(--site-content-width);
+    margin: 0 auto;
+    padding: 0 var(--site-space-3xl);
+}
+
+.site-container--wide {
+    max-width: var(--site-content-width-wide);
+}
+
+.site-page {
+    width: 100%;
+    padding: var(--site-space-page-y) var(--site-space-3xl) var(--site-space-page-bottom);
+}
+
+.site-page-header {
+    margin-bottom: var(--site-space-4xl);
+}
+
+.site-page-header--centered {
+    text-align: center;
+}
+
+.site-page-title {
+    margin: 0 0 var(--site-space-md);
+    color: var(--site-text-heading);
+    font-size: var(--site-font-size-page-title);
+    line-height: var(--site-line-height-tight);
+    letter-spacing: var(--site-letter-spacing-heading);
+}
+
+.site-page-subtitle {
+    max-width: 620px;
+    margin: 0;
+    color: var(--site-text-muted);
+    font-size: var(--site-font-size-base);
+    line-height: var(--site-line-height-readable);
+}
+
+.site-page-header--centered .site-page-subtitle {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.site-grid {
+    display: grid;
+    gap: var(--site-space-3xl);
+}
+
+.site-grid--cards {
+    grid-template-columns: repeat(auto-fill, minmax(var(--site-card-grid-min), 1fr));
+}
+
+.site-grid--admin {
+    grid-template-columns: repeat(auto-fit, minmax(var(--site-admin-grid-min), 1fr));
+}
+
+.site-grid--deck-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(var(--site-deck-grid-min), 1fr));
+}
+
+@media (max-width: 600px) {
+    .site-container,
+    .site-page {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+}

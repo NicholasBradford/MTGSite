@@ -1,227 +1,126 @@
 {% extends "base.html" %}
+
 {% block title %}Home{% endblock %}
-
-{% block style %}
-{{ super() }}
-    /* Hero & Spotlight Section */
-    .hero-spotlight { 
-        background: #1f1f1f; 
-        padding: 40px; 
-        border-radius: 12px; 
-        margin-bottom: 40px; 
-        color: #eee;
-        border-left: 4px solid #ffca28; /* Gold accent */
-        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-    }
-    .spotlight-card { 
-        display: flex; 
-        align-items: center; 
-        gap: 40px; 
-        flex-wrap: wrap; 
-    }
-    .featured-img { 
-        max-width: 280px; 
-        border-radius: 12px; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
-        transition: transform 0.3s ease;
-    }
-    .featured-img:hover {
-        transform: scale(1.03);
-    }
-    .spotlight-text h1 {
-        color: #ffca28; /* Gold */
-        margin-bottom: 5px;
-        font-size: 1.2em;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .spotlight-text h2 {
-        font-size: 2.5em;
-        margin: 0 0 10px 0;
-        color: #fff;
-    }
-    .spotlight-text p {
-        color: #aaa;
-        font-size: 1.1em;
-        margin-bottom: 25px;
-    }
-
-    /* Adaptive Button (Matches Admin Theme) */
-    .btn-spotlight {
-        background-color: #222;
-        color: #ffca28;
-        border: 1px solid #ffca28;
-        padding: 10px 24px;
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        display: inline-block;
-    }
-    .btn-spotlight:hover {
-        background-color: #ffca28;
-        color: #111;
-        box-shadow: 0 0 15px rgba(255, 202, 40, 0.3);
-    }
-    .btn-spotlight:active {
-        transform: scale(0.97);
-    }
-
-    /* Stats Dashboard */
-    .stats-grid { 
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
-        gap: 25px; 
-        margin-bottom: 50px; 
-    }
-    .stat-item { 
-        background: #1f1f1f; 
-        padding: 25px 20px; 
-        border-radius: 8px; 
-        text-align: center; 
-        border: 1px solid #333; 
-        color: #eee; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        transition: transform 0.2s ease;
-    }
-    .stat-item:hover {
-        transform: translateY(-4px);
-    }
-    .stat-item h3 {
-        margin: 0 0 15px 0;
-        font-size: 1.1em;
-        color: #aaa;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .stat-value { 
-        font-size: 2.5rem; 
-        font-weight: bold; 
-        margin: 0;
-    }
-
-    /* Stat specific colors */
-    .val-cards { color: #17a2b8; } /* Teal */
-    .val-art { color: #007bff; }   /* Blue */
-    .val-money { color: #2ecc71; } /* Green */
-
-    /* Horizontal Scroller for Recent Cards */
-    .recent-additions h2 {
-        color: #eee;
-        border-bottom: 2px solid #333;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        font-size: 1.8em;
-    }
-    .carousel-container {
-        overflow: hidden; 
-        width: 100%;
-        position: relative;
-    }
-    /* Optional: Add gradient fades to the edges so cards seamlessly appear/disappear */
-    .carousel-container::before, .carousel-container::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        width: 60px;
-        height: 100%;
-        z-index: 2;
-        pointer-events: none;
-    }
-    .carousel-container::before {
-        left: 0;
-        background: linear-gradient(to right, #111 0%, transparent 100%);
-    }
-    .carousel-container::after {
-        right: 0;
-        background: linear-gradient(to left, #111 0%, transparent 100%);
-    }
-
-    .recent-scroll { 
-        display: flex; 
-        gap: 15px; 
-        overflow-x: hidden; 
-        padding: 15px 0;
-        -ms-overflow-style: none;  
-        scrollbar-width: none;  
-    }
-    .recent-scroll::-webkit-scrollbar {
-        display: none;
-    }
-    .recent-card {
-        flex: 0 0 auto;
-    }
-    .recent-card img { 
-        scroll-snap-align: start; 
-        height: 240px; /* Slightly larger for better detail */
-        border-radius: 12px; 
-        transition: transform 0.2s, box-shadow 0.2s; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    }
-    .recent-card img:hover { 
-        transform: translateY(-5px) scale(1.02); 
-        box-shadow: 0 8px 20px rgba(255, 202, 40, 0.4); /* Subtle gold glow on hover */
-    }
-{% endblock style %}
+{% block body_class %}home-page{% endblock %}
 
 {% block content %}
 <div class="home-container">
-    <section class="hero-spotlight">
+
+    <section class="hero-spotlight site-accent-gold">
         {% if spotlight %}
             <div class="spotlight-card">
-                <img src="{{ url_for('serve_card_image', filename = spotlight.image_url) }}" alt="{{ spotlight.name }}" class="featured-img" loading="lazy">
+                <div class="spotlight-image-wrap">
+                    <img
+                        src="{{ url_for('serve_card_image', filename=spotlight.image_url) }}"
+                        alt="{{ spotlight.name }}"
+                        class="featured-img"
+                        loading="lazy"
+                    >
+                </div>
+
                 <div class="spotlight-text">
-                    <h1><i class="fas fa-star"></i> Featured Collection Piece</h1>
-                    <h2>{{ spotlight.name }}</h2>
-                    <p>{{ spotlight.set_name }} ({{ spotlight.set_code|upper }})</p>
-                    <a href="{{ url_for('sets.set_detail', set_code=spotlight.set_code) }}" class="btn-spotlight">View Set</a>
+                    <p class="spotlight-kicker">
+                        <i class="fas fa-star"></i>
+                        Featured Collection Piece
+                    </p>
+
+                    <h1>{{ spotlight.name }}</h1>
+
+                    <p class="spotlight-meta">
+                        {{ spotlight.set_name }} ({{ spotlight.set_code|upper }})
+                    </p>
+
+                    <a
+                        href="{{ url_for('sets.set_detail', set_code=spotlight.set_code) }}"
+                        class="site-button site-button--accent btn-spotlight"
+                    >
+                        View Set
+                    </a>
                 </div>
             </div>
         {% else %}
-            <div class="hero-placeholder" style="text-align: center; padding: 40px 0;">
-                <h1 style="color: #eee;">Welcome to the Vault!</h1>
-                <p style="color: #aaa;">No featured pieces available at the moment.</p>
+            <div class="hero-placeholder">
+                <h1>Welcome to MTG Catalog</h1>
+                <p>No featured collection piece is available at the moment.</p>
             </div>
         {% endif %}
     </section>
 
-    <section class="stats-grid">
-        <div class="stat-item">
-            <h3><i class="fas fa-layer-group"></i> Total Cards</h3>
+
+    <section class="stats-grid" aria-label="Collection statistics">
+        <article class="stat-item site-accent-teal">
+            <h2>
+                <i class="fas fa-layer-group"></i>
+                Total Cards
+            </h2>
             <p class="stat-value val-cards">{{ stats.total_cards }}</p>
-        </div>
-        <div class="stat-item">
-            <h3><i class="fas fa-palette"></i> Unique Artworks</h3>
+        </article>
+
+        <article class="stat-item site-accent-blue">
+            <h2>
+                <i class="fas fa-palette"></i>
+                Unique Artworks
+            </h2>
             <p class="stat-value val-art">{{ stats.unique_cards }}</p>
-        </div>
-        
+        </article>
+
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-        <div class="stat-item">
-            <h3><i class="fas fa-chart-line"></i> Collection Value</h3>
-            <p class="stat-value val-money">${{ "{:,.2f}".format(stats.total_value) }}</p>
-        </div>
+            <article class="stat-item site-accent-green">
+                <h2>
+                    <i class="fas fa-chart-line"></i>
+                    Collection Value
+                </h2>
+                <p class="stat-value val-money">
+                    ${{ "{:,.2f}".format(stats.total_value) }}
+                </p>
+            </article>
         {% endif %}
     </section>
 
-    <section class="recent-additions">
-        <h2><i class="fas fa-fire" style="color: #e74c3c; margin-right: 8px;"></i> Recently Cracked</h2>
-        <div class="carousel-container">
-            <div class="recent-scroll" id="carousel">
-                {% for card in recent %}
-                    <div class="recent-card">
-                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }} loading="lazy"">
-                    </div>
-                {% endfor %}
-                
-                {% for card in recent %}
-                    <div class="recent-card">
-                        <img src="{{ url_for('serve_card_image', filename = card.image_url) }}" alt="{{ card.name }}" title="{{ card.name }} loading="lazy"">
-                    </div>
-                {% endfor %}
+
+    <section class="recent-additions" aria-labelledby="recent-additions-heading">
+        <header class="recent-additions-header">
+            <h2 id="recent-additions-heading">
+                <i class="fas fa-fire"></i>
+                Recently Cracked
+            </h2>
+        </header>
+
+        {% if recent %}
+            <div class="carousel-container" aria-label="Recently added cards">
+                <div class="recent-scroll" id="carousel">
+                    {% for card in recent %}
+                        <div class="recent-card">
+                            <img
+                                src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                                alt="{{ card.name }}"
+                                title="{{ card.name }}"
+                                loading="lazy"
+                            >
+                        </div>
+                    {% endfor %}
+
+                    {% for card in recent %}
+                        <div class="recent-card" aria-hidden="true">
+                            <img
+                                src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                                alt=""
+                                title="{{ card.name }}"
+                                loading="lazy"
+                            >
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
+        {% else %}
+            <div class="site-card empty-recent-card">
+                <p>No recent cards to show yet.</p>
+            </div>
+        {% endif %}
     </section>
+
 </div>
+
 
 <script>
     const carousel = document.getElementById('carousel');

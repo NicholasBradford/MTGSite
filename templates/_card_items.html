@@ -1,17 +1,17 @@
-{% if cards[0]%}
+{% if cards and cards[0] %}
     {% for card in cards %}
-    {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
-        <div class="card_class" >
+        {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
+        {% set is_foil = card['finish'] == 'foil' %}
+
+        <article class="site-card-tile card_class {% if is_foil %}site-card-tile--foil{% endif %}">
             {% if card['image_url'] %}
-                <div class="{% if card['finish'] == 'foil' %}rainbow_image{% endif %}">
-                    <img 
-                        src="{{ url_for('serve_card_image', filename = card['image_url'] ) }}" 
-                        alt="{{ card['name'] }}" 
+                <div class="site-card-image-wrap {% if is_foil %}rainbow_image{% endif %}">
+                    <img
+                        src="{{ url_for('serve_card_image', filename=card['image_url']) }}"
+                        alt="{{ card['name'] }}"
+                        class="site-card-image {% if is_admin_inventory %}site-card-image--editable{% endif %}"
                         {% if is_admin_inventory %}
-                                    onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}')"
-                                    style="cursor: pointer; border: 2px solid transparent; transition: border 0.2s;"
-                                    onmouseover="this.style.borderColor='#ffca28'"
-                                    onmouseout="this.style.borderColor='transparent'"
+                            onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}', this)"
                         {% else %}
                             onclick="showPopup('{{ card['name'] }}')"
                         {% endif %}
@@ -19,60 +19,64 @@
                     >
                 </div>
             {% else %}
-                <div class="no-image">No Image Available</div>
+                <div class="site-card-no-image no-image">No Image Available</div>
             {% endif %}
 
-            <div class="card-label">
-                {{ card['name'] }} 
+            <div class="site-card-label card-label">
+                <span class="site-card-name">{{ card['name'] }}</span>
+
                 {% if card['qty'] > 1 %}
-                    <span class="qty-badge">x{{ card['qty'] }}</span>
+                    <span class="site-qty-badge qty-badge">x{{ card['qty'] }}</span>
                 {% endif %}
-                {% if card['finish'] == 'foil' %}
-                    <span style="color: gold;">★</span>
+
+                {% if is_foil %}
+                    <span class="site-foil-marker" title="Foil">★</span>
                 {% endif %}
-                <br/>
-                <span class="card-meta">({{ card['set_code']|upper }} #{{ card['collector_number'] }})</span>
-                
-               
-            </div> 
-        
 
-        {% if view_mode == 'tracking' and current_user.is_authenticated %}
-            {# Safety check: Ensure old_price is greater than 0 to prevent Divide by Zero errors #}
-            {% if card.old_price and card.old_price > 0 %}
-                {% set price_diff = card.new_price - card.old_price %}
-                {% set percent_diff = (price_diff / card.old_price) * 100 %}
-                
-                <div class="price-shift-data" style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #333; line-height: 1.4;">
-                    {% if price_diff > 0 %}
-                        <span style="color: #2ecc71; font-weight: bold;">
-                            ↑ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
-                            <br/>
-                            +{{ "%.2f"|format(percent_diff) }}%
-                        </span>
-                    {% elif price_diff < 0 %}
-                        <span style="color: #e74c3c; font-weight: bold;">
-                            ↓ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
-                            <br/>
-                            {{ "%.2f"|format(percent_diff) }}%
-                        </span>
-                    {% else %}
-                        <span style="color: #aaa;">No Change</span>
-                    {% endif %}
-                </div>
-            {% endif %}
+                <br>
 
-            {# Location Tag Formatting #}
-            {% if card.location_name %}
-                <div style="margin-top: 8px; font-size: 0.85em; color: #888;">
-                    <i class="fas fa-box" style="margin-right: 4px;"></i>{{ card.location_name }}
-                </div>
+                <span class="site-card-meta card-meta">
+                    ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
+                </span>
+            </div>
+
+            {% if view_mode == 'tracking' and current_user.is_authenticated %}
+                {% if card.old_price and card.old_price > 0 %}
+                    {% set price_diff = card.new_price - card.old_price %}
+                    {% set percent_diff = (price_diff / card.old_price) * 100 %}
+
+                    <div class="site-price-shift price-shift-data">
+                        {% if price_diff > 0 %}
+                            <span class="site-price-shift__value site-price-shift__value--up">
+                                ↑ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
+                                <br>
+                                +{{ "%.2f"|format(percent_diff) }}%
+                            </span>
+                        {% elif price_diff < 0 %}
+                            <span class="site-price-shift__value site-price-shift__value--down">
+                                ↓ ${{ "%.2f"|format(card.old_price) }} → ${{ "%.2f"|format(card.new_price) }}
+                                <br>
+                                {{ "%.2f"|format(percent_diff) }}%
+                            </span>
+                        {% else %}
+                            <span class="site-price-shift__value site-price-shift__value--flat">
+                                No Change
+                            </span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% if card.location_name %}
+                    <div class="site-card-location">
+                        <i class="fas fa-box" aria-hidden="true"></i>
+                        {{ card.location_name }}
+                    </div>
+                {% endif %}
             {% endif %}
-        {% endif %}
-    </div>
+        </article>
     {% endfor %}
 {% elif view_mode == 'tracking' %}
-        <div style="text-align: center; width: 100%; padding: 20px; color: #aaa;">
-            <h2>No recent hits</h2>
-        </div>
+    <div class="site-empty-state">
+        <h2>No recent hits</h2>
+    </div>
 {% endif %}

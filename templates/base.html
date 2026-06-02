@@ -1,35 +1,45 @@
-<!DOCTYPE>
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
         <title>{% block title %}{% endblock %} - MTG Catalog</title>
+
         <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+
+        {# Temporary legacy stylesheet during migration. Remove once migrated. #}
         <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-        
+
+        {# New standardized stylesheet #}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+
         <style>
             {% block style %}{% endblock %}
         </style>
 
         <script>
-
-            {% block script %}
-            
-            {% endblock %}
-        
+            {% block script %}{% endblock %}
         </script>
     </head>
-    <body>
-        <nav class="container">
-            <div class="nav-bar">
-                <ul>
-                    <li><a href="/" class="dropbtn">Home</a></li>
 
-                    <li class="dropdown">
-                        <a href="javascript:void(0)" class="dropbtn">Collection</a>
-                        <div class="dropdown-content">
+    <body class="{% block body_class %}{% endblock %}">
+        <nav class="site-container site-nav">
+            <div class="site-nav__bar">
+                <ul class="site-nav__list">
+                    <li class="site-nav__item">
+                        <a href="/" class="site-nav__link">Home</a>
+                    </li>
+
+                    <li class="site-nav__item site-dropdown">
+                        <a href="javascript:void(0)" class="site-nav__link site-dropdown__trigger">Collection</a>
+
+                        <div class="site-dropdown__content">
                             <a href="/binder/trades">Trade Binder</a>
                             <a href="/sets">Set Collections</a>
                             <a href="/edh/gallery">Commander</a>
                             <a href="/collection/planeswalkers">Planeswalkers</a>
+
                             {% if current_user.is_authenticated and current_user.role == 'admin' %}
                                 <hr>
                                 <a href="/inventory">Master Inventory</a>
@@ -38,49 +48,51 @@
                     </li>
 
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                    <li class="dropdown">
-                        <a href="javascript:void(0)" class="dropbtn">Market</a>
-                        <div class="dropdown-content">
-                            <a href="/admin/tracker">Price Tracker</a>
-                            <a href="/wishlist">Wishlist</a>
-                        </div>
-                    </li>
-                    {% endif %}
+                        <li class="site-nav__item site-dropdown">
+                            <a href="javascript:void(0)" class="site-nav__link site-dropdown__trigger">Market</a>
 
-                    <li>
-                        {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                            <a href="/admin/dashboard">Trade Requests</a>
-                        {% else %}
-                        <li class="dropdown">
-                            <a href="/trade" class="dropbtn">Create Trade</a>
-                            <div class="dropdown-content">
+                            <div class="site-dropdown__content">
+                                <a href="/market/dashboard">Market Dashboard</a>
                                 <a href="/wishlist">Wishlist</a>
                             </div>
                         </li>
-                        {% endif %}
-                    </li>
 
-                    <li class="nav-right-group">
+                        <li class="site-nav__item">
+                            <a href="/admin/dashboard" class="site-nav__link">Trade Requests</a>
+                        </li>
+                    {% else %}
+                        <li class="site-nav__item site-dropdown">
+                            <a href="/trade" class="site-nav__link site-dropdown__trigger">Create Trade</a>
+
+                            <div class="site-dropdown__content">
+                                <a href="/wishlist">Wishlist</a>
+                            </div>
+                        </li>
+                    {% endif %}
+
+                    <li class="site-nav__item site-nav__right">
                         {% if current_user.is_authenticated %}
                             {% if current_user.role == 'admin' %}
-                                <a href="/add/inventory" class="nav-highlight">Add Cards</a>
-                                <a href="{{ url_for('admin.admin') }}" title="Admin Dashboard">
+                                <a href="/add/inventory" class="site-nav__highlight">Add Cards</a>
+
+                                <a href="{{ url_for('admin.admin') }}" class="site-nav__link" title="Admin Dashboard">
                                     ⚙️ {{ current_user.username }}
                                 </a>
                             {% else %}
-                                <span>{{ current_user.username }}</span>
+                                <span class="site-nav__user">{{ current_user.username }}</span>
                             {% endif %}
-                            <a href="/logout">Logout</a>
+
+                            <a href="/logout" class="site-nav__link">Logout</a>
                         {% else %}
-                            <a href="/login">Login</a>
+                            <a href="/login" class="site-nav__link">Login</a>
                         {% endif %}
                     </li>
                 </ul>
             </div>
         </nav>
-        <main class="container">
-        {% block content %}
-        {% endblock %}
+
+        <main class="site-container">
+            {% block content %}{% endblock %}
         </main>
     </body>
 </html>
