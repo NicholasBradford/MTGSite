@@ -1,158 +1,274 @@
 {% extends "base.html" %}
 
 {% block title %}Home{% endblock %}
-{% block body_class %}home-page{% endblock %}
+{% block body_class %}home-page catalog-home-page{% endblock %}
 
 {% block content %}
-<div class="home-container">
+<div class="home-container catalog-home">
 
-    <section class="hero-spotlight site-accent-gold">
+    <section class="catalog-hero site-accent-teal" aria-labelledby="catalog-home-title">
+        <div class="catalog-hero-copy">
+            <p class="catalog-kicker">
+                <i class="fas fa-book-open"></i>
+                The MTG Catalog
+            </p>
+
+            <h1 id="catalog-home-title">Welcome to <br />Magic: The Card Catalog</h1>
+
+            <p class="catalog-hero-text">
+                Search the collection, check the trade binder, see what I am looking for,
+                and follow current set and planeswalker collection projects.
+            </p>
+
+            <form
+                action="{% if current_user.is_authenticated and current_user.role == 'admin' %}/inventory{% else %}/binder/trades{% endif %}"
+                method="GET"
+                class="catalog-search"
+                role="search"
+            >
+                <label for="home-card-search" class="sr-only">Search cards</label>
+
+                <input
+                    id="home-card-search"
+                    type="search"
+                    name="q"
+                    placeholder="{% if current_user.is_authenticated and current_user.role == 'admin' %}Search inventory...{% else %}Search trade binder...{% endif %}"
+                    autocomplete="off"
+                >
+
+                <button type="submit" class="site-button site-button--accent">
+                    <i class="fas fa-search"></i>
+                    Search
+                </button>
+            </form>
+
+            <div class="catalog-hero-actions" aria-label="Primary collection links">
+                <a href="{{ links.trade_binder }}" class="site-button site-button--accent">
+                    View Trade Binder
+                </a>
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <a href="{{ links.inventory }}" class="site-button site-button--ghost">
+                        Browse Full Collection
+                    </a>
+                {% endif %}
+                <a href="{{ links.wishlist }}" class="site-button site-button--ghost">
+                    View Wishlist
+                </a>
+            </div>
+        </div>
+
         {% if spotlight %}
-            <div class="spotlight-card">
-                <div class="spotlight-image-wrap">
+            <aside class="catalog-spotlight" aria-label="Featured collection card">
+                <div class="catalog-spotlight-image">
                     <img
                         src="{{ url_for('serve_card_image', filename=spotlight.image_url) }}"
                         alt="{{ spotlight.name }}"
-                        class="featured-img"
                         loading="lazy"
                     >
                 </div>
-
-                <div class="spotlight-text">
-                    <p class="spotlight-kicker">
-                        <i class="fas fa-star"></i>
-                        Featured Collection Piece
-                    </p>
-
-                    <h1>{{ spotlight.name }}</h1>
-
-                    <p class="spotlight-meta">
-                        {{ spotlight.set_name }} ({{ spotlight.set_code|upper }})
-                    </p>
-
-                    <a
-                        href="{{ url_for('sets.set_detail', set_code=spotlight.set_code) }}"
-                        class="site-button site-button--accent btn-spotlight"
-                    >
-                        View Set
-                    </a>
+                <div class="catalog-spotlight-text">
+                    <p class="catalog-mini-label">Random Collection Piece</p>
+                    <h2>{{ spotlight.name }}</h2>
+                    <p>{{ spotlight.set_name }} ({{ spotlight.set_code|upper }})</p>
                 </div>
-            </div>
-        {% else %}
-            <div class="hero-placeholder">
-                <h1>Welcome to MTG Catalog</h1>
-                <p>No featured collection piece is available at the moment.</p>
-            </div>
+            </aside>
         {% endif %}
     </section>
 
-
-    <section class="stats-grid" aria-label="Collection statistics">
-        <article class="stat-item site-accent-teal">
-            <h2>
-                <i class="fas fa-layer-group"></i>
-                Total Cards
-            </h2>
-            <p class="stat-value val-cards">{{ stats.total_cards }}</p>
+    <section class="catalog-stats-grid" aria-label="Collection summary">
+        <article class="catalog-stat site-accent-teal">
+            <span class="catalog-stat-label">Total Cards</span>
+            <strong>{{ "{:,}".format(stats.total_cards) }}</strong>
         </article>
 
-        <article class="stat-item site-accent-blue">
-            <h2>
-                <i class="fas fa-palette"></i>
-                Unique Artworks
-            </h2>
-            <p class="stat-value val-art">{{ stats.unique_cards }}</p>
+        <article class="catalog-stat site-accent-blue">
+            <span class="catalog-stat-label">Unique Printings</span>
+            <strong>{{ "{:,}".format(stats.unique_cards) }}</strong>
+        </article>
+
+        <article class="catalog-stat site-accent-gold">
+            <span class="catalog-stat-label">Tradeable Cards</span>
+            <strong>{{ "{:,}".format(stats.tradeable_cards) }}</strong>
+        </article>
+
+        <article class="catalog-stat site-accent-purple">
+            <span class="catalog-stat-label">Wishlist Cards</span>
+            <strong>{{ "{:,}".format(stats.wishlist_cards) }}</strong>
         </article>
 
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-            <article class="stat-item site-accent-green">
-                <h2>
-                    <i class="fas fa-chart-line"></i>
-                    Collection Value
-                </h2>
-                <p class="stat-value val-money">
-                    ${{ "{:,.2f}".format(stats.total_value) }}
-                </p>
+            <article class="catalog-stat site-accent-green">
+                <span class="catalog-stat-label">Collection Value</span>
+                <strong>${{ "{:,.2f}".format(stats.total_value) }}</strong>
             </article>
         {% endif %}
     </section>
 
+    <section class="catalog-path-grid" aria-label="Browse collection sections">
+        <a href="{{ links.trade_binder }}" class="catalog-path-card site-accent-gold">
+            <i class="fas fa-handshake"></i>
+            <h2>Trade Binder</h2>
+            <p>Cards intentionally marked as available for trade.</p>
+        </a>
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <a href="{{ links.search }}" class="catalog-path-card site-accent-teal">
+            <i class="fas fa-search"></i>
+            <h2>Full Collection</h2>
+            <p>Browse and search owned cards across sets, finishes, and locations.</p>
+        </a>
+        {% endif %}
 
-    <section class="recent-additions" aria-labelledby="recent-additions-heading">
-        <header class="recent-additions-header">
-            <h2 id="recent-additions-heading">
-                <i class="fas fa-fire"></i>
-                Recently Cracked
-            </h2>
-        </header>
+        <a href="{{ links.wishlist }}" class="catalog-path-card site-accent-purple">
+            <i class="fas fa-scroll"></i>
+            <h2>Wishlist</h2>
+            <p>Cards I am currently looking for, with priority when available.</p>
+        </a>
 
-        {% if recent %}
-            <div class="carousel-container" aria-label="Recently added cards">
-                <div class="recent-scroll" id="carousel">
-                    {% for card in recent %}
-                        <div class="recent-card">
+        <a href="{{ links.sets }}" class="catalog-path-card site-accent-blue">
+            <i class="fas fa-layer-group"></i>
+            <h2>Set Progress</h2>
+            <p>Track binder and set-completion projects.</p>
+        </a>
+
+        <a href="{{ links.planeswalkers }}" class="catalog-path-card site-accent-red">
+            <i class="fas fa-user-astronaut"></i>
+            <h2>Planeswalkers</h2>
+            <p>A dedicated view of the planeswalker collection.</p>
+        </a>
+    </section>
+
+    <section class="catalog-split-section">
+        <div class="catalog-panel site-accent-gold">
+            <div class="catalog-panel-header">
+                <div>
+                    <p class="catalog-mini-label">Available</p>
+                    <h2>Featured for Trade</h2>
+                </div>
+                <a href="{{ links.trade_binder }}">View all</a>
+            </div>
+
+            {% if featured_trade_cards %}
+                <div class="catalog-card-strip catalog-card-strip--large">
+                    {% for card in featured_trade_cards %}
+                        <article class="catalog-card-preview">
                             <img
                                 src="{{ url_for('serve_card_image', filename=card.image_url) }}"
                                 alt="{{ card.name }}"
                                 title="{{ card.name }}"
                                 loading="lazy"
                             >
-                        </div>
+                        </article>
                     {% endfor %}
+                </div>
+            {% else %}
+                <p class="catalog-empty-note">No cards are currently marked tradeable.</p>
+            {% endif %}
+        </div>
 
-                    {% for card in recent %}
-                        <div class="recent-card" aria-hidden="true">
+        <div class="catalog-panel site-accent-purple">
+            <div class="catalog-panel-header">
+                <div>
+                    <p class="catalog-mini-label">Looking For</p>
+                    <h2>Wishlist Priorities</h2>
+                </div>
+                <a href="{{ links.wishlist }}">View all</a>
+            </div>
+
+            {% if wishlist_highlights %}
+                <div class="catalog-wishlist-list">
+                    {% for card in wishlist_highlights %}
+                        <article class="catalog-wishlist-item">
                             <img
                                 src="{{ url_for('serve_card_image', filename=card.image_url) }}"
-                                alt=""
+                                alt="{{ card.name }}"
+                                loading="lazy"
+                            >
+                            <div>
+                                <h3>{{ card.name }}</h3>
+                                <p>{{ card.set_code|upper }} #{{ card.collector_number }}</p>
+                                {% if card.priority %}
+                                    <span class="catalog-priority-pill">Priority {{ card.priority }}</span>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="catalog-empty-note">No wishlist cards are currently listed.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="catalog-split-section catalog-split-section--lower">
+        <div class="catalog-panel site-accent-blue">
+            <div class="catalog-panel-header">
+                <div>
+                    <p class="catalog-mini-label">Projects</p>
+                    <h2>Recent Set Activity</h2>
+                </div>
+                <a href="{{ links.sets }}">Browse sets</a>
+            </div>
+
+            {% if current_set_projects %}
+                <div class="catalog-set-list">
+                    {% for set in current_set_projects %}
+                        <a href="{{ url_for('sets.set_detail', set_code=set.set_code) }}" class="catalog-set-row">
+                            <span>
+                                <strong>{{ set.set_name }}</strong>
+                                <small>{{ set.set_code|upper }}</small>
+                            </span>
+                            <span>{{ set.owned_printings }} owned</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="catalog-empty-note">No set activity to show yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="catalog-panel site-accent-teal">
+            <div class="catalog-panel-header">
+                <div>
+                    <p class="catalog-mini-label">Recently Added</p>
+                    <h2>Latest Cards</h2>
+                </div>
+            </div>
+
+            {% if recent_cards %}
+                <div class="catalog-card-strip">
+                    {% for card in recent_cards %}
+                        <article class="catalog-card-preview catalog-card-preview--small">
+                            <img
+                                src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                                alt="{{ card.name }}"
                                 title="{{ card.name }}"
                                 loading="lazy"
                             >
-                        </div>
+                        </article>
                     {% endfor %}
                 </div>
+            {% else %}
+                <p class="catalog-empty-note">No recent cards to show yet.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <section class="catalog-admin-bar site-accent-green" aria-label="Admin shortcuts">
+            <div>
+                <p class="catalog-mini-label">Admin</p>
+                <h2>Collection management</h2>
+                <p>Private tools for pricing, data quality, and maintenance live outside the public browsing flow.</p>
             </div>
-        {% else %}
-            <div class="site-card empty-recent-card">
-                <p>No recent cards to show yet.</p>
-            </div>
-        {% endif %}
+            <a href="{{ links.market_dashboard }}" class="site-button site-button--accent">Open Market Dashboard</a>
+        </section>
+    {% endif %}
+
+    <section class="catalog-footer-note">
+        <p><center>
+            Trade availability is based on cards explicitly marked tradeable.
+        </center></p>
     </section>
 
 </div>
-
-
-<script>
-    const carousel = document.getElementById('carousel');
-    let speed = 0.5; 
-    let scrollPos = 0;
-    let animationId; 
-
-    function step() {
-        scrollPos += speed;
-        carousel.scrollLeft = scrollPos;
-
-        // Reset logic: check if we've scrolled past the first set of images
-        if (carousel.scrollLeft >= (carousel.scrollWidth / 2)) {
-            scrollPos = 0;
-            carousel.scrollLeft = 0;
-        }
-
-        animationId = requestAnimationFrame(step);
-    }
-
-    // Initialize animation
-    animationId = requestAnimationFrame(step);
-
-    // Pause on Hover
-    carousel.addEventListener('mouseenter', () => {
-        cancelAnimationFrame(animationId);
-    });
-
-    // Resume on Leave
-    carousel.addEventListener('mouseleave', () => {
-        cancelAnimationFrame(animationId); 
-        animationId = requestAnimationFrame(step);
-    });
-</script>
 {% endblock %}

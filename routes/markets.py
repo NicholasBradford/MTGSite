@@ -870,18 +870,16 @@ def get_market_summary(manager):
 
     row = fetch_one_dict(manager, query, movement_threshold_params())
 
-    missing_price_count = get_missing_price_count(manager)
-
     return {
         "last_sync": row.get("last_sync") or "Not yet synced",
-        "collection_value": money(row.get("collection_value")),
-        "total_gains": money(row.get("total_gains")),
-        "total_losses": money(row.get("total_losses")),
-        "trade_value": money(row.get("trade_value")),
+        "collection_value": row.get("collection_value") or 0,
+        "total_gains": row.get("total_gains") or 0,
+        "total_losses": row.get("total_losses") or 0,
+        "trade_value": row.get("trade_value") or 0,
         "alert_count": row.get("alert_count", 0),
-        "wishlist_drop_count": 0,
-        "missing_price_count": missing_price_count,
         "tracked_count": row.get("tracked_count", 0),
+        "missing_price_count": get_missing_price_count(manager),
+        "wishlist_drop_count": 0,
     }
 
 

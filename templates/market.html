@@ -49,7 +49,7 @@
         <article class="site-card site-card--top-accent site-accent-gold site-market-metric">
             <div class="site-market-metric-label">Collection Value</div>
             <div class="site-market-metric-value">
-                {{ market_summary.collection_value if market_summary and market_summary.collection_value else "$0.00" }}
+                {{ "${:,.2f}".format(market_summary.collection_value) if market_summary and market_summary.collection_value else "$0.00" }}
             </div>
             <div class="site-market-metric-note">Total estimated market value</div>
         </article>
@@ -81,7 +81,7 @@
         <article class="site-card site-card--top-accent site-accent-teal site-market-metric">
             <div class="site-market-metric-label">Trade Binder Value</div>
             <div class="site-market-metric-value">
-                {{ market_summary.trade_value if market_summary and market_summary.trade_value else "$0.00" }}
+                {{ "${:,.2f}".format(market_summary.trade_value) if market_summary and market_summary.trade_value else "$0.00" }}
             </div>
             <div class="site-market-metric-note">Estimated tradeable value</div>
         </article>

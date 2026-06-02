@@ -84,7 +84,7 @@
 
                             <a href="/logout" class="site-nav__link">Logout</a>
                         {% else %}
-                            <a href="/login" class="site-nav__link">Login</a>
+                            <a href="{{ url_for('authentication.login', next=request.path if not request.query_string else request.full_path) }}" class="site-nav__link">Login</a>                        
                         {% endif %}
                     </li>
                 </ul>

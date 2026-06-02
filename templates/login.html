@@ -145,6 +145,7 @@
                 </label>
             </div>
             <button type="submit" class="login-btn">Sign In</button>
+            <input type="hidden" name="next" value="{{ next or request.args.get('next', '') }}">
         </form>
 
 

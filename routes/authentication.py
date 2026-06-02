@@ -1,39 +1,119 @@
 import os
+from urllib.parse import urlparse, urljoin
+
 from flask import request, Blueprint, redirect, url_for, render_template, flash
-from flask_login import login_user, logout_user, login_required
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+
 from db.db_manager import CardDB
 from db.user_manager import User
 
 authentication_bp = Blueprint('authentication', __name__)
 
+
+def is_safe_url(target):
+    """
+    Prevent open redirects by only allowing local redirects.
+    """
+    if not target:
+        return False
+
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+
+    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
+
+
+def get_safe_next_url(default_endpoint="main.index"):
+    """
+    Pulls ?next=/some/page safely.
+    Falls back to the given endpoint.
+    """
+    next_url = request.args.get("next") or request.form.get("next")
+
+    if next_url and is_safe_url(next_url):
+        return next_url
+
+    return url_for(default_endpoint)
+
+
+def is_credentialed_path(path):
+    """
+    Paths that should not remain visible after logout.
+    Add to this list as your app grows.
+    """
+    credentialed_prefixes = (
+        "/inventory",
+        "/add",
+        "/admin",
+        "/market",
+        "/logout",
+        "/register",
+    )
+
+    return path.startswith(credentialed_prefixes)
+
+
 @authentication_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(get_safe_next_url())
+
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
-        # In a real app, use werkzeug.security to check password_hash
+
         manager = CardDB()
         user = manager.cursor.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
+            "SELECT * FROM users WHERE username = ?",
+            (username,)
         ).fetchone()
         manager.close()
 
-        if user and check_password_hash(user['password_hash'], password): # Replace with hash check
+        if user and check_password_hash(user['password_hash'], password):
             user_obj = User(user['user_id'], user['username'], user['role'])
             remember_me = True if request.form.get('remember') else False
+
             login_user(user_obj, remember=remember_me)
-            return redirect(url_for('inventory.inventory')) # Redirect to collection
-        
+
+            return redirect(get_safe_next_url())
+
         flash('Invalid username or password')
-    return render_template('login.html')
+
+    next_url = request.args.get("next")
+
+    if not next_url:
+        referrer = request.referrer
+
+        if referrer and is_safe_url(referrer):
+            parsed_referrer = urlparse(referrer)
+
+            # Do not bounce back to login/logout/register pages
+            if parsed_referrer.path not in ("/login", "/logout", "/register"):
+                next_url = referrer
+
+    return render_template(
+        'login.html',
+        next=next_url or ""
+    )
+
 
 @authentication_bp.route('/logout')
 @login_required
 def logout():
+    next_url = request.referrer or url_for('main.index')
+
     logout_user()
-    return redirect(url_for('authentication.login'))
+
+    if is_safe_url(next_url):
+        parsed_next = urlparse(next_url)
+        next_path = parsed_next.path
+
+        if not is_credentialed_path(next_path):
+            return redirect(next_url)
+
+    return redirect(url_for('main.index'))
+
 
 @authentication_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -42,28 +122,32 @@ def register():
         password = request.form['password']
         role = request.form['role']
         admin_key = request.form.get('admin_key')
-        
+
         hashed_pw = generate_password_hash(password)
-        
-        SECRET_ADMIN_PHRASE = os.environ.get('ADMIN_REGISTRATION_KEY')
-        
+        secret_admin_phrase = os.environ.get('ADMIN_REGISTRATION_KEY')
+
         manager = CardDB()
-        if role == "admin" and admin_key != SECRET_ADMIN_PHRASE:
+
+        if role == "admin" and admin_key != secret_admin_phrase:
+            manager.close()
             flash('Cannot create ADMIN account without site owner authorization')
             return redirect(url_for('authentication.login'))
+
         try:
             manager.cursor.execute(
                 "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
                 (username, hashed_pw, role)
             )
             manager.commit()
+
             flash('Account created! Please log in.')
             return redirect(url_for('authentication.login'))
+
         except Exception as e:
-            print(f"Registration Error: {e}") # This will show the real error in your terminal
+            print(f"Registration Error: {e}")
             flash('An error occurred during registration.')
-            flash('Username already exists.')
+
         finally:
             manager.close()
-            
+
     return render_template('register.html')
