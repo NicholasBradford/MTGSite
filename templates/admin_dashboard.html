@@ -3,76 +3,219 @@
 
 {% block style %}
 {{ super() }}
+.admin-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
 .admin-header {
-    margin-bottom: 30px;
+    margin-bottom: 24px;
+}
+.admin-header h3 {
+    margin-bottom: 6px;
 }
 .admin-header p {
-    color: #bbb;
+    color: #b8bec8;
+    margin: 0;
+}
+.admin-section {
+    margin-bottom: 34px;
+}
+.admin-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.admin-section-header h4,
+.admin-section-header h3 {
+    margin: 0;
+}
+.admin-section-header p {
+    color: #9aa3af;
+    margin: 0;
+    font-size: 0.92rem;
 }
 .admin-grid {
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-    gap: 20px; 
-    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+.admin-grid.wide {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 .admin-card {
-    background: #1f1f1f; /* Consistent dark theme background */
-    padding: 20px; 
-    border-radius: 12px; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    background: #1b1f27;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 4px solid #3b82f6;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.26);
 }
-.admin-card.collection { border-top: 4px solid #ffd700; }
-.admin-card.integrity { border-top: 4px solid #17a2b8; }
-.admin-card.health { border-top: 4px solid #28a745; }
-
-.admin-card h4 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    font-size: 1.2em;
+.admin-card.collection { border-left-color: #ffd166; }
+.admin-card.integrity { border-left-color: #22d3ee; }
+.admin-card.health { border-left-color: #22c55e; }
+.admin-card.market { border-left-color: #a78bfa; }
+.admin-card.sync { border-left-color: #fb923c; }
+.admin-card.trade { border-left-color: #facc15; }
+.admin-card.danger { border-left-color: #ef4444; }
+.admin-card h4,
+.admin-card h5 {
+    margin: 0 0 14px;
+    color: #f4f7fb;
 }
-.collection h4 { color: #ffd700; }
-.integrity h4 { color: #17a2b8; }
-.health h4 { color: #28a745; }
-
+.admin-card h5 {
+    font-size: 1rem;
+}
 .metric-row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 1.05em;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 9px;
+    color: #d7dce5;
+}
+.metric-row span:first-child {
+    color: #aeb6c2;
+}
+.metric-value {
+    color: #f6f8fb;
+    font-weight: 700;
+    text-align: right;
 }
 .metric-value a {
+    color: inherit;
     text-decoration: none;
-    font-weight: bold;
 }
 .metric-value a:hover {
     text-decoration: underline;
 }
-
-/* Status Colors */
-.text-green { color: #2ecc71; }
-.text-red { color: #e74c3c; }
-.text-amber { color: #ffc107; }
-
 .card-footer {
-    margin-top: 15px; 
-    font-size: 0.85em; 
-    color: #888;
-    border-top: 1px solid #333;
-    padding-top: 10px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    color: #8f98a7;
+    font-size: 0.86rem;
 }
-
-/* Trade Dashboard Styles */
+.text-green { color: #2ecc71; }
+.text-red { color: #ff6b6b; }
+.text-amber { color: #ffc857; }
+.text-blue { color: #60a5fa; }
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    background: rgba(148,163,184,0.15);
+    color: #dbe4f0;
+}
+.status-pill.good { background: rgba(34,197,94,0.16); color: #86efac; }
+.status-pill.warning { background: rgba(250,204,21,0.15); color: #fde68a; }
+.status-pill.critical { background: rgba(239,68,68,0.16); color: #fca5a5; }
+.status-pill.info { background: rgba(96,165,250,0.16); color: #bfdbfe; }
+.attention-list {
+    display: grid;
+    gap: 10px;
+}
+.attention-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.075);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.attention-item strong {
+    color: #f5f7fb;
+}
+.attention-item small {
+    display: block;
+    color: #9fa8b6;
+    margin-top: 3px;
+}
+.attention-item a {
+    color: #93c5fd;
+    text-decoration: none;
+}
+.attention-item a:hover {
+    text-decoration: underline;
+}
+.empty-state {
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.075);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    color: #9da6b6;
+}
+.mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+.mini-table th,
+.mini-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    text-align: left;
+    vertical-align: top;
+}
+.mini-table th {
+    color: #aeb6c2;
+    font-weight: 700;
+}
+.mini-table td {
+    color: #dce2ea;
+}
+.mini-table tr:last-child td {
+    border-bottom: 0;
+}
+.breakdown-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.breakdown-chip {
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 6px 10px;
+    color: #cbd5e1;
+    font-size: 0.88rem;
+}
+.breakdown-chip strong {
+    color: #f8fafc;
+}
 .trade-card {
-    background: #1f1f1f;
-    border-left: 4px solid #ffca28;
-    padding: 20px; 
-    margin-bottom: 20px; 
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    background: #1b1f27;
+    border-left: 4px solid #facc15;
+    padding: 20px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
 }
 .trade-card hr {
-    border-color: #333;
+    border: 0;
+    border-top: 1px solid rgba(255,255,255,0.09);
     margin: 15px 0;
+}
+.trade-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+}
+.trade-card ul {
+    color: #cbd5e1;
+    line-height: 1.6;
+    padding-left: 20px;
 }
 .form-group {
     margin-top: 15px;
@@ -82,165 +225,289 @@
     color: #ddd;
 }
 .form-group textarea {
-    width: 100%; 
-    margin-top: 8px; 
-    background: #111; 
-    color: white; 
-    border: 1px solid #444;
-    border-radius: 4px;
+    width: 100%;
+    margin-top: 8px;
+    background: #111827;
+    color: white;
+    border: 1px solid #374151;
+    border-radius: 8px;
     padding: 10px;
     font-family: inherit;
 }
+.btn-row {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
 .btn {
-    padding: 8px 16px; 
-    border: none; 
-    border-radius: 4px; 
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: bold;
     transition: filter 0.2s;
 }
-.btn:hover { filter: brightness(1.2); }
-.btn-accept { background: #28a745; color: white; }
+.btn:hover { filter: brightness(1.15); }
+.btn-accept { background: #22c55e; color: white; }
 .btn-deny { background: #dc3545; color: white; }
+@media (max-width: 720px) {
+    .admin-section-header,
+    .attention-item {
+        display: block;
+    }
+    .attention-item .status-pill,
+    .attention-item .metric-value {
+        margin-top: 8px;
+    }
+}
 {% endblock style %}
 
 {% block content %}
-<div class="admin-header">
-    <h3>Admin Dashboard</h3>
-    <p>View collection statistics, active trade requests, and site health.</p>
+<div class="admin-page">
+    <div class="admin-header">
+        <h3>Admin Dashboard</h3>
+        <p>Collection status, data quality, sync health, infrastructure checks, and pending trade requests.</p>
+    </div>
+
+    <section class="admin-section">
+        <div class="admin-section-header">
+            <h4>Needs Attention</h4>
+            <p>Only non-zero alerts are shown here.</p>
+        </div>
+
+        {% if attention_items %}
+            <div class="attention-list">
+                {% for item in attention_items %}
+                    <div class="attention-item">
+                        <span class="status-pill {{ item.severity }}">{{ item.severity|title }}</span>
+                        <div>
+                            <strong>
+                                {% if item.href %}<a href="{{ item.href }}">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}
+                            </strong>
+                            {% if item.detail %}<small>{{ item.detail }}</small>{% endif %}
+                        </div>
+                        <span class="metric-value">{% if item.count is not none %}{{ item.count }}{% endif %}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">No dashboard alerts right now.</div>
+        {% endif %}
+    </section>
+
+    <section class="admin-section">
+        <div class="admin-grid">
+            <div class="admin-card collection">
+                <h4>Market & Collection</h4>
+                <div class="metric-row"><span>Total Cards</span><span class="metric-value">{{ total_cards }}</span></div>
+                <div class="metric-row"><span>Unique Printings</span><span class="metric-value">{{ unique_cards }}</span></div>
+                <div class="metric-row"><span>Tradeable Cards</span><span class="metric-value">{{ collection_health.tradeable_cards|default(0) }}</span></div>
+                <div class="metric-row"><span>Wishlist Rows</span><span class="metric-value">{{ collection_health.wishlist_cards|default(0) }}</span></div>
+                <div class="metric-row">
+                    <span>Price Spikes Today</span>
+                    <span class="metric-value">{% if change[0] > 0 %}<a href="/market/dashboard" class="text-green">+{{ change[0] }}</a>{% else %}0{% endif %}</span>
+                </div>
+                <div class="metric-row">
+                    <span>Price Drops Today</span>
+                    <span class="metric-value">{% if change[1] > 0 %}<a href="/market/dashboard" class="text-red">-{{ change[1] }}</a>{% else %}0{% endif %}</span>
+                </div>
+                <div class="card-footer">Price movement keeps your existing $2 threshold logic.</div>
+            </div>
+
+            <div class="admin-card integrity">
+                <h4>Data Integrity</h4>
+                <div class="metric-row"><span>Cards Missing Values</span><span class="metric-value {% if data_integrity.missing_value_count|default(0) > 0 %}text-red{% else %}text-green{% endif %}">{{ data_integrity.missing_value_count|default(0) }}</span></div>
+                <div class="metric-row"><span>Unassigned Inventory</span><span class="metric-value {% if data_integrity.unassigned_cards|default(0) > 0 %}text-amber{% else %}text-green{% endif %}">{{ data_integrity.unassigned_cards|default(0) }}</span></div>
+                <div class="metric-row"><span>Orphan Inventory Rows</span><span class="metric-value {% if data_integrity.orphan_inventory|default(0) > 0 %}text-red{% else %}text-green{% endif %}">{{ data_integrity.orphan_inventory|default(0) }}</span></div>
+                <div class="metric-row"><span>Orphan Printings</span><span class="metric-value {% if data_integrity.orphan_printings|default(0) > 0 %}text-red{% else %}text-green{% endif %}">{{ data_integrity.orphan_printings|default(0) }}</span></div>
+                <div class="metric-row"><span>Unexpected Finishes</span><span class="metric-value {% if data_integrity.unexpected_finish|default(0) > 0 %}text-amber{% else %}text-green{% endif %}">{{ data_integrity.unexpected_finish|default(0) }}</span></div>
+                <div class="card-footer">Catches broken joins, location gaps, and finish normalization problems.</div>
+            </div>
+
+            <div class="admin-card market">
+                <h4>Price Data Health</h4>
+                <div class="metric-row"><span>Newest Snapshot</span><span class="metric-value">{{ price_health.newest_snapshot|default('None') }}</span></div>
+                <div class="metric-row"><span>Snapshot Dates</span><span class="metric-value">{{ price_health.snapshot_dates|default(0) }}</span></div>
+                <div class="metric-row"><span>Cards With History</span><span class="metric-value">{{ price_health.cards_with_history|default(0) }}</span></div>
+                <div class="metric-row"><span>Owned With 2+ Snapshots</span><span class="metric-value text-green">{{ price_health.owned_cards_with_two_snapshots|default(0) }}</span></div>
+                <div class="metric-row"><span>Owned Missing 2 Snapshots</span><span class="metric-value {% if price_health.owned_cards_missing_two_snapshots|default(0) > 0 %}text-amber{% else %}text-green{% endif %}">{{ price_health.owned_cards_missing_two_snapshots|default(0) }}</span></div>
+                <div class="card-footer">Explains when market movement pages are empty by design.</div>
+            </div>
+
+            <div class="admin-card health">
+                <h4>Infrastructure Health</h4>
+                <div class="metric-row"><span>Database</span><span class="metric-value text-green">{{ infrastructure_health.database_status|default('Unknown') }}</span></div>
+                <div class="metric-row"><span>Database Size</span><span class="metric-value">{{ infrastructure_health.db_size_mb|default(db_size_mb) }} MB</span></div>
+                <div class="metric-row"><span>WAL Size</span><span class="metric-value">{{ infrastructure_health.wal_size_mb|default('Unknown') }} MB</span></div>
+                <div class="metric-row"><span>Server Time</span><span class="metric-value">{{ infrastructure_health.server_time|default('Unknown') }}</span></div>
+                <div class="metric-row"><span>Debug Mode</span><span class="metric-value {% if infrastructure_health.debug_mode %}text-amber{% else %}text-green{% endif %}">{{ 'On' if infrastructure_health.debug_mode else 'Off' }}</span></div>
+                <div class="card-footer">DB path is {{ 'configured' if infrastructure_health.db_path_known else 'not visible from DB_PATH' }}.</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <div class="admin-section-header">
+            <h4>Detailed Health Panels</h4>
+            <p>More context for pricing, sync jobs, finishes, and trades.</p>
+        </div>
+
+        <div class="admin-grid wide">
+            <div class="admin-card sync">
+                <h4>Sync / Job Log</h4>
+                <div class="metric-row"><span>Last Successful Job</span><span class="metric-value">{{ sync_health.last_success.task_name|default('None') }}</span></div>
+                <div class="metric-row"><span>Success Timestamp</span><span class="metric-value">{{ sync_health.last_success.timestamp|default('None') }}</span></div>
+                <div class="metric-row"><span>Cards Updated</span><span class="metric-value">{{ sync_health.last_success.cards_updated|default(0) }}</span></div>
+                <div class="metric-row"><span>Last Error Job</span><span class="metric-value {% if sync_health.last_error %}text-red{% else %}text-green{% endif %}">{{ sync_health.last_error.task_name|default('None') }}</span></div>
+                {% if sync_health.last_error.message %}<div class="card-footer">{{ sync_health.last_error.message }}</div>{% else %}<div class="card-footer">Uses update_log status/message without changing the logging system.</div>{% endif %}
+            </div>
+
+            <div class="admin-card market">
+                <h4>TCG / Price Coverage</h4>
+                <div class="metric-row"><span>History Rows</span><span class="metric-value">{{ price_health.price_history_rows|default(0) }}</span></div>
+                <div class="metric-row"><span>Missing Nonfoil Current Price</span><span class="metric-value">{{ price_health.current_nonfoil_missing|default(0) }}</span></div>
+                <div class="metric-row"><span>Missing Foil Current Price</span><span class="metric-value">{{ price_health.current_foil_missing|default(0) }}</span></div>
+                <div class="metric-row"><span>TCGPlayer IDs Missing</span><span class="metric-value">{{ price_health.tcgplayer_id_missing|default(0) }}</span></div>
+                <div class="metric-row"><span>Marked TCGPlayer Missing</span><span class="metric-value">{{ price_health.tcgplayer_marked_missing|default(0) }}</span></div>
+                <div class="metric-row"><span>Manual Overrides</span><span class="metric-value">{{ price_health.manual_price_overrides|default(0) }}</span></div>
+                <div class="card-footer">Foil missing count is informational; some printings legitimately lack foil pricing.</div>
+            </div>
+
+            <div class="admin-card collection">
+                <h4>Finish Breakdown</h4>
+                {% if finish_breakdown %}
+                    <div class="breakdown-list">
+                        {% for row in finish_breakdown %}
+                            <span class="breakdown-chip"><strong>{{ row.count }}</strong> {{ row.finish }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="card-footer">No inventory finish data found.</p>
+                {% endif %}
+            </div>
+
+            <div class="admin-card trade">
+                <h4>Trade Health</h4>
+                <div class="metric-row"><span>Pending</span><span class="metric-value">{{ trade_health.pending|default(0) }}</span></div>
+                <div class="metric-row"><span>Completed</span><span class="metric-value">{{ trade_health.completed|default(0) }}</span></div>
+                <div class="metric-row"><span>Declined</span><span class="metric-value">{{ trade_health.declined|default(0) }}</span></div>
+                <div class="metric-row"><span>Pending With No Outbound</span><span class="metric-value {% if trade_health.empty_outbound|default(0) > 0 %}text-amber{% else %}text-green{% endif %}">{{ trade_health.empty_outbound|default(0) }}</span></div>
+                <div class="metric-row"><span>Pending With No Inbound</span><span class="metric-value {% if trade_health.empty_inbound|default(0) > 0 %}text-amber{% else %}text-green{% endif %}">{{ trade_health.empty_inbound|default(0) }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <div class="admin-grid wide">
+            <div class="admin-card sync">
+                <h4>Recent Update Log</h4>
+                {% if sync_health.recent_logs %}
+                    <table class="mini-table">
+                        <thead>
+                            <tr><th>Time</th><th>Task</th><th>Status</th><th>Cards</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for log in sync_health.recent_logs %}
+                                <tr>
+                                    <td>{{ log.timestamp }}</td>
+                                    <td>{{ log.task_name }}</td>
+                                    <td><span class="status-pill {% if log.status|lower in ['success', 'successful', 'ok', 'completed'] %}good{% else %}critical{% endif %}">{{ log.status }}</span></td>
+                                    <td>{{ log.cards_updated }}</td>
+                                </tr>
+                                {% if log.message %}
+                                    <tr><td></td><td colspan="3" style="color: #9fa8b6;">{{ log.message }}</td></tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">No update log rows found.</div>
+                {% endif %}
+            </div>
+
+            <div class="admin-card market">
+                <h4>Price Source Breakdown</h4>
+                {% if source_breakdown %}
+                    <table class="mini-table">
+                        <thead><tr><th>Source</th><th>Rows</th></tr></thead>
+                        <tbody>
+                            {% for source in source_breakdown %}
+                                <tr><td>{{ source.source }}</td><td>{{ source.count }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">No price source rows found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-section trade-dashboard">
+        <div class="admin-section-header">
+            <h3>Pending Trade Requests</h3>
+            <p>Existing accept/decline workflow preserved.</p>
+        </div>
+
+        {% if pending_trades %}
+            {% for trade in pending_trades %}
+            <div class="trade-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <h4 style="margin: 0; color: #facc15;">Trade ID: {{ trade.trade_id }}</h4>
+                    <span style="color: #aaa; font-size: 0.9em;">{{ trade.created_at }}</span>
+                </div>
+                <p style="margin-top: 5px;"><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
+
+                <hr>
+
+                <div class="trade-columns">
+                    <div>
+                        <h5 style="color: #ff7b7b; margin-bottom: 10px;">Cards Requested from You</h5>
+                        <ul>
+                            {% for item in trade.requested_cards %}
+                                <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                            {% else %}
+                                <li><em>None</em></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h5 style="color: #86efac; margin-bottom: 10px;">Cards Offered to You</h5>
+                        <ul>
+                            {% for item in trade.offered_cards %}
+                                <li><strong>{{ item.quantity }}x</strong> {{ item.name|default('Unknown Card') }} ({{ item.set_code|default('?')|upper }} #{{ item.collector_number|default('?') }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                            {% else %}
+                                <li><em>None</em></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <hr>
+
+                <form action="{{ url_for('admin.manage_trade') }}" method="POST">
+                    <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
+
+                    <div class="form-group">
+                        <label for="trade_notes_{{ trade.trade_id }}">Trade Notes (tracking #, condition notes, etc.):</label>
+                        <textarea id="trade_notes_{{ trade.trade_id }}" name="trade_notes" rows="2" placeholder="Internal notes for this transaction..."></textarea>
+                    </div>
+
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-accept" onclick="respondToTrade('{{ trade.trade_id }}', 'accept')">Accept Trade</button>
+                        <button type="button" class="btn btn-deny" onclick="respondToTrade('{{ trade.trade_id }}', 'decline')">Deny Trade</button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">No pending trade requests at this time.</div>
+        {% endif %}
+    </section>
 </div>
 
-<div class="admin-grid">
-    <div class="admin-card collection">
-        <h4>📊 Market & Collection</h4>
-        <div class="metric-row">
-            <span>Total Cards:</span>
-            <span class="metric-value">{{ total_cards }}</span>
-        </div>
-        <div class="metric-row">
-            <span>Unique Printings:</span>
-            <span class="metric-value">{{ unique_cards }}</span>
-        </div>
-        <div class="metric-row">
-            <span>Price Spikes (Today):</span>
-            <span class="metric-value">
-                {% if change[0] > 0 %}<a href="/market/dashboard" class="text-green">+{{ change[0] }}</a>{% else %} 0 {% endif %}
-            </span>
-        </div>
-        <div class="metric-row">
-            <span>Price Drops (Today):</span>
-            <span class="metric-value">
-                {% if change[1] > 0 %}<a href="/market/dashboard" class="text-red">-{{ change[1] }}</a>{% else %} 0 {% endif %}
-            </span>
-        </div>
-        <div class="card-footer">Tracks value shifts crossing $2 threshold</div>
-    </div>
-
-    <div class="admin-card integrity">
-        <h4>🛠️ Data Integrity</h4>
-        <div class="metric-row">
-            <span>Cards Missing Values:</span>
-            <span class="metric-value">
-                {% if zero_value_count > 0 %}
-                    <a href="/inventory?q=usd%3D0" class="text-red">{{ zero_value_count }}</a>
-                {% else %}
-                    <span class="text-green">0</span>
-                {% endif %}
-            </span>
-        </div>
-        <div class="metric-row">
-            <span>Unassigned Inventory:</span>
-            <span class="metric-value">
-                {% if unassigned_cards > 0 %}
-                    <a href="/inventory?location=unassigned" class="text-amber">{{ unassigned_cards }}</a>
-                {% else %}
-                    <span class="text-green">0</span>
-                {% endif %}
-            </span>
-        </div>
-        <div class="card-footer">Actionable alerts for missing data</div>
-    </div>
-
-    <div class="admin-card health">
-        <h4>🖥️ Infrastructure Health</h4>
-        <div class="metric-row">
-            <span>Database Size:</span>
-            <span class="metric-value">{{ db_size_mb }} MB</span>
-        </div>
-        <div class="metric-row">
-            <span>Price Sync Status:</span>
-            <span class="metric-value text-green">Active 🟢</span>
-        </div>
-        <div class="card-footer">Monitor storage against hosting limits</div>
-    </div>
-</div> 
-
-<div class="trade-dashboard">
-    <h3 style="margin-bottom: 20px;">Pending Trade Requests</h3>
-    
-    {% if pending_trades %}
-        {% for trade in pending_trades %}
-        <div class="trade-card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="margin: 0; color: #ffca28;">Trade ID: {{ trade.trade_id }}</h4>
-                <span style="color: #aaa; font-size: 0.9em;">{{ trade.created_at }}</span>
-            </div>
-            <p style="margin-top: 5px;"><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
-            
-            <hr>
-            
-            <div style="display: flex; gap: 20px;">
-                <div style="flex: 1;">
-                    <h5 style="color: #ff5252; margin-bottom: 10px;">Cards Requested from You:</h5>
-                    <ul style="color: #ccc; line-height: 1.6; padding-left: 20px;">
-                        {% for item in trade.requested_cards %}
-                            <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
-                        {% else %}
-                            <li><em>None</em></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-
-                <div style="flex: 1;">
-                    <h5 style="color: #4caf50; margin-bottom: 10px;">Cards Offered to You:</h5>
-                    <ul style="color: #ccc; line-height: 1.6; padding-left: 20px;">
-                        {% for item in trade.offered_cards %}
-                            <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
-                        {% else %}
-                            <li><em>None</em></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            
-            <hr>
-            
-            <form action="{{ url_for('admin.manage_trade') }}" method="POST">
-                <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
-                
-                <div class="form-group">
-                    <label for="trade_notes">Trade Notes (Tracking #, condition notes, etc.):</label>
-                    <textarea name="trade_notes" rows="2" placeholder="Internal notes for this transaction..."></textarea>
-                </div>
-                
-                <div style="margin-top: 20px; display: flex; gap: 15px;">
-                    <button type="button" class="btn-success" onclick="respondToTrade('{{ trade.trade_id }}', 'accept')" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-                        Accept Trade
-                    </button>
-                    
-                    <button type="button" class="btn-danger" onclick="respondToTrade('{{ trade.trade_id }}', 'decline')" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-                        Deny Trade
-                    </button>
-                </div>
-            </form>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: #888;">
-            <p style="font-size: 1.1em; margin: 0;">No pending trade requests at this time.</p>
-        </div>
-    {% endif %}
-</div>
 <script>
     function respondToTrade(tradeId, action) {
         const actionText = action === 'accept' ? 'accept and finalize' : 'decline';
@@ -255,7 +522,7 @@
         .then(data => {
             if (data.success) {
                 alert(`Trade ${action}ed successfully!`);
-                location.reload(); // Refresh the page to update the UI
+                location.reload();
             } else {
                 alert("Error: " + data.error);
             }

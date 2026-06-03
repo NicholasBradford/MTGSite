@@ -57,7 +57,7 @@
         <article class="site-card site-card--top-accent site-accent-green site-market-metric">
             <div class="site-market-metric-label">Total Gains</div>
             <div class="site-market-metric-value">
-                {{ market_summary.total_gains if market_summary and market_summary.total_gains else "$0.00" }}
+                {{ "${:,.2f}".format(market_summary.total_gains) if market_summary and market_summary.total_gains else "$0.00" }}
             </div>
             <div class="site-market-metric-note">Tracked upward movement</div>
         </article>
@@ -65,7 +65,7 @@
         <article class="site-card site-card--top-accent site-accent-red site-market-metric">
             <div class="site-market-metric-label">Total Losses</div>
             <div class="site-market-metric-value">
-                {{ market_summary.total_losses if market_summary and market_summary.total_losses else "$0.00" }}
+                {{ "${:,.2f}".format(market_summary.total_losses) if market_summary and market_summary.total_losses else "$0.00" }}
             </div>
             <div class="site-market-metric-note">Tracked downward movement</div>
         </article>

@@ -14,6 +14,13 @@ class CardDB:
         self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
         self.cursor = self.conn.cursor()
+        
+    def log_update(self, task_name, cards_updated=0, status="Success", message=""):
+        self.cursor.execute("""
+            INSERT INTO update_log (task_name, cards_updated, status, message)
+            VALUES (?, ?, ?, ?)
+        """, (task_name, cards_updated, status, message))
+        self.commit()
     
     def wipe_db(self):
         """Safely closes connection, deletes the file, and restarts."""
@@ -243,7 +250,40 @@ class CardDB:
             );
         ''')
         
-        self.cursor.execute('''CREATE INDEX IF NOT EXISTS idx_type_line ON card_definitions(type_line);''')   
+        self.cursor.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_type_line 
+                ON card_definitions(type_line);                      
+                                  
+            CREATE INDEX IF NOT EXISTS idx_inventory_scryfall_id
+                ON inventory(scryfall_id);
+
+            CREATE INDEX IF NOT EXISTS idx_inventory_tradeable
+                ON inventory(is_tradeable);
+
+            CREATE INDEX IF NOT EXISTS idx_inventory_location
+                ON inventory(location_id);
+
+            CREATE INDEX IF NOT EXISTS idx_inventory_finish
+                ON inventory(finish);
+
+            CREATE INDEX IF NOT EXISTS idx_inventory_tradeable_scryfall
+                ON inventory(is_tradeable, scryfall_id);
+
+            CREATE INDEX IF NOT EXISTS idx_inventory_location_scryfall
+                ON inventory(location_id, scryfall_id);
+
+            CREATE INDEX IF NOT EXISTS idx_card_printings_oracle
+                ON card_printings(oracle_id);
+
+            CREATE INDEX IF NOT EXISTS idx_card_printings_set_collector
+                ON card_printings(set_code, collector_number);
+
+            CREATE INDEX IF NOT EXISTS idx_price_history_scryfall_date
+                ON price_history(scryfall_id, scraped_at);
+
+            CREATE INDEX IF NOT EXISTS idx_price_history_source_date
+                ON price_history(source, scraped_at);
+        """)  
         
         if self.cursor.execute("SELECT * FROM locations").fetchone()[0] == 0:  
             self.initialize_locations()       

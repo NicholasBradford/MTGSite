@@ -59,10 +59,35 @@
 
         {% if spotlight %}
             <aside class="catalog-spotlight" aria-label="Featured collection card">
-                <div class="catalog-spotlight-image">
+                {% set spotlight_finish = spotlight.finish|default('')|lower %}
+                {% set spotlight_is_foil = spotlight_finish == 'foil' %}
+                {% set spotlight_is_rainbow_foil = spotlight_finish == 'rainbow foil' %}
+
+                <div
+                    class="
+                        catalog-spotlight-image
+                        site-card-image-wrap
+                        {% if spotlight_is_foil %}site-card-tile--foil{% endif %}
+                        {% if spotlight_is_rainbow_foil %}site-card-tile--rainbow-foil{% endif %}
+                    "
+                >
+                    {% if spotlight_is_foil or spotlight_is_rainbow_foil %}
+                        <span
+                            class="finish-badge {% if spotlight_is_rainbow_foil %}finish-badge--rainbow{% else %}finish-badge--foil{% endif %}"
+                            title="{% if spotlight_is_rainbow_foil %}Rainbow foil{% else %}Foil{% endif %}"
+                            aria-label="{% if spotlight_is_rainbow_foil %}Rainbow foil card{% else %}Foil card{% endif %}"
+                        >
+                            {% if spotlight_is_rainbow_foil %}
+                                <span aria-hidden="true">🌈 ★</span>
+                            {% else %}
+                                <span aria-hidden="true">★</span>
+                            {% endif %}
+                        </span>
+                    {% endif %}
+
                     <img
                         src="{{ url_for('serve_card_image', filename=spotlight.image_url) }}"
-                        alt="{{ spotlight.name }}"
+                        alt="{{ spotlight.name }}{% if spotlight_is_rainbow_foil %}, rainbow foil{% elif spotlight_is_foil %}, foil{% endif %}"
                         loading="lazy"
                     >
                 </div>
@@ -150,13 +175,40 @@
             {% if featured_trade_cards %}
                 <div class="catalog-card-strip catalog-card-strip--large">
                     {% for card in featured_trade_cards %}
-                        <article class="catalog-card-preview">
-                            <img
-                                src="{{ url_for('serve_card_image', filename=card.image_url) }}"
-                                alt="{{ card.name }}"
-                                title="{{ card.name }}"
-                                loading="lazy"
-                            >
+                        {% set finish = card.finish|default('')|lower %}
+                        {% set is_foil = finish == 'foil' %}
+                        {% set is_rainbow_foil = finish == 'rainbow foil' %}
+
+                        <article
+                            class="
+                                catalog-card-preview
+                                {% if is_foil %}site-card-tile--foil{% endif %}
+                                {% if is_rainbow_foil %}site-card-tile--rainbow-foil{% endif %}
+                            "
+                            data-finish="{{ card.finish|default('') }}"
+                        >
+                            <div class="site-card-image-wrap">
+                                {% if is_foil or is_rainbow_foil %}
+                                    <span
+                                        class="finish-badge {% if is_rainbow_foil %}finish-badge--rainbow{% else %}finish-badge--foil{% endif %}"
+                                        title="{% if is_rainbow_foil %}Rainbow foil{% else %}Foil{% endif %}"
+                                        aria-label="{% if is_rainbow_foil %}Rainbow foil card{% else %}Foil card{% endif %}"
+                                    >
+                                        {% if is_rainbow_foil %}
+                                            <span aria-hidden="true">🌈 ★</span>
+                                        {% else %}
+                                            <span aria-hidden="true">★</span>
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+
+                                <img
+                                    src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                                    alt="{{ card.name }}{% if is_rainbow_foil %}, rainbow foil{% elif is_foil %}, foil{% endif %}"
+                                    title="{{ card.name }}"
+                                    loading="lazy"
+                                >
+                            </div>
                         </article>
                     {% endfor %}
                 </div>
@@ -178,14 +230,47 @@
                 <div class="catalog-wishlist-list">
                     {% for card in wishlist_highlights %}
                         <article class="catalog-wishlist-item">
-                            <img
-                                src="{{ url_for('serve_card_image', filename=card.image_url) }}"
-                                alt="{{ card.name }}"
-                                loading="lazy"
+                            {% set finish = card.finish|default('')|lower %}
+                            {% set is_foil = finish == 'foil' %}
+                            {% set is_rainbow_foil = finish == 'rainbow foil' %}
+
+                            <div
+                                class="
+                                    catalog-wishlist-image
+                                    site-card-image-wrap
+                                    {% if is_foil %}site-card-tile--foil{% endif %}
+                                    {% if is_rainbow_foil %}site-card-tile--rainbow-foil{% endif %}
+                                "
+                                data-finish="{{ card.finish|default('') }}"
                             >
+
+                                <img
+                                    src="{{ url_for('serve_card_image', filename=card.image_url) }}"
+                                    alt="{{ card.name }}{% if is_rainbow_foil %}, rainbow foil{% elif is_foil %}, foil{% endif %}"
+                                    loading="lazy"
+                                >
+                            </div>
                             <div>
-                                <h3>{{ card.name }}</h3>
+                                <h3>
+                                    {{ card.name }}
+
+                                    {% if is_foil or is_rainbow_foil %}
+                                        <span
+                                            class="catalog-title-finish-badge {% if is_rainbow_foil %}catalog-title-finish-badge--rainbow{% else %}catalog-title-finish-badge--foil{% endif %}"
+                                            title="{% if is_rainbow_foil %}Rainbow foil{% else %}Foil{% endif %}"
+                                            aria-label="{% if is_rainbow_foil %}Rainbow foil card{% else %}Foil card{% endif %}"
+                                        >
+                                            {% if is_rainbow_foil %}
+                                                <span aria-hidden="true">🌈 ★</span>
+                                            {% else %}
+                                                <span aria-hidden="true">★</span>
+                                            {% endif %}
+                                        </span>
+                                    {% endif %}
+                                </h3>
+
                                 <p>{{ card.set_code|upper }} #{{ card.collector_number }}</p>
+
                                 {% if card.priority %}
                                     <span class="catalog-priority-pill">Priority {{ card.priority }}</span>
                                 {% endif %}

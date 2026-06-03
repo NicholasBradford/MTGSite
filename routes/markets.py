@@ -182,10 +182,12 @@ def get_wishlist_drops(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
 
     wishlist_is_foil_sql = """
-        LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%foil%'
-        OR LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%etched%'
-        OR LOWER(REPLACE(w.finish, '_', ' ')) LIKE '%rainbow%'
-    """
+        LOWER(REPLACE(COALESCE(w.finish, ''), '_', ' ')) IN (
+            'foil',
+            'etched',
+            'rainbow foil'
+        )
+        """
 
     query = f"""
         {PRICE_PAIR_CTE},
@@ -776,18 +778,22 @@ MarketRows AS (
         cd.name,
 
         CASE
-            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%foil%'
-                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%etched%'
-                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%rainbow%'
+            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) IN (
+                'foil',
+                'etched',
+                'rainbow foil'
+            )
             THEN pp.old_price_foil
             ELSE pp.old_price_usd
         END AS old_price,
 
         CASE
-            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%foil%'
-                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%etched%'
-                OR LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) LIKE '%rainbow%'
-            THEN pp.new_price_foil
+            WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) IN (
+            'foil',
+            'etched',
+            'rainbow foil'
+        )
+        THEN pp.new_price_foil
             ELSE pp.new_price_usd
         END AS new_price,
 
@@ -1364,6 +1370,13 @@ def update_prices():
         try:
             tcgcsv_timestamp = tcgcsv_get_text(session, TCGCSV_LAST_UPDATED_URL)
         except Exception as error:
+            manager.log_update(
+                task_name="TCGCSV Price Sync",
+                cards_updated=0,
+                status="Error",
+                message=f"Could not reach TCGCSV: {error}"
+            )
+
             yield sse_message(100, f"Could not reach TCGCSV: {error}")
             return
 
@@ -1372,6 +1385,13 @@ def update_prices():
         local_rows = get_local_cards_needing_prices(manager)
 
         if not local_rows:
+            manager.log_update(
+                task_name="TCGCSV Price Sync",
+                cards_updated=0,
+                status="Warning",
+                message="No cards with TCGplayer IDs found. Run the TCGCSV/Scryfall ID migration first."
+            )
+
             yield sse_message(
                 100,
                 "No cards with TCGplayer IDs found. Run the TCGCSV/Scryfall ID migration first."
@@ -1390,6 +1410,13 @@ def update_prices():
         grouped_targets = get_grouped_local_price_targets(manager, session, local_rows)
 
         if not grouped_targets:
+            manager.log_update(
+                task_name="TCGCSV Price Sync",
+                cards_updated=0,
+                status="Warning",
+                message="No TCGCSV group matches found for your local TCGplayer product IDs."
+            )
+
             yield sse_message(
                 100,
                 "No TCGCSV group matches found for your local TCGplayer product IDs."
@@ -1482,13 +1509,30 @@ def update_prices():
 
             time.sleep(TCGCSV_RATE_LIMIT_DELAY)
 
+        manager.log_update(
+            task_name="TCGCSV Price Sync",
+            cards_updated=updated_count,
+            status="Success",
+            message=f"Updated {updated_count} cards. Missing prices for {missing_count} cards."
+        )
+
         yield sse_message(
             100,
             f"TCGCSV sync complete. Updated {updated_count} cards. Missing prices for {missing_count} cards."
         )
 
+    except Exception as error:
+        manager.log_update(
+            task_name="TCGCSV Price Sync",
+            cards_updated=0,
+            status="Error",
+            message=str(error)
+        )
+        yield sse_message(100, f"TCGCSV sync failed: {error}")
+
     finally:
         manager.close()
+
 
 
 def progress_for_index(index, total_cards):

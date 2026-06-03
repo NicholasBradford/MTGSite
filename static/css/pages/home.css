@@ -332,3 +332,51 @@
         grid-template-columns: 88px minmax(0, 1fr);
     }
 }
+
+/* =========================================================
+   Homepage Finish Treatment Overrides
+   Smaller cards need smaller indicators
+   ========================================================= */
+
+.catalog-card-preview .site-card-image-wrap,
+.catalog-wishlist-image,
+.catalog-spotlight-image.site-card-image-wrap {
+    position: relative;
+}
+
+/* Small homepage strip cards: tiny badge */
+.catalog-card-preview .finish-badge {
+    top: 5px;
+    right: 5px;
+
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+
+    font-size: 0.58rem;
+    border-radius: 999px;
+}
+
+/* Wishlist image is larger than strip cards, but still smaller than full card grid */
+.catalog-wishlist-image .finish-badge {
+    top: 5px;
+    right: 5px;
+
+    min-width: 19px;
+    height: 19px;
+    padding: 0 4px;
+
+    font-size: 0.6rem;
+}
+
+/* Spotlight can keep a medium badge */
+.catalog-spotlight-image .finish-badge {
+    top: 8px;
+    right: 8px;
+
+    min-width: 24px;
+    height: 22px;
+    padding: 0 6px;
+
+    font-size: 0.72rem;
+}

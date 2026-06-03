@@ -406,13 +406,13 @@
     box-shadow: var(--site-shadow-card, 0 4px 15px rgba(0, 0, 0, 0.3));
 }
 
-.site-card-image--editable {
+/* .site-card-image--editable {
     cursor: pointer;
 }
 
 .site-card-image--editable:hover {
     border-color: var(--site-accent-gold, #ffca28);
-}
+} */
 
 .site-card-no-image {
     width: 100%;

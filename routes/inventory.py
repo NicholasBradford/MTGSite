@@ -22,9 +22,11 @@ sort_options = {
         'set': 'cp.set_code ASC, cd.name ASC',
         'price': """
             CASE 
-                WHEN LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%foil%'
-                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%etched%'
-                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%rainbow%'
+                WHEN LOWER(REPLACE(COALESCE(i.finish, ''), '_', ' ')) IN (
+                    'foil',
+                    'etched',
+                    'rainbow foil'
+                )
                 THEN cp.current_price_foil
                 ELSE cp.current_price 
             END DESC
@@ -92,9 +94,11 @@ def inventory():
             cd.mana_cost,
             COUNT(i.instance_id) as qty,
             CASE 
-                WHEN LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%foil%'
-                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%etched%'
-                    OR LOWER(REPLACE(i.finish, '_', ' ')) LIKE '%rainbow%'
+                WHEN LOWER(REPLACE(COALESCE(i.finish, ''), '_', ' ')) IN (
+                    'foil',
+                    'etched',
+                    'rainbow foil'
+                )
                 THEN cp.current_price_foil
                 ELSE cp.current_price 
             END as price,

@@ -59,6 +59,32 @@
     color: var(--site-local-accent);
 }
 
+.site-card-meta {
+    color: var(--site-text-faint, #888);
+    font-size: 0.85rem;
+}
+
+.site-card-tile__meta {
+    margin-top: 0.65rem;
+    text-align: center;
+}
+
+.site-card-tile__name {
+    margin: 0;
+    color: var(--site-text-main, #f8fafc);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.site-card-tile__printing {
+    margin: 0.25rem 0 0;
+    color: var(--site-text-faint, #9ca3af);
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+
 .site-card__text {
     margin: 0;
     color: var(--site-text-soft);
@@ -86,4 +112,303 @@
 .site-muted-item:hover {
     opacity: 1;
     filter: grayscale(0);
+}
+
+/* =========================================================
+   Card Image / Finish Effect Layering
+   ---------------------------------------------------------
+   The image is the base layer.
+   Foil/rainbow effects sit above the image.
+   Badges sit above everything.
+   ========================================================= */
+
+.site-card-image-wrap {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--site-radius-card, 12px);
+}
+
+.site-card-image-wrap img,
+.site-card-image {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: inherit;
+}
+
+.site-card-image-wrap::before,
+.site-card-image-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.site-card-image-wrap::after {
+    z-index: 3;
+}
+
+/* =========================================================
+   Editable Card Image Hover
+   ---------------------------------------------------------
+   Hover ring belongs on the wrapper so foil overlays
+   cannot cover it.
+   ========================================================= */
+
+.site-card-image--editable {
+    cursor: pointer;
+}
+
+.site-card-image-wrap:has(.site-card-image--editable) {
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition:
+        border-color var(--site-transition-fast, 0.15s ease),
+        box-shadow var(--site-transition-fast, 0.15s ease);
+}
+
+.site-card-image-wrap:has(.site-card-image--editable:hover),
+.site-card-image-wrap:has(.site-card-image--editable):hover {
+    border-color: var(--site-accent-gold, #ffca28);
+    box-shadow:
+        0 0 0 1px rgba(255, 202, 40, 0.35),
+        0 0 14px rgba(255, 202, 40, 0.28);
+}
+/* =========================================================
+   Regular Foil
+   ---------------------------------------------------------
+   Silver/white sheen. No rainbow.
+   ========================================================= */
+
+.site-card-tile--foil .site-card-image-wrap,
+.site-card-tile--foil .catalog-card-preview,
+.site-card-tile--foil .catalog-wishlist-image,
+.site-card-tile--foil .catalog-spotlight-image {
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.32),
+        0 0 14px rgba(210, 230, 255, 0.22);
+}
+
+.site-card-tile--foil .site-card-image-wrap::before,
+.site-card-tile--foil .catalog-card-preview::before,
+.site-card-tile--foil .catalog-wishlist-image::before,
+.site-card-tile--foil .catalog-spotlight-image::before {
+    z-index: 2;
+    opacity: 0.72;
+
+    background:
+        linear-gradient(
+            115deg,
+            transparent 0%,
+            transparent 34%,
+            rgba(255, 255, 255, 0.50) 45%,
+            rgba(220, 235, 255, 0.24) 52%,
+            transparent 64%,
+            transparent 100%
+        );
+}
+
+
+/* =========================================================
+   Rainbow Foil
+   ---------------------------------------------------------
+   Rainbow border + faint rainbow streak.
+   ========================================================= */
+
+.site-card-tile--rainbow-foil .site-card-image-wrap,
+.site-card-tile--rainbow-foil .catalog-card-preview,
+.site-card-tile--rainbow-foil .catalog-wishlist-image,
+.site-card-tile--rainbow-foil .catalog-spotlight-image {
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.22),
+        0 0 16px rgba(255, 80, 180, 0.24),
+        0 0 24px rgba(0, 190, 255, 0.18);
+}
+
+/* Rainbow border ring */
+.site-card-tile--rainbow-foil .site-card-image-wrap::before,
+.site-card-tile--rainbow-foil .catalog-card-preview::before,
+.site-card-tile--rainbow-foil .catalog-wishlist-image::before,
+.site-card-tile--rainbow-foil .catalog-spotlight-image::before {
+    z-index: 2;
+    padding: 2px;
+    opacity: 0.95;
+
+    background:
+        linear-gradient(
+            130deg,
+            rgba(255, 70, 170, 0.95),
+            rgba(255, 185, 60, 0.95),
+            rgba(100, 230, 120, 0.95),
+            rgba(70, 200, 255, 0.95),
+            rgba(155, 95, 255, 0.95),
+            rgba(255, 70, 170, 0.95)
+        );
+
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+}
+
+/* Faint rainbow streak over the image */
+.site-card-tile--rainbow-foil .site-card-image-wrap::after,
+.site-card-tile--rainbow-foil .catalog-card-preview::after,
+.site-card-tile--rainbow-foil .catalog-wishlist-image::after,
+.site-card-tile--rainbow-foil .catalog-spotlight-image::after {
+    z-index: 3;
+    opacity: 0.9;
+
+    background:
+        linear-gradient(
+            115deg,
+            transparent 0%,
+            transparent 30%,
+            rgba(255, 60, 170, 0.16) 40%,
+            rgba(255, 190, 70, 0.16) 45%,
+            rgba(90, 230, 120, 0.16) 50%,
+            rgba(60, 200, 255, 0.16) 55%,
+            rgba(150, 90, 255, 0.16) 60%,
+            transparent 70%,
+            transparent 100%
+        );
+}
+
+.site-card-tile--rainbow-foil .site-card-image-wrap img,
+.site-card-tile--rainbow-foil .site-card-image,
+.site-card-tile--rainbow-foil .catalog-card-preview img,
+.site-card-tile--rainbow-foil .catalog-wishlist-image img,
+.site-card-tile--rainbow-foil .catalog-spotlight-image img {
+    filter: saturate(1.05) contrast(1.02);
+}
+
+
+/* =========================================================
+   Finish Badge
+   ========================================================= */
+
+.finish-badge {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    z-index: 10;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.25rem;
+
+    border-radius: 999px;
+    font-size: 0.58rem;
+    font-weight: 800;
+    line-height: 1;
+
+    background: rgba(10, 14, 22, 0.82);
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+}
+
+.finish-badge--foil {
+    color: #e8f0ff;
+}
+
+.finish-badge--rainbow {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.42);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+/* Larger badges on full-size collection views */
+.inventory-page .finish-badge,
+.trades-page .finish-badge,
+.card-display-page .finish-badge,
+.search-page .finish-badge {
+    top: 0.5rem;
+    right: 0.5rem;
+
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.35rem;
+
+    font-size: 0.68rem;
+}
+
+/* Smaller homepage/card-strip badges */
+.home-page .catalog-card-preview .finish-badge,
+.catalog-home-page .catalog-card-preview .finish-badge {
+    top: 0.22rem;
+    right: 0.22rem;
+
+    min-width: 0.95rem;
+    height: 0.95rem;
+    padding: 0 0.18rem;
+
+    font-size: 0.48rem;
+}
+
+.home-page .catalog-wishlist-image .finish-badge,
+.catalog-home-page .catalog-wishlist-image .finish-badge {
+    top: 0.28rem;
+    right: 0.28rem;
+
+    min-width: 1rem;
+    height: 1rem;
+    padding: 0 0.2rem;
+
+    font-size: 0.5rem;
+}
+
+.home-page .catalog-spotlight-image .finish-badge,
+.catalog-home-page .catalog-spotlight-image .finish-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+
+    font-size: 0.62rem;
+}
+
+/* =========================================================
+   Misc Card Badges / Markers
+   ========================================================= */
+
+.site-qty-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-left: 5px;
+    padding: 2px 6px;
+
+    color: #fff;
+    background-color: var(--site-border-strong, #444);
+    border: 1px solid var(--site-border-bright, #555);
+    border-radius: var(--site-radius-pill, 999px);
+
+    font-size: 0.8em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+.site-foil-marker {
+    color: var(--site-accent-gold, #ffca28);
 }

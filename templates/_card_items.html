@@ -1,14 +1,39 @@
 {% if cards and cards[0] %}
     {% for card in cards %}
         {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
-        {% set is_foil = card['finish'] == 'foil' %}
+        {% set finish = card['finish']|lower %}
+        {% set is_foil = finish == 'foil' %}
+        {% set is_rainbow_foil = finish == 'rainbow foil' %}
 
-        <article class="site-card-tile card_class {% if is_foil %}site-card-tile--foil{% endif %}">
+        <article
+            class="
+                site-card-tile
+                card_class
+                {% if is_foil %}site-card-tile--foil{% endif %}
+                {% if is_rainbow_foil %}site-card-tile--rainbow-foil{% endif %}
+            "
+            data-finish="{{ card['finish'] }}"
+        >
             {% if card['image_url'] %}
-                <div class="site-card-image-wrap {% if is_foil %}rainbow_image{% endif %}">
+                <div class="site-card-image-wrap">
+                    
+                    {% if is_foil or is_rainbow_foil %}
+                        <span
+                            class="finish-badge {% if is_rainbow_foil %}finish-badge--rainbow{% else %}finish-badge--foil{% endif %}"
+                            title="{% if is_rainbow_foil %}Rainbow foil{% else %}Foil{% endif %}"
+                            aria-label="{% if is_rainbow_foil %}Rainbow foil card{% else %}Foil card{% endif %}"
+                        >
+                            {% if is_rainbow_foil %}
+                                <span aria-hidden="true">🌈 ★</span>
+                            {% else %}
+                                <span aria-hidden="true">★</span>
+                            {% endif %}
+                        </span>
+                    {% endif %}
+
                     <img
                         src="{{ url_for('serve_card_image', filename=card['image_url']) }}"
-                        alt="{{ card['name'] }}"
+                        alt="{{ card['name'] }}{% if is_rainbow_foil %}, rainbow foil{% elif is_foil %}, foil{% endif %}"
                         class="site-card-image {% if is_admin_inventory %}site-card-image--editable{% endif %}"
                         {% if is_admin_inventory %}
                             onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}', this)"
@@ -20,26 +45,20 @@
                 </div>
             {% else %}
                 <div class="site-card-no-image no-image">No Image Available</div>
-            {% endif %}
+            {% endif %}        
 
-            <div class="site-card-label card-label">
-                <span class="site-card-name">{{ card['name'] }}</span>
-
-                {% if card['qty'] > 1 %}
-                    <span class="site-qty-badge qty-badge">x{{ card['qty'] }}</span>
-                {% endif %}
-
-                {% if is_foil %}
-                    <span class="site-foil-marker" title="Foil">★</span>
-                {% endif %}
-
-                <br>
-
-                <span class="site-card-meta card-meta">
+            <div class="site-card-tile__meta">
+                <h3 class="site-card-tile__name">
+                    {{ card['name'] }}
+                    {% if card['qty'] > 1 %}
+                        <span class="site-qty-badge qty-badge">x{{ card['qty'] }}</span>
+                    {% endif %}
+                </h3>
+                    
+                <p class="site-card-tile__printing">
                     ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
-                </span>
+                </p>
             </div>
-
             {% if view_mode == 'tracking' and current_user.is_authenticated %}
                 {% if card.old_price and card.old_price > 0 %}
                     {% set price_diff = card.new_price - card.old_price %}
@@ -73,6 +92,7 @@
                     </div>
                 {% endif %}
             {% endif %}
+
         </article>
     {% endfor %}
 {% elif view_mode == 'tracking' %}
