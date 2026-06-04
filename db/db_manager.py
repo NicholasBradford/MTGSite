@@ -126,24 +126,15 @@ class CardDB:
                 wish_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 scryfall_id TEXT,
                 finish TEXT,
-                priority INTEGER DEFAULT 1, -- 1-5 scale
+                priority INTEGER DEFAULT 1,
                 added DATETIME,
                 notes TEXT,
-                
+                non_specific INTEGER DEFAULT 0,
+
                 FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
             )
         ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS update_log (
-                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                task_name TEXT,              -- e.g., 'Midnight Price Sync'
-                cards_updated INTEGER,
-                status TEXT,                 -- 'Success' or 'Error'
-                message TEXT                 -- e.g., 'Updated 450 prices in 12s'
-            )
-        ''')
-        
+                
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS update_log (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,

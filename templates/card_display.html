@@ -264,6 +264,64 @@
             </div>
         {% endif %}
 
+        {% if view_mode == 'wishlist' and current_user.is_authenticated %}
+            <div id="wishlistEditModal" class="site-modal" hidden>
+                <div class="site-modal__panel site-accent-gold">
+                    <div class="site-modal__header">
+                        <h2>Edit Wishlist Item</h2>
+                        <button type="button" class="site-icon-button site-icon-button--neutral" onclick="closeWishlistEditModal()" aria-label="Close wishlist editor">
+                            ×
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="wishlistEditWishId">
+
+                    <div class="site-form-grid">
+                        <label class="site-form-field">
+                            <span>Finish</span>
+                            <select id="wishlistEditFinish" class="site-select">
+                                <option value="nonfoil">Nonfoil</option>
+                                <option value="foil">Foil</option>
+                                <option value="etched">Etched</option>
+                                <option value="rainbow foil">Rainbow Foil</option>
+                            </select>
+                        </label>
+
+                        <label class="site-form-field">
+                            <span>Priority</span>
+                            <select id="wishlistEditPriority" class="site-select">
+                                <option value="1">1 - Low</option>
+                                <option value="2">2</option>
+                                <option value="3">3 - Medium</option>
+                                <option value="4">4</option>
+                                <option value="5">5 - High</option>
+                            </select>
+                        </label>
+
+                        <label class="site-checkbox-row site-form-field site-form-field--checkbox">
+                            <input type="checkbox" id="wishlistEditNonSpecific">
+                            <span>Any printing is fine</span>
+                        </label>
+
+                        <label class="site-form-field site-form-field--wide">
+                            <span>Notes</span>
+                            <textarea id="wishlistEditNotes" class="site-textarea" rows="4"></textarea>
+                        </label>
+                    </div>
+
+                    <div class="site-modal__actions">
+                        <button type="button" class="site-button site-button--secondary" onclick="closeWishlistEditModal()">
+                            Cancel
+                        </button>
+                        <button type="button" class="site-button site-button--accent" onclick="saveWishlistEdit()">
+                            Save Wishlist Item
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+
         <div id="scroll-sentinel" class="site-scroll-sentinel"></div>
 
         <div id="loading-indicator" class="site-loading-indicator">
@@ -473,6 +531,71 @@ document.addEventListener("DOMContentLoaded", () => {
             syncDrawerState();
             buildCompiledSearchQuery();
             cleanEmptyFormFields();
+        });
+    }
+
+
+    window.openWishlistEditModalFromCard = function(cardEl) {
+        if (!cardEl) return;
+
+        const modal = document.getElementById("wishlistEditModal");
+        if (!modal) return;
+
+        document.getElementById("wishlistEditWishId").value = cardEl.dataset.wishId || "";
+        document.getElementById("wishlistEditFinish").value = cardEl.dataset.wishlistFinish || "nonfoil";
+        document.getElementById("wishlistEditPriority").value = cardEl.dataset.wishlistPriority || "1";
+        document.getElementById("wishlistEditNonSpecific").checked = cardEl.dataset.wishlistNonSpecific === "1";
+        document.getElementById("wishlistEditNotes").value = cardEl.dataset.wishlistNotes || "";
+
+        modal.hidden = false;
+    };
+
+    window.closeWishlistEditModal = function() {
+        const modal = document.getElementById("wishlistEditModal");
+        if (modal) {
+            modal.hidden = true;
+        }
+    };
+
+    window.saveWishlistEdit = async function() {
+        const wishId = document.getElementById("wishlistEditWishId")?.value;
+
+        if (!wishId) {
+            alert("No wishlist item selected.");
+            return;
+        }
+
+        const payload = {
+            finish: document.getElementById("wishlistEditFinish").value,
+            priority: document.getElementById("wishlistEditPriority").value,
+            non_specific: document.getElementById("wishlistEditNonSpecific").checked,
+            notes: document.getElementById("wishlistEditNotes").value
+        };
+
+        const response = await fetch(`/api/wishlist/update/${wishId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            alert(result.error || "Could not update wishlist item.");
+            return;
+        }
+
+        window.location.reload();
+    };
+
+    const wishlistModal = document.getElementById("wishlistEditModal");
+    if (wishlistModal) {
+        wishlistModal.addEventListener("click", event => {
+            if (event.target === wishlistModal) {
+                closeWishlistEditModal();
+            }
         });
     }
 

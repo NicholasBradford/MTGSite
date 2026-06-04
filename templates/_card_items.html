@@ -1,9 +1,11 @@
 {% if cards and cards[0] %}
     {% for card in cards %}
         {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
+        {% set is_wishlist_editable = current_user.is_authenticated and view_mode == 'wishlist' %}
         {% set finish = card['finish']|lower %}
         {% set is_foil = finish == 'foil' %}
         {% set is_rainbow_foil = finish == 'rainbow foil' %}
+        {% set is_non_specific = card['non_specific']|default(0) %}
 
         <article
             class="
@@ -11,12 +13,22 @@
                 card_class
                 {% if is_foil %}site-card-tile--foil{% endif %}
                 {% if is_rainbow_foil %}site-card-tile--rainbow-foil{% endif %}
+                {% if view_mode == 'wishlist' and wishlist_style != 'normal' %}site-card-tile--wishlist-{{ wishlist_style }}{% endif %}
+                {% if view_mode == 'wishlist' and is_non_specific %}site-card-tile--wishlist-any-printing{% endif %}
             "
             data-finish="{{ card['finish'] }}"
+            {% if is_wishlist_editable %}
+                data-wish-id="{{ card['wish_id'] }}"
+                data-wishlist-finish="{{ card['finish'] }}"
+                data-wishlist-priority="{{ card['priority']|default(1) }}"
+                data-wishlist-non-specific="{{ is_non_specific }}"
+                data-wishlist-display-style="{{ wishlist_style }}"
+                data-wishlist-notes="{{ card['notes']|default('', true)|e }}"
+            {% endif %}
         >
             {% if card['image_url'] %}
                 <div class="site-card-image-wrap">
-                    
+
                     {% if is_foil or is_rainbow_foil %}
                         <span
                             class="finish-badge {% if is_rainbow_foil %}finish-badge--rainbow{% else %}finish-badge--foil{% endif %}"
@@ -34,9 +46,11 @@
                     <img
                         src="{{ url_for('serve_card_image', filename=card['image_url']) }}"
                         alt="{{ card['name'] }}{% if is_rainbow_foil %}, rainbow foil{% elif is_foil %}, foil{% endif %}"
-                        class="site-card-image {% if is_admin_inventory %}site-card-image--editable{% endif %}"
+                        class="site-card-image {% if is_admin_inventory or is_wishlist_editable %}site-card-image--editable{% endif %}"
                         {% if is_admin_inventory %}
                             onclick="openEditModal('{{ card.instance_id }}', null, null, '{{ card.scryfall_id }}', '{{ card.finish }}', this)"
+                        {% elif is_wishlist_editable %}
+                            onclick="openWishlistEditModalFromCard(this.closest('.site-card-tile'))"
                         {% else %}
                             onclick="showPopup('{{ card['name'] }}')"
                         {% endif %}
@@ -54,9 +68,13 @@
                         <span class="site-qty-badge qty-badge">x{{ card['qty'] }}</span>
                     {% endif %}
                 </h3>
-                    
-                <p class="site-card-tile__printing">
-                    ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
+
+                <p class="site-card-tile__printing ">
+                    {% if view_mode == "wishlist" and is_non_specific %}
+                        Any Printing
+                    {% else %}
+                        ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
+                    {% endif %}
                 </p>
             </div>
             {% if view_mode == 'tracking' and current_user.is_authenticated %}

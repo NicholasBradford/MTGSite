@@ -91,6 +91,7 @@ def index():
                 w.finish,
                 w.priority,
                 w.notes,
+                w.non_specific,
                 cp.image_url,
                 cp.set_code,
                 cp.collector_number,

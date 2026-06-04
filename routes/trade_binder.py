@@ -214,65 +214,76 @@ def submit_trade():
 def wishlist():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
-    per_page = 50 
+    per_page = 50
     offset = (page - 1) * per_page
-    
+
     manager = CardDB()
 
     params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
 
-    count_query = f'''
+    count_query = f"""
         SELECT COUNT(*) FROM (
-            SELECT w.scryfall_id 
-            FROM wishlist w 
+            SELECT w.scryfall_id
+            FROM wishlist w
             JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
             JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
             {filter_sql}
-            GROUP BY w.scryfall_id, w.finish
+            GROUP BY
+                w.scryfall_id,
+                w.finish,
+                COALESCE(w.non_specific, 0)
             {having_sql}
         )
-    '''
+    """
     total_items = manager.cursor.execute(count_query, params + having_params).fetchone()[0]
-    total_pages = (total_items + per_page - 1) // per_page  
+    total_pages = (total_items + per_page - 1) // per_page
 
-    main_query = f'''
-        SELECT 
-            w.scryfall_id, 
-            w.wish_id, 
-            w.finish, 
-            cd.name, 
-            cp.image_url, 
-            cp.set_code, 
+    main_query = f"""
+        SELECT
+            w.scryfall_id,
+            w.wish_id,
+            w.finish,
+            COALESCE(w.priority, 1) AS priority,
+            COALESCE(w.notes, '') AS notes,
+            COALESCE(w.non_specific, 0) AS non_specific,
+
+            cd.name,
+            cp.image_url,
+            cp.set_code,
             cp.collector_number,
-            cd.type_line, 
+            cd.type_line,
             cd.color,
             cd.color_identity,
-            cd.cmc, 
+            cd.cmc,
             cd.mana_cost,
-            COUNT(w.wish_id) as qty,
-            CASE 
+
+            COUNT(w.wish_id) AS qty,
+
+            CASE
                 WHEN w.finish = 'foil' THEN cp.current_price_foil
-                WHEN w.finish = 'etched' THEN cp.current_price_foil 
-                ELSE cp.current_price 
-            END as price,
-            w.finish, COUNT(*) as qty 
+                WHEN w.finish = 'etched' THEN cp.current_price_foil
+                WHEN w.finish = 'rainbow foil' THEN cp.current_price_foil
+                ELSE cp.current_price
+            END AS price
         FROM wishlist w
         JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
         {filter_sql}
-        GROUP BY w.scryfall_id, w.finish
+        GROUP BY
+            w.scryfall_id,
+            w.finish,
+            COALESCE(w.non_specific, 0)
         {having_sql}
         ORDER BY {sort_sql}, CAST(cp.collector_number AS INTEGER) ASC, w.finish DESC
         LIMIT ? OFFSET ?
-    '''   
-    
-   
+    """
+
     cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
 
     manager.close()
 
     card_list = [dict(row) for row in cards]
-    
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         view_mode = request.headers.get("X-View-Mode", request.args.get("view_mode", "grid"))
 
@@ -288,11 +299,79 @@ def wishlist():
             cards=card_list,
             view_mode="wishlist",
         )
-    
-    return render_template('wishlist.html',cards=card_list, 
-                           view_mode="wishlist",
-                           page=page,
-                           total_pages=total_pages)
+
+    return render_template(
+        'wishlist.html',
+        cards=card_list,
+        view_mode="wishlist",
+        page=page,
+        total_pages=total_pages
+    )
+
+
+@trade_bp.route('/api/wishlist/update/<int:wish_id>', methods=['POST'])
+@login_required
+def update_wishlist_item(wish_id):
+    data = request.get_json() or {}
+
+    finish = data.get('finish', 'nonfoil')
+    priority = data.get('priority', 1)
+    notes = data.get('notes', '')
+    non_specific = 1 if data.get('non_specific') else 0
+
+    allowed_finishes = {'nonfoil', 'foil', 'etched', 'rainbow foil'}
+    allowed_styles = {'normal', 'high-priority', 'watching', 'flexible', 'low-priority'}
+
+    if finish not in allowed_finishes:
+        return jsonify({'success': False, 'error': 'Invalid finish.'}), 400
+
+    try:
+        priority = int(priority)
+    except (TypeError, ValueError):
+        priority = 1
+
+    priority = max(1, min(priority, 5))
+
+    manager = CardDB()
+
+    try:
+        result = manager.cursor.execute("""
+            UPDATE wishlist
+            SET
+                finish = ?,
+                priority = ?,
+                notes = ?,
+                non_specific = ?
+            WHERE wish_id = ?
+        """, (
+            finish,
+            priority,
+            notes,
+            non_specific,
+            wish_id
+        ))
+
+        if result.rowcount == 0:
+            manager.conn.rollback()
+            return jsonify({'success': False, 'error': 'Wishlist item not found.'}), 404
+
+        manager.conn.commit()
+
+        return jsonify({
+            'success': True,
+            'wish_id': wish_id,
+            'finish': finish,
+            'priority': priority,
+            'notes': notes,
+            'non_specific': non_specific,
+        })
+
+    except Exception as e:
+        manager.conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    finally:
+        manager.close()
 
 @trade_bp.route('/trade', methods=['GET'])
 def trade_page():

@@ -38,30 +38,40 @@ def set_gallery():
             SELECT
                 tc.set_code,
                 tc.oracle_id,
-                COUNT(i.instance_id) AS binder_count
+                COALESCE(binder_owned.binder_count, 0) AS binder_count
             FROM target_cards tc
-            LEFT JOIN binder_locations bl
-                ON bl.set_code = tc.set_code
-            LEFT JOIN inventory i
-                ON i.location_id = bl.binder_location_id
-            LEFT JOIN card_printings cp_inv
-                ON cp_inv.scryfall_id = i.scryfall_id
-               AND cp_inv.oracle_id = tc.oracle_id
-            GROUP BY tc.set_code, tc.oracle_id
+            LEFT JOIN (
+                SELECT
+                    bl.set_code,
+                    cp_inv.oracle_id,
+                    COUNT(i.instance_id) AS binder_count
+                FROM binder_locations bl
+                JOIN inventory i
+                    ON i.location_id = bl.binder_location_id
+                JOIN card_printings cp_inv
+                    ON cp_inv.scryfall_id = i.scryfall_id
+                GROUP BY bl.set_code, cp_inv.oracle_id
+            ) binder_owned
+                ON binder_owned.set_code = tc.set_code
+            AND binder_owned.oracle_id = tc.oracle_id
         ),
 
         total_counts AS (
             SELECT
                 tc.set_code,
                 tc.oracle_id,
-                COUNT(i.instance_id) AS total_owned
+                COALESCE(owned_counts.total_owned, 0) AS total_owned
             FROM target_cards tc
-            LEFT JOIN inventory i
-                ON 1 = 1
-            LEFT JOIN card_printings cp_inv
-                ON cp_inv.scryfall_id = i.scryfall_id
-               AND cp_inv.oracle_id = tc.oracle_id
-            GROUP BY tc.set_code, tc.oracle_id
+            LEFT JOIN (
+                SELECT
+                    cp_inv.oracle_id,
+                    COUNT(i.instance_id) AS total_owned
+                FROM inventory i
+                JOIN card_printings cp_inv
+                    ON cp_inv.scryfall_id = i.scryfall_id
+                GROUP BY cp_inv.oracle_id
+            ) owned_counts
+                ON owned_counts.oracle_id = tc.oracle_id
         ),
 
         set_completion AS (
@@ -118,9 +128,11 @@ def set_gallery():
                 s.set_code,
                 SUM(
                     CASE
-                        WHEN i.finish = 'foil'
-                          OR i.finish = 'etched'
-                          OR i.finish = 'rainbow_foil'
+                        WHEN LOWER(REPLACE(COALESCE(i.finish, ''), '_', ' ')) IN (
+                            'foil',
+                            'etched',
+                            'rainbow foil'
+                        )
                         THEN COALESCE(cp_val.current_price_foil, 0)
                         ELSE COALESCE(cp_val.current_price, 0)
                     END
@@ -246,29 +258,37 @@ def set_detail(set_code):
         binder_counts AS (
             SELECT
                 dp.oracle_id,
-                COUNT(cp_inv.scryfall_id) AS binder_count
+                COALESCE(binder_owned.binder_count, 0) AS binder_count
             FROM display_printings dp
-            LEFT JOIN binder_location bl
-                ON 1 = 1
-            LEFT JOIN inventory i
-                ON i.location_id = bl.location_id
-            LEFT JOIN card_printings cp_inv
-                ON cp_inv.scryfall_id = i.scryfall_id
-               AND cp_inv.oracle_id = dp.oracle_id
-            GROUP BY dp.oracle_id
+            LEFT JOIN (
+                SELECT
+                    cp_inv.oracle_id,
+                    COUNT(i.instance_id) AS binder_count
+                FROM inventory i
+                JOIN card_printings cp_inv
+                    ON cp_inv.scryfall_id = i.scryfall_id
+                JOIN binder_location bl
+                    ON i.location_id = bl.location_id
+                GROUP BY cp_inv.oracle_id
+            ) binder_owned
+                ON binder_owned.oracle_id = dp.oracle_id
         ),
 
         total_counts AS (
             SELECT
                 dp.oracle_id,
-                COUNT(cp_inv.scryfall_id) AS total_owned
+                COALESCE(owned_counts.total_owned, 0) AS total_owned
             FROM display_printings dp
-            LEFT JOIN inventory i
-                ON 1 = 1
-            LEFT JOIN card_printings cp_inv
-                ON cp_inv.scryfall_id = i.scryfall_id
-               AND cp_inv.oracle_id = dp.oracle_id
-            GROUP BY dp.oracle_id
+            LEFT JOIN (
+                SELECT
+                    cp_inv.oracle_id,
+                    COUNT(i.instance_id) AS total_owned
+                FROM inventory i
+                JOIN card_printings cp_inv
+                    ON cp_inv.scryfall_id = i.scryfall_id
+                GROUP BY cp_inv.oracle_id
+            ) owned_counts
+                ON owned_counts.oracle_id = dp.oracle_id
         ),
         
         location_summary AS (

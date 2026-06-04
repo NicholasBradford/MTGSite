@@ -412,3 +412,11 @@
 .site-foil-marker {
     color: var(--site-accent-gold, #ffca28);
 }
+
+.site-card-printing-badge--any {
+    border-color: var(--site-accent-gold, #ffca28);
+    color: var(--site-accent-gold, #ffca28);
+    background: rgba(255, 202, 40, 0.12);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}

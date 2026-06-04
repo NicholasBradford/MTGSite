@@ -229,11 +229,12 @@
             {% if wishlist_highlights %}
                 <div class="catalog-wishlist-list">
                     {% for card in wishlist_highlights %}
-                        <article class="catalog-wishlist-item">
-                            {% set finish = card.finish|default('')|lower %}
-                            {% set is_foil = finish == 'foil' %}
-                            {% set is_rainbow_foil = finish == 'rainbow foil' %}
+                        {% set is_non_specific = card.non_specific|default(0)|int %}
+                        {% set finish = card.finish|default('')|lower %}
+                        {% set is_foil = finish == 'foil' %}
+                        {% set is_rainbow_foil = finish == 'rainbow foil' %}
 
+                        <article class="catalog-wishlist-item">
                             <div
                                 class="
                                     catalog-wishlist-image
@@ -243,13 +244,13 @@
                                 "
                                 data-finish="{{ card.finish|default('') }}"
                             >
-
                                 <img
                                     src="{{ url_for('serve_card_image', filename=card.image_url) }}"
                                     alt="{{ card.name }}{% if is_rainbow_foil %}, rainbow foil{% elif is_foil %}, foil{% endif %}"
                                     loading="lazy"
                                 >
                             </div>
+
                             <div>
                                 <h3>
                                     {{ card.name }}
@@ -269,7 +270,13 @@
                                     {% endif %}
                                 </h3>
 
-                                <p>{{ card.set_code|upper }} #{{ card.collector_number }}</p>
+                                <p class="site-card-tile__printing">
+                                    {% if is_non_specific %}
+                                        Any Printing
+                                    {% else %}
+                                        ({{ card['set_code']|upper }} #{{ card['collector_number'] }})
+                                    {% endif %}
+                                </p>
 
                                 {% if card.priority %}
                                     <span class="catalog-priority-pill">Priority {{ card.priority }}</span>
