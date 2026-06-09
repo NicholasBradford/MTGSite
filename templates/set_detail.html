@@ -132,10 +132,12 @@
                 <strong>{{ card.name }}</strong><br>
                 <span style="opacity: 0.6;">#{{ card.collector_number }}</span>
 
-                {% if set.standard_legal and binder_count < 4 and card.can_complete_from_elsewhere %}
+                {% if set.standard_legal and binder_count < 4 and card.elsewhere_count > 0 %}
                     <br>
-                    <span title="{{ card.location_tooltip }}"
-                        style="opacity: 0.75; color: #64d8ff; font-size: 0.85em;">
+                    <span
+                        title="{{ card.location_tooltip }}"
+                        style="opacity: 0.75; color: #64d8ff; font-size: 0.85em;"
+                    >
                         {{ card.elsewhere_count }} elsewhere
                     </span>
                 {% endif %}

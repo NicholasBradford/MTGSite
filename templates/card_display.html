@@ -286,17 +286,39 @@
                                 <option value="rainbow foil">Rainbow Foil</option>
                             </select>
                         </label>
+                        <div class="inventory-field inventory-field-special-price">
+                            <label class="site-form-field">
+                                <span>Priority</span>
+                                <select id="wishlistEditPriority" class="site-select">
+                                    <option value="1">1 - Low</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3 - Medium</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5 - High</option>
+                                </select>
+                            </label>
 
-                        <label class="site-form-field">
-                            <span>Priority</span>
-                            <select id="wishlistEditPriority" class="site-select">
-                                <option value="1">1 - Low</option>
-                                <option value="2">2</option>
-                                <option value="3">3 - Medium</option>
-                                <option value="4">4</option>
-                                <option value="5">5 - High</option>
-                            </select>
-                        </label>
+                            <div class="site-form-field">
+                                <span>Remove</span>
+
+                                <form
+                                    id="wishlistDeleteForm"
+                                    class="delete-form"
+                                    action="{{ url_for('admin.delete_wish', wish_id=0) }}"
+                                    method="POST"
+                                    onsubmit="return confirm('Remove this card from your wishlist?');"
+                                >
+                                    <button
+                                        type="submit"
+                                        class="inventory-delete-btn"
+                                        aria-label="Remove wishlist card"
+                                        title="Remove wishlist card"
+                                    >
+                                        &times;
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
 
                         <label class="site-checkbox-row site-form-field site-form-field--checkbox">
                             <input type="checkbox" id="wishlistEditNonSpecific">
@@ -342,6 +364,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("drawer_state") ||
         document.getElementById("drawer_state_open");
     const compiledSearchInput = document.getElementById("compiledSearchQuery");
+    const baseDeleteUrl = "{{ url_for('admin.delete_wish', wish_id=0) }}";
 
     const sentinel = document.getElementById("scroll-sentinel");
     const loader = document.getElementById("loading-indicator");
@@ -540,12 +563,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const modal = document.getElementById("wishlistEditModal");
         if (!modal) return;
+        const wishId = cardEl.dataset.wishId || "";
 
-        document.getElementById("wishlistEditWishId").value = cardEl.dataset.wishId || "";
+        document.getElementById("wishlistEditWishId").value = wishId;
         document.getElementById("wishlistEditFinish").value = cardEl.dataset.wishlistFinish || "nonfoil";
         document.getElementById("wishlistEditPriority").value = cardEl.dataset.wishlistPriority || "1";
         document.getElementById("wishlistEditNonSpecific").checked = cardEl.dataset.wishlistNonSpecific === "1";
         document.getElementById("wishlistEditNotes").value = cardEl.dataset.wishlistNotes || "";
+
+        const deleteForm = document.getElementById("wishlistDeleteForm");
+        if (deleteForm) {
+            deleteForm.action = baseDeleteUrl.replace("/0", `/${wishId}`);
+        }
 
         modal.hidden = false;
     };
@@ -560,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.saveWishlistEdit = async function() {
         const wishId = document.getElementById("wishlistEditWishId")?.value;
 
-        if (!wishId) {
+        if (!wishId || wishId === "0") {
             alert("No wishlist item selected.");
             return;
         }

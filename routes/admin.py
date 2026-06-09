@@ -576,23 +576,33 @@ def wishlist_add():
 
     query = '''
         SELECT 
-        w.wish_id, 
-        cd.name, 
-        cp.set_code, 
-        cp.collector_number,
-        w.added, 
-        w.finish, 
-        ph.price_usd as nonfoil, 
-        ph.price_foil as foil
+            w.wish_id, 
+            cd.name, 
+            cp.set_code, 
+            cp.collector_number,
+            w.added, 
+            w.finish,
+
+            ph.price_usd AS nonfoil, 
+            ph.price_foil AS foil,
+
+            cp.current_price AS current_nonfoil,
+            cp.current_price_foil AS current_foil
+
         FROM wishlist w
-        JOIN card_printings cp ON w.scryfall_id = cp.scryfall_id
-        JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
-        JOIN price_history ph ON ph.scryfall_id = cp.scryfall_id
-        WHERE ph.scraped_At = (
-            SELECT MAX(scraped_at) 
-            FROM price_history 
-            WHERE scryfall_id = cp.scryfall_id
+        JOIN card_printings cp
+            ON w.scryfall_id = cp.scryfall_id
+        JOIN card_definitions cd
+            ON cp.oracle_id = cd.oracle_id
+
+        LEFT JOIN price_history ph
+            ON ph.scryfall_id = cp.scryfall_id
+        AND ph.scraped_at = (
+                SELECT MAX(ph2.scraped_at)
+                FROM price_history ph2
+                WHERE ph2.scryfall_id = cp.scryfall_id
         )
+
         ORDER BY w.added DESC
     '''
     
