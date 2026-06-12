@@ -1,8 +1,9 @@
 import sqlite3, ScryfallFetcher, db.db_manager, datetime, csv, os, math
 from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, session, current_app
-from db.db_manager import CardDB
+from db.db_manager import get_db
 from flask_login import login_required, current_user
 from io import TextIOWrapper
+from functools import wraps
 
 def get_db_connection():
     # Points to your db folder
@@ -12,14 +13,21 @@ def get_db_connection():
 
 adder_bp = Blueprint('adder', __name__)
 
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            return "Access Denied", 403
+        return f(*args, **kwargs)
+
+    return decorated_function
+
 @adder_bp.route('/add/inventory', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def adder():
-    
-    if current_user.role != 'admin':
-        return "Access Denied", 403
-    
-    manager = CardDB()
+    manager = get_db()
     fetcher = ScryfallFetcher.ScryfallFetcher(manager)
     
     page = int(request.args.get('page', 1))
@@ -139,8 +147,10 @@ def adder():
                            last_set_code=last_set_code)
 
 @adder_bp.route('/delete_card/<int:inventory_id>', methods=['POST'])
+@login_required
+@admin_required
 def delete_card(inventory_id):
-    manager = CardDB()
+    manager = get_db()
     try:
         # 1. Get the set_code of the card BEFORE deleting it
         # This allows us to check the set's status after the card is gone
@@ -178,13 +188,14 @@ def delete_card(inventory_id):
     finally:
         manager.close()
     
-    return redirect(request.referrer or url_for('index'))
+    return redirect(request.referrer or url_for('.adder'))
 
 # Route 1: To VIEW the page
 @adder_bp.route('/add/inventory/bulk', methods=['GET'])
 @login_required
+@admin_required
 def bulk_import_page():
-    manager = CardDB()
+    manager = get_db()
     # Fetch locations so the user can select a default for the CSV rows
     locations = manager.cursor.execute("SELECT * FROM locations").fetchall()
     manager.close()
@@ -193,11 +204,8 @@ def bulk_import_page():
 # Route 2: To PROCESS the file
 @adder_bp.route('/add/inventory/bulk', methods=['POST'])
 @login_required
+@admin_required
 def bulk_import_action():
-    # 1. Admin check (from your adder logic)
-    if current_user.role != 'admin':
-        return "Access Denied", 403
-
     if 'file' not in request.files:
         return redirect(url_for('.bulk_import_page'))
     
@@ -210,8 +218,10 @@ def bulk_import_action():
         csv_file = TextIOWrapper(file.stream, encoding='utf-8')
         reader = csv.DictReader(csv_file)
         
-        manager = CardDB()
-        fetcher = ScryfallFetcher.ScryfallFetcher(manager)
+        manager = get_db()
+        # Bulk import still skips per-card full-set sync checks, but preserves
+        # import-time pricing behavior via fetcher defaults.
+        fetcher = ScryfallFetcher.ScryfallFetcher(manager, setting=1)
 
         # Helper function to dynamically get or create locations
         def get_loc(loc_name):
@@ -321,8 +331,8 @@ def bulk_import_action():
                                             "UPDATE inventory SET location_id = ? WHERE instance_id = ?",
                                             (bulk_loc_id, kick_target['instance_id'])
                                         )
-                                        # Save the kick immediately so the counts update correctly
-                                        manager.commit() 
+                                        # Keep changes in the same transaction; SQLite sees
+                                        # uncommitted writes on this connection.
                                     
                                     assigned_loc_id = binder_loc_id
                                 else:
@@ -352,8 +362,9 @@ def bulk_import_action():
                             datetime.datetime.now(), 
                             surplus_val
                         ))
-                        # We commit inside the loop so if qty=4, the queries correctly see the count go 1, 2, 3, 4!
-                        manager.commit()
+                        # Commit once at the end for better bulk import throughput.
+
+            manager.commit()
                         
         except Exception as e:
             print(f"Bulk Import Error: {e}")

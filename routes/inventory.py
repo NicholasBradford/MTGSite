@@ -4,15 +4,11 @@ from db.db_manager import get_db
 from search import search
 import sqlite3, ScryfallFetcher, db.db_manager, re
 from services.tcgcsv_prices import (
+    TCGCSV_SOURCE_LOCAL_ONLY,
     normalize_finish,
     search_tcgcsv_products_for_finish,
     update_single_card_price_from_tcgcsv,
 )
-
-try:
-    from services.tcgcsv_prices import TCGCSV_SOURCE_LOCAL_ONLY
-except ImportError:
-    TCGCSV_SOURCE_LOCAL_ONLY = "local_only"
 
 sort_options = {
         'name': """

@@ -1,273 +1,117 @@
-import requests, time, shutil, os
-from datetime import timedelta,datetime
-from services.tcgcsv_prices import update_single_card_price_from_tcgcsv
+import os
+import shutil
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+import requests
+
+from services.tcgcsv_prices import (
+    TCGCSV_SOURCE_LOCAL_ONLY,
+    update_prices_for_scryfall_ids_from_tcgcsv,
+    update_single_card_price_from_tcgcsv,
+)
 
 # Global headers for Scryfall API compliance
-headers = {'User-Agent': 'Mozilla/5.0 (MTG-Collection-Tracker/1.0)'}
+headers = {'User-Agent': 'Mozilla/5.0 (MTG-Collection-Tracker/1.0)', 'Accept': 'application/json'}
 IMAGE_PATH = os.environ.get('IMAGE_PATH')
-class ScryfallFetcher:
-    def __init__(self, db_manager, setting = 0):
-        self.db = db_manager
-        self.setting = setting
+
+SCRYFALL_TIMEOUT_SECONDS = 20
+IMAGE_TIMEOUT_SECONDS = 10
+RATE_LIMIT_DELAY_SECONDS = 0.1
+
+
+@dataclass
+class NormalizedCard:
+    scryfall_id: str
+    oracle_id: str
+    set_code: str
+    collector_number: str
+    rarity: str
+    local_img_path: str
+    name: str
+    mana_cost: str
+    cmc: float
+    type_line: str
+    oracle_text: str
+    color: str
+    color_identity: str
+    tcgplayer_id: int
+    tcgplayer_etched_id: int
+
+
+class ScryfallApiClient:
+    def __init__(self):
         self.base_url = "https://api.scryfall.com/cards"
-        self.image_dir = f"{IMAGE_PATH}/img/cards"
-        self.icon_dir = f"{IMAGE_PATH}/img/icons"
-        
-        # Ensure directories exist
-        for directory in [self.image_dir, self.icon_dir]:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-    
-    def ensure_set_is_fully_populated(self, set_code):
-        """Checks if a set is in the DB; if not, pulls every card printing for that set."""
-        set_code = set_code.lower()
-        
-        # 1. Check if we have already processed this set (either downloaded or skipped)
-        self.db.cursor.execute("SELECT set_code FROM sets WHERE set_code = ?", (set_code,))
-        if self.db.cursor.fetchone():
-            return 
 
-        # 2. Fetch Set Metadata
-        set_res = requests.get(f"https://api.scryfall.com/sets/{set_code}", headers=headers)
-        if set_res.status_code != 200:
-            return
-            
-        set_data = set_res.json()
-        
-        # 3. Determine eligibility
-        set_type = set_data.get('set_type')
-        is_expansion = (set_type == 'expansion') or (set_type == 'core')
-        release_date_str = set_data.get('released_at')
-        is_recent = False
-        
-        if release_date_str:
-            release_date = datetime.strptime(release_date_str, '%Y-%m-%d')
-            three_years_ago = datetime.now() - timedelta(days=1095)
-            is_recent = release_date > three_years_ago
-        
-        is_standard_legal = 1 if (is_expansion and is_recent) else 0
-        # 4. Handle Icon Download (Common for both skipped and synced sets)
-        icon_url = set_data.get('icon_svg_uri')
-        local_icon_path = f"img/icons/{set_code}.svg"
-        full_fs_path = os.path.join(IMAGE_PATH, local_icon_path)
-        
-        if icon_url and not os.path.exists(full_fs_path):
-            os.makedirs(os.path.dirname(full_fs_path), exist_ok=True)
-            img_res = requests.get(icon_url, headers=headers)
-            if img_res.status_code == 200:
-                with open(full_fs_path, 'wb') as f:
-                    f.write(img_res.content)
-
-        # 5. Insert set into 'sets' table immediately 
-        # This ensures we don't re-query Scryfall for metadata on skipped sets
-        self.db.cursor.execute("""
-            INSERT OR REPLACE INTO sets (set_code, set_name, set_type, standard_legal, released_at, icon_svg_uri) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (set_code, set_data['name'], set_type, is_standard_legal, set_data.get('released_at'), local_icon_path))
-        self.db.commit()
-
-        # 6. Exit early if it doesn't meet your "Bulk Download" criteria
-        if not (is_expansion and is_recent):
-            print(f"Skipping bulk card download for {set_code.upper()} (Not a recent expansion).")
-            return
-
-        print(f"Standard Expansion confirmed: {set_code.upper()}. Syncing all cards...")
-        
-        # 7. Fetch EVERY card printing (excluding basic lands)
-        search_url = f"https://api.scryfall.com/cards/search?q=set:{set_code}+-type:basic&unique=prints"
-        
-        while search_url:
-            cards_res = requests.get(search_url, headers=headers)
-            if cards_res.status_code != 200:
-                break
-                
-            cards_data = cards_res.json()
-            for card in cards_data.get('data', []):
-                scryfall_id = card.get('id')
-                oracle_id = card.get('oracle_id')
-                if not oracle_id and 'card_faces' in card and len(card['card_faces']) > 0:
-                    oracle_id = card['card_faces'][0].get('oracle_id')
-                if 'image_uris' in card:
-                    image_url = card.get('image_uris', {}).get('normal', '')
-                elif 'card_faces' in card:
-                    # Gets the image of the front face (Peter Parker)
-                    image_url = card['card_faces'][0]['image_uris']['normal']
-                # Setup Paths
-                local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
-                full_fs_path = os.path.join(IMAGE_PATH, local_img_path)
-
-                # 1. Download Image locally if it doesn't exist
-                if image_url and not os.path.exists(full_fs_path):
-                    os.makedirs(os.path.dirname(full_fs_path), exist_ok=True)
-                    try:
-                        with requests.get(image_url, stream=True, headers=headers, timeout=10) as img_res:
-                            if img_res.status_code == 200:
-                                with open(full_fs_path, 'wb') as f:
-                                    shutil.copyfileobj(img_res.raw, f)
-                                time.sleep(0.1) # Be a good citizen
-                    except Exception as e:
-                        print(f"Error downloading {card.get('name')}: {e}")
-
-                name = card.get('name')
-                cmc = card.get('cmc', 0.0)
-                color = "".join(card.get('colors', []))
-                color_identity = "".join(card.get('color_identity', []))
-                tcgplayer_id = card.get("tcgplayer_id")
-                tcgplayer_etched_id = card.get("tcgplayer_etched_id")
-                
-                # These often go missing on double-faced cards
-                mana_cost = card.get('mana_cost')
-                type_line = card.get('type_line')
-                oracle_text = card.get('oracle_text')
-
-                # 2. The DFC Fallback
-                if 'card_faces' in card and len(card['card_faces']) > 0:
-                    face = card['card_faces'][0] # Look at the front face
-                    
-                    # If the root was empty, grab it from the face
-                    if not mana_cost: 
-                        mana_cost = face.get('mana_cost')
-                    if not type_line: 
-                        type_line = face.get('type_line')
-                    if not oracle_text: 
-                        # Combine both faces of oracle text so your search finds everything!
-                        front_text = face.get('oracle_text', '')
-                        back_text = card['card_faces'][1].get('oracle_text', '') if len(card['card_faces']) > 1 else ''
-                        
-                        if back_text:
-                            oracle_text = f"{front_text} // {back_text}"
-                        else:
-                            oracle_text = front_text
-
-                # 3. The Clean Insert
-                self.db.cursor.execute("""
-                    INSERT OR IGNORE INTO card_definitions 
-                    (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity
-                ))
-
-                # 3. B. Populate card_printings with the LOCAL path
-                self.db.cursor.execute("""
-                    INSERT OR IGNORE INTO card_printings 
-                        (
-                            scryfall_id,
-                            oracle_id,
-                            set_code,
-                            collector_number,
-                            rarity,
-                            image_url,
-                            tcgplayer_id,
-                            tcgplayer_etched_id
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(scryfall_id) DO UPDATE SET
-                            oracle_id = excluded.oracle_id,
-                            set_code = excluded.set_code,
-                            collector_number = excluded.collector_number,
-                            rarity = excluded.rarity,
-                            image_url = excluded.image_url,
-                            tcgplayer_id = COALESCE(excluded.tcgplayer_id, card_printings.tcgplayer_id),
-                            tcgplayer_etched_id = COALESCE(excluded.tcgplayer_etched_id, card_printings.tcgplayer_etched_id)
-                    """, (
-                        scryfall_id,
-                        oracle_id,
-                        set_code,
-                        card.get("collector_number"),
-                        card.get("rarity"),
-                        local_img_path,
-                        tcgplayer_id,
-                        tcgplayer_etched_id
-                    ))
-
-            search_url = cards_data.get('next_page')
-            if search_url:
-                time.sleep(0.1)
-
-        self.db.commit()
-        print(f"Set {set_code.upper()} fully synchronized.")
-
-    def fetch_and_add(self, set_code, collector_number):     
-        set_code = set_code.lower()
-        # Trigger the full set sync first to ensure checklist is ready
-        if self.setting == 0:
-            self.ensure_set_is_fully_populated(set_code)
-
-        # 1. Request the specific card from Scryfall
-        url = f"{self.base_url}/{set_code}/{collector_number}"
-        response = requests.get(url, headers=headers)
-        
+    def _request_json(self, url):
+        response = requests.get(url, headers=headers, timeout=SCRYFALL_TIMEOUT_SECONDS)
         if response.status_code != 200:
-            print(f"Error: Could not find {set_code} {collector_number}")
-            return False
+            return None
+        return response.json()
 
-        data = response.json()
-        scryfall_id = data.get('id')
-        
-        oracle_id = data.get('oracle_id')
-        if not oracle_id and 'card_faces' in data and len(data['card_faces']) > 0:
-            oracle_id = data['card_faces'][0].get('oracle_id')
-        
-        img_url = "" 
-        if 'image_uris' in data:
-            img_url = data.get('image_uris', {}).get('normal', '')
-        elif 'card_faces' in data and len(data['card_faces']) > 0:
-            img_url = data['card_faces'][0].get('image_uris', {}).get('normal', '')
-            
-        local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
-        full_img_fs_path = os.path.join(IMAGE_PATH, local_img_path)
-        
-        if img_url and not os.path.exists(full_img_fs_path):
-            os.makedirs(os.path.dirname(full_img_fs_path), exist_ok=True)
-            img_res = requests.get(img_url, stream=True)
-            if img_res.status_code == 200:
-                with open(full_img_fs_path, 'wb') as f:
-                    shutil.copyfileobj(img_res.raw, f)
-         
-        # prices = data.get('prices', {})        
-        # non_foil_price = prices.get("usd")
-        # foil_price = prices.get("usd_foil")
-        name = data.get('name')
-        cmc = data.get('cmc', 0.0)
-        color = "".join(data.get('colors', []))
-        color_identity = "".join(data.get('color_identity', []))
-        tcgplayer_id = data.get("tcgplayer_id")
-        tcgplayer_etched_id = data.get("tcgplayer_etched_id")
-        
-        # These often go missing on double-faced cards
-        mana_cost = data.get('mana_cost')
-        type_line = data.get('type_line')
-        oracle_text = data.get('oracle_text')
-        
-        # 3. DB Transaction
-        try:
-            if 'card_faces' in data and len(data['card_faces']) > 0:
-                face = data['card_faces'][0] 
-                if not mana_cost: 
-                    mana_cost = face.get('mana_cost')
-                if not type_line: 
-                    type_line = face.get('type_line')
-                if not oracle_text: 
-                    front_text = face.get('oracle_text', '')
-                    back_text = data['card_faces'][1].get('oracle_text', '') if len(data['card_faces']) > 1 else ''
-                    
-                    if back_text:
-                        oracle_text = f"{front_text} // {back_text}"
-                    else:
-                        oracle_text = front_text
+    def get_set(self, set_code):
+        return self._request_json(f"https://api.scryfall.com/sets/{set_code}")
 
-            self.db.cursor.execute("""
-                INSERT OR IGNORE INTO card_definitions 
-                (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity
-            ))
-            
+    def get_card_by_set_collector(self, set_code, collector_number):
+        return self._request_json(f"{self.base_url}/{set_code}/{collector_number}")
 
-            self.db.cursor.execute("""
-                INSERT OR IGNORE INTO card_printings 
+    def iter_set_cards(self, set_code):
+        search_url = f"https://api.scryfall.com/cards/search?q=set:{set_code}+-type:basic&unique=prints"
+
+        while search_url:
+            page = self._request_json(search_url)
+            if not page:
+                break
+
+            for card in page.get('data', []):
+                yield card
+
+            search_url = page.get('next_page')
+            if search_url:
+                time.sleep(RATE_LIMIT_DELAY_SECONDS)
+
+
+class CardPersistenceService:
+    def __init__(self, db_manager):
+        self.db = db_manager
+
+    def set_exists(self, set_code):
+        self.db.cursor.execute("SELECT set_code FROM sets WHERE set_code = ?", (set_code,))
+        return self.db.cursor.fetchone() is not None
+
+    def upsert_set(self, set_code, set_data, is_standard_legal, local_icon_path):
+        self.db.cursor.execute("""
+            INSERT OR REPLACE INTO sets (set_code, set_name, set_type, standard_legal, released_at, icon_svg_uri)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            set_code,
+            set_data['name'],
+            set_data.get('set_type'),
+            is_standard_legal,
+            set_data.get('released_at'),
+            local_icon_path,
+        ))
+
+    def upsert_card_definition(self, card):
+        self.db.cursor.execute("""
+            INSERT OR IGNORE INTO card_definitions
+            (oracle_id, name, mana_cost, cmc, type_line, oracle_text, color, color_identity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            card.oracle_id,
+            card.name,
+            card.mana_cost,
+            card.cmc,
+            card.type_line,
+            card.oracle_text,
+            card.color,
+            card.color_identity,
+        ))
+
+    def upsert_card_printing(self, card):
+        self.db.cursor.execute("""
+            INSERT OR IGNORE INTO card_printings
                 (
                     scryfall_id,
                     oracle_id,
@@ -279,26 +123,278 @@ class ScryfallFetcher:
                     tcgplayer_etched_id
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                scryfall_id,
-                oracle_id,
-                set_code,
-                data.get("collector_number"),
-                data.get("rarity"),
-                local_img_path,
-                tcgplayer_id,
-                tcgplayer_etched_id
-            ))
+                ON CONFLICT(scryfall_id) DO UPDATE SET
+                    oracle_id = excluded.oracle_id,
+                    set_code = excluded.set_code,
+                    collector_number = excluded.collector_number,
+                    rarity = excluded.rarity,
+                    image_url = excluded.image_url,
+                    tcgplayer_id = COALESCE(excluded.tcgplayer_id, card_printings.tcgplayer_id),
+                    tcgplayer_etched_id = COALESCE(excluded.tcgplayer_etched_id, card_printings.tcgplayer_etched_id)
+        """, (
+            card.scryfall_id,
+            card.oracle_id,
+            card.set_code,
+            card.collector_number,
+            card.rarity,
+            card.local_img_path,
+            card.tcgplayer_id,
+            card.tcgplayer_etched_id,
+        ))
+
+    def commit(self):
+        self.db.commit()
+
+
+class ScryfallOrchestrator:
+    def __init__(self, db_manager, api_client, persistence, image_path=None):
+        self.db = db_manager
+        self.api = api_client
+        self.persistence = persistence
+        self.image_path = image_path or IMAGE_PATH or os.environ.get('IMAGE_PATH') or os.path.join('static', 'images')
+
+    def _download_binary(self, url, destination_path, stream=False):
+        if not url or os.path.exists(destination_path):
+            return
+
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+        try:
+            if stream:
+                with requests.get(url, stream=True, headers=headers, timeout=IMAGE_TIMEOUT_SECONDS) as response:
+                    if response.status_code == 200:
+                        with open(destination_path, 'wb') as file_handle:
+                            shutil.copyfileobj(response.raw, file_handle)
+            else:
+                response = requests.get(url, headers=headers, timeout=IMAGE_TIMEOUT_SECONDS)
+                if response.status_code == 200:
+                    with open(destination_path, 'wb') as file_handle:
+                        file_handle.write(response.content)
+        except Exception as error:
+            print(f"Asset download skipped for {destination_path}: {error}")
+
+    def _extract_oracle_id(self, card_payload):
+        oracle_id = card_payload.get('oracle_id')
+        if oracle_id:
+            return oracle_id
+
+        faces = card_payload.get('card_faces') or []
+        if faces:
+            return faces[0].get('oracle_id')
+
+        return None
+
+    def _extract_image_url(self, card_payload):
+        if card_payload.get('image_uris'):
+            return card_payload.get('image_uris', {}).get('normal', '')
+
+        faces = card_payload.get('card_faces') or []
+        if faces:
+            return faces[0].get('image_uris', {}).get('normal', '')
+
+        return ''
+
+    def _extract_text_fields(self, card_payload):
+        mana_cost = card_payload.get('mana_cost')
+        type_line = card_payload.get('type_line')
+        oracle_text = card_payload.get('oracle_text')
+
+        faces = card_payload.get('card_faces') or []
+        if not faces:
+            return mana_cost, type_line, oracle_text
+
+        face = faces[0]
+        if not mana_cost:
+            mana_cost = face.get('mana_cost')
+        if not type_line:
+            type_line = face.get('type_line')
+        if not oracle_text:
+            front_text = face.get('oracle_text', '')
+            back_text = faces[1].get('oracle_text', '') if len(faces) > 1 else ''
+            oracle_text = f"{front_text} // {back_text}" if back_text else front_text
+
+        return mana_cost, type_line, oracle_text
+
+    def _normalize_card(self, card_payload, set_code):
+        scryfall_id = card_payload.get('id')
+        oracle_id = self._extract_oracle_id(card_payload)
+        if not scryfall_id or not oracle_id:
+            return None
+
+        image_url = self._extract_image_url(card_payload)
+        local_img_path = f"img/cards/{set_code}/{scryfall_id}.jpg"
+        full_img_path = os.path.join(self.image_path, local_img_path)
+
+        if image_url:
+            self._download_binary(image_url, full_img_path, stream=True)
+
+        mana_cost, type_line, oracle_text = self._extract_text_fields(card_payload)
+
+        return NormalizedCard(
+            scryfall_id=scryfall_id,
+            oracle_id=oracle_id,
+            set_code=set_code,
+            collector_number=card_payload.get('collector_number'),
+            rarity=card_payload.get('rarity'),
+            local_img_path=local_img_path,
+            name=card_payload.get('name'),
+            mana_cost=mana_cost,
+            cmc=card_payload.get('cmc', 0.0),
+            type_line=type_line,
+            oracle_text=oracle_text,
+            color="".join(card_payload.get('colors', [])),
+            color_identity="".join(card_payload.get('color_identity', [])),
+            tcgplayer_id=card_payload.get('tcgplayer_id'),
+            tcgplayer_etched_id=card_payload.get('tcgplayer_etched_id'),
+        )
+
+    def _update_batch_prices(self, scryfall_ids):
+        try:
+            updated_count = update_prices_for_scryfall_ids_from_tcgcsv(
+                self.db,
+                scryfall_ids,
+                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                allow_remote_group_lookup=False,
+            )
+            self.persistence.commit()
+            return updated_count
+        except Exception as error:
+            print(f"TCGCSV batch price sync skipped: {error}")
+            return 0
+
+    def ensure_set_is_fully_populated(self, set_code):
+        result = {
+            'set_code': set_code,
+            'set_inserted': False,
+            'cards_synced': 0,
+            'cards_failed': 0,
+            'prices_updated': 0,
+            'skipped': False,
+        }
+
+        if self.persistence.set_exists(set_code):
+            result['skipped'] = True
+            return result
+
+        set_data = self.api.get_set(set_code)
+        if not set_data:
+            result['skipped'] = True
+            return result
+
+        set_type = set_data.get('set_type')
+        is_expansion = set_type in {'expansion', 'core'}
+        release_date_str = set_data.get('released_at')
+        is_recent = False
+
+        if release_date_str:
+            release_date = datetime.strptime(release_date_str, '%Y-%m-%d')
+            is_recent = release_date > (datetime.now() - timedelta(days=1095))
+
+        is_standard_legal = 1 if (is_expansion and is_recent) else 0
+
+        icon_url = set_data.get('icon_svg_uri')
+        local_icon_path = f"img/icons/{set_code}.svg"
+        icon_full_path = os.path.join(self.image_path, local_icon_path)
+        if icon_url:
+            self._download_binary(icon_url, icon_full_path, stream=False)
+
+        self.persistence.upsert_set(set_code, set_data, is_standard_legal, local_icon_path)
+        self.persistence.commit()
+        result['set_inserted'] = True
+
+        if not (is_expansion and is_recent):
+            print(f"Skipping bulk card download for {set_code.upper()} (Not a recent expansion).")
+            result['skipped'] = True
+            return result
+
+        print(f"Standard Expansion confirmed: {set_code.upper()}. Syncing all cards...")
+        imported_ids = []
+
+        for raw_card in self.api.iter_set_cards(set_code):
+            normalized = self._normalize_card(raw_card, set_code)
+            if not normalized:
+                result['cards_failed'] += 1
+                continue
 
             try:
-                update_single_card_price_from_tcgcsv(self.db, scryfall_id)
-                self.db.commit()
-            except Exception as e:
-                print(f"TCGCSV price update skipped for {scryfall_id}: {e}")
+                self.persistence.upsert_card_definition(normalized)
+                self.persistence.upsert_card_printing(normalized)
+                imported_ids.append(normalized.scryfall_id)
+                result['cards_synced'] += 1
+            except Exception as error:
+                result['cards_failed'] += 1
+                print(f"Card persistence skipped for {raw_card.get('name', 'unknown')}: {error}")
 
-            time.sleep(0.1)
-            return scryfall_id
+        self.persistence.commit()
+        result['prices_updated'] = self._update_batch_prices(imported_ids)
+        print(f"Set {set_code.upper()} fully synchronized.")
+        return result
 
-        except Exception as e:
-            print(f"DB Error: {e}")
+    def fetch_and_add(self, set_code, collector_number, sync_prices=True):
+        data = self.api.get_card_by_set_collector(set_code, collector_number)
+        if not data:
+            print(f"Error: Could not find {set_code} {collector_number}")
             return False
+
+        normalized = self._normalize_card(data, set_code)
+        if not normalized:
+            print(f"Error: Missing oracle_id/scryfall_id for {set_code} {collector_number}")
+            return False
+
+        try:
+            self.persistence.upsert_card_definition(normalized)
+            self.persistence.upsert_card_printing(normalized)
+            self.persistence.commit()
+
+            if sync_prices:
+                try:
+                    updated = update_prices_for_scryfall_ids_from_tcgcsv(
+                        self.db,
+                        [normalized.scryfall_id],
+                        data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                        allow_remote_group_lookup=False,
+                    )
+                    if not updated:
+                        update_single_card_price_from_tcgcsv(
+                            self.db,
+                            normalized.scryfall_id,
+                            data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                            allow_remote_group_lookup=False,
+                        )
+                    self.persistence.commit()
+                except Exception as error:
+                    print(f"TCGCSV price update skipped for {normalized.scryfall_id}: {error}")
+
+            time.sleep(RATE_LIMIT_DELAY_SECONDS)
+            return normalized.scryfall_id
+        except Exception as error:
+            print(f"DB Error: {error}")
+            return False
+
+
+class ScryfallFetcher:
+    def __init__(self, db_manager, setting = 0):
+        self.db = db_manager
+        self.setting = setting
+        self.image_root = IMAGE_PATH or os.environ.get('IMAGE_PATH') or os.path.join('static', 'images')
+        self.image_dir = f"{self.image_root}/img/cards"
+        self.icon_dir = f"{self.image_root}/img/icons"
+        self.api = ScryfallApiClient()
+        self.persistence = CardPersistenceService(self.db)
+        self.orchestrator = ScryfallOrchestrator(self.db, self.api, self.persistence, image_path=self.image_root)
+        
+        # Ensure directories exist
+        for directory in [self.image_dir, self.icon_dir]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+    
+    def ensure_set_is_fully_populated(self, set_code):
+        """Checks if a set is in the DB; if not, pulls every card printing for that set."""
+        return self.orchestrator.ensure_set_is_fully_populated(set_code.lower())
+
+    def fetch_and_add(self, set_code, collector_number, sync_prices=True):     
+        set_code = set_code.lower()
+        # Trigger the full set sync first to ensure checklist is ready
+        if self.setting == 0:
+            self.ensure_set_is_fully_populated(set_code)
+
+        return self.orchestrator.fetch_and_add(set_code, collector_number, sync_prices=sync_prices)
