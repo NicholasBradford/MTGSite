@@ -124,6 +124,7 @@
                     <td>{{card["added"]}}</td>
                     <td>
                         <form action="{{ url_for('.delete_card', inventory_id=card['instance_id']) }}" method="POST" onsubmit="return confirm('Remove this card?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="delete-btn">&times;</button>
                         </form>
                     </td>
@@ -135,6 +136,7 @@
     
     <div class="right-bar">
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <ul>
                 <li><input type="text" name="set_code" placeholder="Set Code" value="{{ last_set_code }}" required></li>
                 <li><input type="text" name="collector_number" placeholder="Collector #"></li>

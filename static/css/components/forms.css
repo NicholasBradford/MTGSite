@@ -1,0 +1,128 @@
+/* =========================================================
+   MTGSite Forms (Auth)
+   ========================================================= */
+
+.auth-wrapper {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 80vh;
+}
+
+.auth-card {
+	background-color: var(--site-surface-2);
+	padding: 40px;
+	border-radius: var(--site-radius-md);
+	box-shadow: var(--site-shadow-panel);
+	width: 100%;
+	max-width: 400px;
+	border: var(--site-border-width) solid var(--site-border);
+}
+
+.auth-card h2 {
+	text-align: center;
+	color: #fff;
+	margin-bottom: 25px;
+}
+
+.auth-card-subtitle {
+	text-align: center;
+	color: var(--site-text-faint);
+	font-size: var(--site-font-size-md);
+	margin-bottom: 25px;
+}
+
+.auth-flash {
+	color: #ff5252;
+	text-align: center;
+	margin-bottom: 15px;
+	font-size: var(--site-font-size-md);
+}
+
+.auth-form-group {
+	margin-bottom: 20px;
+}
+
+.auth-form-group label {
+	display: block;
+	color: var(--site-text-muted);
+	margin-bottom: var(--site-space-xs);
+	font-size: var(--site-font-size-md);
+}
+
+.auth-form-group input,
+.auth-form-group select {
+	width: 100%;
+	padding: 12px;
+	background-color: #2a2a2a;
+	border: var(--site-border-width) solid #444;
+	color: #fff;
+	border-radius: var(--site-radius-xs);
+	box-sizing: border-box;
+}
+
+.auth-remember-group {
+	display: flex;
+	align-items: center;
+	gap: var(--site-space-lg);
+	margin-bottom: 20px;
+}
+
+.auth-remember-group label {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: var(--site-space-md);
+	margin-bottom: 0;
+	cursor: pointer;
+	color: var(--site-text-muted);
+}
+
+.auth-remember-group input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	cursor: pointer;
+}
+
+.auth-button {
+	width: 100%;
+	padding: 12px;
+	background-color: #3d3d3d;
+	color: #fff;
+	border: none;
+	border-radius: var(--site-radius-xs);
+	cursor: pointer;
+	font-weight: var(--site-font-weight-bold);
+	transition: background-color var(--site-transition-slow);
+}
+
+.auth-button:hover {
+	background-color: #505050;
+}
+
+.auth-button--spaced {
+	margin-top: var(--site-space-lg);
+}
+
+.auth-footer {
+	margin-top: 20px;
+	text-align: center;
+	font-size: 0.85em;
+	color: var(--site-text-faint);
+	border-top: var(--site-border-width) solid var(--site-border);
+	padding-top: 20px;
+}
+
+.auth-footer a {
+	color: var(--site-accent-gold);
+	text-decoration: none;
+}
+
+.auth-footer a:hover {
+	text-decoration: underline;
+}
+
+.is-hidden {
+	display: none;
+}

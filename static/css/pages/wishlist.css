@@ -31,11 +31,11 @@
     letter-spacing: 0.03em;
 }
 
-.site-modal[hidden] {
+#wishlistEditModal[hidden] {
     display: none;
 }
 
-.site-modal {
+#wishlistEditModal {
     position: fixed;
     inset: 0;
     z-index: 1000;

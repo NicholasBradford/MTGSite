@@ -3,6 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{% block title %}{% endblock %} - MTG Catalog</title>
 
@@ -17,6 +18,13 @@
         <style>
             {% block style %}{% endblock %}
         </style>
+
+        <script>
+            function getCsrfToken() {
+                const el = document.querySelector('meta[name="csrf-token"]');
+                return el ? el.getAttribute('content') : '';
+            }
+        </script>
 
         <script>
             {% block script %}{% endblock %}

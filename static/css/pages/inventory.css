@@ -27,6 +27,10 @@
     backdrop-filter: blur(5px);
 }
 
+.inventory-modal:not([hidden]) {
+    display: block;
+}
+
 .site-modal__content,
 .inventory-modal__content {
     position: relative;

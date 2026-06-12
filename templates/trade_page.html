@@ -1,248 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Trade Request{% endblock %}
 
-{% block style %}
-{{super()}}
-<style>
-    .rainbow_image {
-        outline: 3px solid red; !important
-    }
-    
-
-    .rainbow_image img {
-        display: block;
-        width: 100%;
-        border-radius: 4.75% / 3.5%;
-    }
-
-    .rainbow_image::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: 1;
-        pointer-events: none;
-
-        background: linear-gradient(
-            115deg,
-            transparent 15%,
-            rgba(255, 150, 255, 0.4) 30%,
-            rgba(100, 255, 255, 0.4) 50%,
-            rgba(255, 255, 100, 0.4) 70%,
-            transparent 85%
-        );
-
-        mix-blend-mode: color-dodge;
-        opacity: 0.5;
-    }
-
-    /* Trade Page Layout */
-    .trade-dashboard {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        padding: 20px;
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-
-    /* Outgoing Search Bar */
-    .search-container {
-        position: relative;
-        width: 100%;
-        background: rgba(20, 20, 20, 0.8);
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #ffd700;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    }
-
-    .search-container input {
-        width: 100%;
-        height: 100%;
-        padding: 15px;
-        font-size: 1.2rem;
-        background: #2a2a2a;
-        color: white;
-        border: 1px solid #555;
-        border-radius: 5px;
-    }
-
-    /* Dynamic Dropdown */
-    #search-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 20px;
-        right: 20px;
-        background: rgba(30, 30, 30, 0.95);
-        border: 1px solid #ffd700;
-        border-top: none;
-        border-radius: 0 0 10px 10px;
-        max-height: 400px;
-        overflow-y: auto;
-        z-index: 1000;
-        display: none;
-    }
-
-    .dropdown-item {
-        display: flex;
-        align-items: center;
-        padding: 10px;
-        cursor: pointer;
-        border-bottom: 1px solid #444;
-        transition: background 0.2s;
-    }
-
-    .dropdown-item:hover {
-        background: rgba(255, 215, 0, 0.2);
-    }
-
-    .dropdown-item img {
-        height: 60px;
-        border-radius: 4%;
-        margin-right: 15px;
-    }
-
-    .dropdown-item .details {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .dropdown-item .name {
-        font-weight: bold;
-        color: #ffd700;
-        font-size: 1.1rem;
-    }
-
-    .dropdown-item .set-info {
-        font-size: 0.85rem;
-        color: #ccc;
-    }
-
-    /* Two Columns */
-    .trade-columns {
-        display: flex;
-        gap: 30px;
-        width: 100%;
-    }
-
-    .column {
-        flex: 1;
-        background: rgba(20, 20, 20, 0.8);
-        border: 1px solid #444;
-        border-radius: 10px;
-        padding: 20px;
-        min-height: 500px;
-    }
-
-    .column h2 {
-        text-align: center;
-        color: #ffd700;
-        border-bottom: 2px solid #555;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-    }
-
-    /* Incoming Form */
-    .incoming-form {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        justify-content: center;
-    }
-
-    .incoming-form input, .incoming-form select {
-        padding: 8px;
-        background: #2a2a2a;
-        color: white;
-        border: 1px solid #555;
-        border-radius: 5px;
-    }
-
-    .btn-gold {
-        background: #ffd700;
-        color: #000;
-        font-weight: bold;
-        padding: 8px 15px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: transform 0.1s;
-    }
-    
-    .btn-gold:hover { transform: scale(1.05); }
-
-    /* Card Grids */
-    .card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 15px;
-    }
-
-    .trade-card {
-        text-align: center;
-        position: relative;
-    }
-
-    .trade-card img {
-        width: 100%;
-        border-radius: 4.75% / 3.5%;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.6);
-    }
-    
-    .trade-card .remove-btn {
-        position: absolute;
-        top: -10px;
-        right: -10px;
-        background: red;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 25px;
-        height: 25px;
-        cursor: pointer;
-        font-weight: bold;
-    }
-
-    .qty-badge {
-        position: absolute;
-        top: 5px;
-        left: 5px;
-        background: #ffd700;
-        color: #000;
-        font-weight: bold;
-        padding: 2px 8px;
-        border-radius: 5px;
-        font-size: 0.9rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        z-index: 10;
-        pointer-events: none; /* Let clicks pass through to the image */
-    }
-    .card-name-label {
-        position: relative;
-        z-index: 2;
-        display: block;
-        font-size: 0.8rem;
-        color: #ccc;
-        margin-top: 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        background: transparent;
-    }
-    .trade-card::before,
-    .trade-card::after {
-        content: none !important;
-        display: none !important;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="trade-dashboard">
+<div class="trade-dashboard trade-page">
     
     <div class="search-container">
-        <input type="text" id="outgoing-search" placeholder="Search the Trade Binder... (e.g., Boros)" autocomplete="off">
-        <div id="search-dropdown"></div>
+        <input type="text" id="outgoing-search" class="trade-search-input" placeholder="Search the Trade Binder... (e.g., Boros)" autocomplete="off">
+        <div id="search-dropdown" class="is-hidden"></div>
     </div>
 
     <div class="trade-columns">
@@ -256,13 +20,13 @@
             <h2>Offer</h2>
             
             <div class="incoming-form">
-                <input type="text" id="inc-set" placeholder="Set (e.g. sos)" size="8">
-                <input type="text" id="inc-cn" placeholder="CN" size="5">
-                <select id="inc-finish">
+                <input type="text" id="inc-set" class="trade-input" placeholder="Set (e.g. sos)" size="8">
+                <input type="text" id="inc-cn" class="trade-input" placeholder="CN" size="5">
+                <select id="inc-finish" class="trade-select">
                     <option value="nonfoil">Non-Foil</option>
                     <option value="foil">Foil</option>
                 </select>
-                <button class="btn-gold" onclick="addIncomingCard()">Add</button>
+                <button type="button" class="site-button site-button--accent trade-action-button" onclick="addIncomingCard(event)">Add</button>
             </div>
 
             <div class="card-grid" id="incoming-grid">
@@ -270,15 +34,15 @@
         </div>
     </div>
 </div>
-<div class="submit-section" style="margin-top: 30px; text-align: center;">
+<div class="trade-submit-section">
     {% if current_user.is_authenticated %}
-        <button id="submit-trade-btn" class="btn-gold" onclick="submitTradeRequest()" style="padding: 15px 40px; font-size: 1.2rem;">
+        <button id="submit-trade-btn" class="site-button site-button--accent trade-submit-button" onclick="submitTradeRequest()">
             Submit Trade Proposal
         </button>
     {% else %}
-        <div class="auth-prompt" style="background: rgba(255,215,0,0.1); padding: 20px; border-radius: 10px; border: 1px dashed #ffd700;">
-            <p style="color: #ccc;">Ready to finalize this trade?</p>
-            <a href="{{ url_for('authentication.login') }}" class="btn-gold" style="text-decoration: none; display: inline-block;">
+        <div class="trade-auth-prompt">
+            <p class="trade-auth-copy">Ready to finalize this trade?</p>
+            <a href="{{ url_for('authentication.login') }}" class="site-button site-button--accent trade-login-button">
                 Log In to Submit Trade
             </a>
         </div>
@@ -298,7 +62,7 @@
         const query = this.value.trim();
         
         if (query.length < 2) {
-            dropdown.style.display = 'none';
+            dropdown.classList.add('is-hidden');
             return;
         }
 
@@ -310,19 +74,19 @@
                     if (data.length > 0) {
                         data.forEach(card => {
                             const item = document.createElement('div');
-                            item.className = 'dropdown-item';
+                            item.className = 'trade-dropdown-item';
                             // Build the dropdown row visually
                             item.innerHTML = `
                                     <img src="${IMAGE_BASE_PATH}${card.image_url}" alt="${card.name}" loading="lazy">                                
-                                <div class="details">
-                                    <span class="name">${card.name}</span>
-                                    <span class="set-info">${card.set_code.toUpperCase()} #${card.collector_number} - ${card.finish} </span>
-                                    <b style="color: #ffd700;">(Available: ${card.qty})</b>
+                                <div class="trade-dropdown-item__details">
+                                    <span class="trade-dropdown-item__name">${card.name}</span>
+                                    <span class="trade-dropdown-item__meta">${card.set_code.toUpperCase()} #${card.collector_number} - ${card.finish}</span>
+                                    <span class="trade-dropdown-item__available">(Available: ${card.qty})</span>
                                 </div>
                             `;
                             // When clicked, add to outgoing grid
                             item.onclick = () => {
-                                const selector = `#outgoing-grid .trade-card[data-card-id="${card.scryfall_id}"][data-finish="${card.finish}"]`;
+                                const selector = `#outgoing-grid .trade-card[data-id="${card.scryfall_id}"][data-finish="${card.finish}"]`;
                                 const currentInTrade = document.querySelectorAll(selector).length;
                                 if (currentInTrade >= card.qty) {
                                     alert(`Limit Reached: There are only ${card.qty} tradeable copies of ${card.name} (${card.finish}).`);
@@ -331,13 +95,13 @@
                                 console.log("Card object from search:", card);
                                 addCardToGrid('outgoing-grid', card);
                                 searchInput.value = '';
-                                dropdown.style.display = 'none';
+                                dropdown.classList.add('is-hidden');
                             };
                             dropdown.appendChild(item);
                         });
-                        dropdown.style.display = 'block';
+                        dropdown.classList.remove('is-hidden');
                     } else {
-                        dropdown.style.display = 'none';
+                        dropdown.classList.add('is-hidden');
                     }
                 });
         }, 300); // 300ms delay to prevent spamming the DB
@@ -346,7 +110,7 @@
     // Hide dropdown if clicked outside
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && e.target !== dropdown) {
-            dropdown.style.display = 'none';
+            dropdown.classList.add('is-hidden');
         }
     });
 
@@ -363,7 +127,7 @@
 
         fetch('/api/fetch_incoming', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ set_code: setCode, cn: cn, finish: finish })
         })
         .then(res => res.json())
@@ -398,7 +162,7 @@
             let newQty = currentQty + 1;
             existingCard.setAttribute('data-qty', newQty);
             existingCard.querySelector('.qty-badge').innerText = `x${newQty}`;
-            existingCard.querySelector('.qty-badge').style.display = 'block';
+            existingCard.querySelector('.qty-badge').classList.remove('is-hidden');
             return; // Exit function so we don't create a duplicate element
         }
 
@@ -429,19 +193,13 @@
         const badge = document.createElement('span');
         badge.className = 'qty-badge';
         badge.innerText = 'x1';
-        badge.style.display = 'none';
+        badge.classList.add('is-hidden');
 
         
         
         if (card.finish === 'foil') {
             const wrapper = document.createElement('div');
-            wrapper.className = 'rainbow_image';
-            wrapper.style.position = 'relative';
-            wrapper.style.display = 'inline-block';
-            wrapper.style.lineHeight = '0';
-            wrapper.style.borderRadius = '4.75% / 3.5%';
-            wrapper.style.overflow = 'hidden';
-            wrapper.style.width = '100%';
+            wrapper.className = 'trade-foil-frame';
             wrapper.appendChild(img); 
             cardDiv.appendChild(wrapper);
         } else {
@@ -493,7 +251,7 @@
 
         fetch('/api/submit_trade', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ 
                 outbound: outboundData,
                 inbound: inboundData

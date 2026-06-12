@@ -1,0 +1,286 @@
+/* =========================================================
+   MTGSite Trade Page
+   ========================================================= */
+
+.trade-page {
+    --site-local-accent: var(--site-accent-gold);
+    --site-local-accent-soft: rgba(255, 215, 0, 0.24);
+    --site-local-accent-glow: rgba(255, 215, 0, 0.16);
+
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.trade-page .search-container {
+    position: relative;
+    width: 100%;
+    background: rgba(20, 20, 20, 0.8);
+    padding: 20px;
+    border-radius: var(--site-radius-xl);
+    border: 1px solid var(--site-local-accent);
+    box-shadow: var(--site-shadow-panel-strong);
+}
+
+.trade-page .trade-search-input {
+    width: 100%;
+    height: 100%;
+    padding: 15px;
+    font-size: 1.2rem;
+    background: var(--site-surface-2);
+    color: var(--site-text-heading);
+    border: 1px solid var(--site-border-bright);
+    border-radius: var(--site-radius-sm);
+    box-sizing: border-box;
+}
+
+.trade-page #search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    right: 20px;
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid var(--site-local-accent);
+    border-top: none;
+    border-radius: 0 0 var(--site-radius-xl) var(--site-radius-xl);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: var(--site-z-dropdown);
+}
+
+.trade-page #search-dropdown.is-hidden {
+    display: none;
+}
+
+.trade-page .trade-dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: var(--site-space-lg);
+    cursor: pointer;
+    border-bottom: 1px solid var(--site-border-strong);
+    transition: background-color var(--site-transition-normal);
+}
+
+.trade-page .trade-dropdown-item:hover {
+    background: rgba(255, 215, 0, 0.2);
+}
+
+.trade-page .trade-dropdown-item img {
+    height: 60px;
+    border-radius: 4%;
+    margin-right: 15px;
+}
+
+.trade-page .trade-dropdown-item__details {
+    display: flex;
+    flex-direction: column;
+}
+
+.trade-page .trade-dropdown-item__name {
+    font-weight: var(--site-font-weight-bold);
+    color: var(--site-local-accent);
+    font-size: 1.1rem;
+}
+
+.trade-page .trade-dropdown-item__meta {
+    font-size: 0.85rem;
+    color: var(--site-text-muted);
+}
+
+.trade-page .trade-dropdown-item__available {
+    color: var(--site-local-accent);
+    font-weight: var(--site-font-weight-bold);
+}
+
+.trade-page .trade-columns {
+    display: flex;
+    gap: 30px;
+    width: 100%;
+}
+
+.trade-page .column {
+    flex: 1;
+    background: rgba(20, 20, 20, 0.8);
+    border: 1px solid var(--site-border-strong);
+    border-radius: var(--site-radius-xl);
+    padding: 20px;
+    min-height: 500px;
+}
+
+.trade-page .column h2 {
+    text-align: center;
+    color: var(--site-local-accent);
+    border-bottom: 2px solid var(--site-border-strong);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.trade-page .incoming-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.trade-page .trade-input,
+.trade-page .trade-select {
+    padding: 8px;
+    background: var(--site-surface-2);
+    color: var(--site-text-heading);
+    border: 1px solid var(--site-border-strong);
+    border-radius: var(--site-radius-sm);
+}
+
+.trade-page .trade-action-button,
+.trade-page .trade-submit-button,
+.trade-page .trade-login-button {
+    text-decoration: none;
+}
+
+.trade-page .trade-action-button {
+    white-space: nowrap;
+}
+
+.trade-page .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.trade-page .trade-card {
+    text-align: center;
+    position: relative;
+}
+
+.trade-page .trade-foil-frame {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    border-radius: 4.75% / 3.5%;
+    overflow: hidden;
+    width: 100%;
+}
+
+.trade-page .trade-foil-frame img,
+.trade-page .trade-card > img {
+    display: block;
+    width: 100%;
+    border-radius: 4.75% / 3.5%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.trade-page .trade-foil-frame::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+        115deg,
+        transparent 15%,
+        rgba(255, 150, 255, 0.4) 30%,
+        rgba(100, 255, 255, 0.4) 50%,
+        rgba(255, 255, 100, 0.4) 70%,
+        transparent 85%
+    );
+    mix-blend-mode: color-dodge;
+    opacity: 0.5;
+}
+
+.trade-page .trade-card .remove-btn {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: var(--site-danger);
+    color: var(--site-text-heading);
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    font-weight: var(--site-font-weight-bold);
+}
+
+.trade-page .qty-badge {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: var(--site-local-accent);
+    color: var(--site-text-inverse);
+    font-weight: var(--site-font-weight-bold);
+    padding: 2px 8px;
+    border-radius: var(--site-radius-sm);
+    font-size: 0.9rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.trade-page .card-name-label {
+    position: relative;
+    z-index: 2;
+    display: block;
+    font-size: 0.8rem;
+    color: var(--site-text-muted);
+    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: transparent;
+}
+
+.trade-page .trade-submit-section {
+    margin-top: 30px;
+    text-align: center;
+}
+
+.trade-page .trade-submit-button {
+    padding: 15px 40px;
+    font-size: 1.2rem;
+}
+
+.trade-page .trade-auth-prompt {
+    background: rgba(255, 215, 0, 0.1);
+    padding: 20px;
+    border-radius: var(--site-radius-xl);
+    border: 1px dashed var(--site-local-accent);
+}
+
+.trade-page .trade-auth-copy {
+    color: var(--site-text-muted);
+}
+
+@media (max-width: 960px) {
+    .trade-page .trade-columns {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 720px) {
+    .trade-page {
+        padding: 14px;
+    }
+
+    .trade-page .search-container {
+        padding: 14px;
+    }
+
+    .trade-page #search-dropdown {
+        left: 14px;
+        right: 14px;
+    }
+
+    .trade-page .incoming-form {
+        justify-content: stretch;
+    }
+
+    .trade-page .incoming-form .trade-input,
+    .trade-page .incoming-form .trade-select,
+    .trade-page .trade-action-button {
+        width: 100%;
+    }
+}

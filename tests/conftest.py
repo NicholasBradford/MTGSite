@@ -1,10 +1,14 @@
 import importlib
 import os
+import re
+import socket
 import sqlite3
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+from werkzeug.serving import make_server
 from werkzeug.security import generate_password_hash
 
 
@@ -426,23 +430,8 @@ def seed_cards(clean_db, seed_locations):
 
 @pytest.fixture()
 def auth_client(client, seed_users):
-    """
-    Logged-in user client.
-
-    Your login route expects form fields:
-    - username
-    - password
-
-    It redirects to inventory on successful login.
-    """
-    response = client.post(
-        "/login",
-        data={
-            "username": seed_users["user"]["username"],
-            "password": seed_users["user"]["password"],
-        },
-        follow_redirects=True,
-    )
+    login_as = _build_login_helper(client, seed_users)
+    response = login_as("user")
 
     assert response.status_code == 200
     return client
@@ -450,17 +439,52 @@ def auth_client(client, seed_users):
 
 @pytest.fixture()
 def admin_client(client, seed_users):
-    response = client.post(
-        "/login",
-        data={
-            "username": seed_users["admin"]["username"],
-            "password": seed_users["admin"]["password"],
-        },
-        follow_redirects=True,
-    )
+    login_as = _build_login_helper(client, seed_users)
+    response = login_as("admin")
 
     assert response.status_code == 200
     return client
+
+
+def _build_login_helper(client, seed_users):
+    def _login(role="user", follow_redirects=True, next_url=None):
+        user = seed_users[role]
+        form_data = {
+            "username": user["username"],
+            "password": user["password"],
+        }
+
+        if next_url is not None:
+            form_data["next"] = next_url
+
+        return client.post(
+            "/login",
+            data=form_data,
+            follow_redirects=follow_redirects,
+        )
+
+    return _login
+
+
+@pytest.fixture()
+def login_as(client, seed_users):
+    return _build_login_helper(client, seed_users)
+
+
+@pytest.fixture()
+def login_user(login_as):
+    def _login_user(follow_redirects=True, next_url=None):
+        return login_as("user", follow_redirects=follow_redirects, next_url=next_url)
+
+    return _login_user
+
+
+@pytest.fixture()
+def login_admin(login_as):
+    def _login_admin(follow_redirects=True, next_url=None):
+        return login_as("admin", follow_redirects=follow_redirects, next_url=next_url)
+
+    return _login_admin
 
 
 @pytest.fixture()
@@ -484,3 +508,53 @@ def ajax_grid_headers():
         "X-Requested-With": "XMLHttpRequest",
         "X-View-Mode": "grid",
     }
+
+
+@pytest.fixture()
+def extract_csrf_token():
+    hidden_input_pattern = re.compile(r'name="csrf_token"\s+value="([^"]+)"')
+    meta_tag_pattern = re.compile(r'meta\s+name="csrf-token"\s+content="([^"]+)"')
+
+    def _extract(html):
+        meta_match = meta_tag_pattern.search(html)
+        if meta_match:
+            return meta_match.group(1)
+
+        for hidden_match in hidden_input_pattern.finditer(html):
+            token = hidden_match.group(1)
+            if token and not token.startswith("${"):
+                return token
+
+        raise AssertionError("Expected csrf token in hidden input or meta tag")
+
+    return _extract
+
+
+@pytest.fixture()
+def csrf_client(app):
+    previous_csrf_state = app.config.get("WTF_CSRF_ENABLED", False)
+    app.config["WTF_CSRF_ENABLED"] = True
+
+    with app.test_client() as client:
+        yield client
+
+    app.config["WTF_CSRF_ENABLED"] = previous_csrf_state
+
+
+@pytest.fixture()
+def live_server(app):
+    host = "127.0.0.1"
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind((host, 0))
+    _, port = sock.getsockname()
+    sock.close()
+
+    server = make_server(host, port, app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

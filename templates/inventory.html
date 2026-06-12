@@ -7,7 +7,7 @@
     {{ super() }}
 
     {% if current_user.is_authenticated %}
-        <div id="editModal" class="site-modal inventory-modal" aria-hidden="true">
+        <div id="editModal" class="site-modal inventory-modal" aria-hidden="true" hidden>
             <div class="site-modal__content inventory-modal__content login-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                 <button type="button" class="site-modal__close" onclick="closeModal()" aria-label="Close modal">
                     &times;
@@ -31,6 +31,7 @@
 
 const allLocations = {{ locations|tojson }};
 const viewMode = "{{ request.args.get('view_mode', '') }}";
+const _csrfToken = {{ csrf_token()|tojson }};
 
 let activeCardElement = null;
 
@@ -40,7 +41,8 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
 
     if (!modal || !container) return;
 
-    modal.style.display = "block";
+    modal.hidden = false;
+    modal.style.display = "";
     modal.setAttribute("aria-hidden", "false");
 
     container.innerHTML = `<p class="inventory-empty-message">Loading copies...</p>`;
@@ -172,6 +174,7 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
                             method="POST"
                             onsubmit="return confirm('Remove this card?');"
                         >
+                            <input type="hidden" name="csrf_token" value="${_csrfToken}">
                             <button type="submit" class="inventory-delete-btn" aria-label="Remove card">
                                 &times;
                             </button>
@@ -206,6 +209,7 @@ function updateCard(instanceId, newLocation, isTradeable, inputElement) {
 
     fetch(`/edit_instance/${instanceId}`, {
         method: "POST",
+        headers: { 'X-CSRFToken': getCsrfToken() },
         body: formData
     }).then(res => {
         if (!res.ok) {
@@ -278,7 +282,8 @@ function findSpecialFinishPrice(scryfallId, instanceId) {
             return fetch("/api/tcgcsv/price-override", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCsrfToken()
                 },
                 body: JSON.stringify({
                     scryfall_id: scryfallId,
@@ -312,7 +317,8 @@ function closeModal() {
 
     if (!modal) return;
 
-    modal.style.display = "none";
+    modal.hidden = true;
+    modal.style.display = "";
     modal.setAttribute("aria-hidden", "true");
     activeCardElement = null;
 }

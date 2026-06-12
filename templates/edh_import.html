@@ -5,6 +5,7 @@
 <div class="admin-card" style="max-width: 500px; margin: 40px auto;">
     <h1>Import Decklist</h1>
     <form action="{{ url_for('edh.import_deck') }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="margin-bottom: 15px;">
             <label>Deck Name:</label><br>
             <input type="text" name="deck_name" required style="width: 100%; padding: 8px;">

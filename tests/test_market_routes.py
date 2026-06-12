@@ -36,210 +36,42 @@ def test_market_dashboard_renders_empty_states_when_no_market_data(client, login
     assert "No losers found" in page_text
 
 
-def test_market_dashboard_renders_spike_and_drop_cards(client, login_user, app):
-    """
-    Seeds enough data to create one market gainer and one market loser.
+def test_market_dashboard_renders_spike_and_drop_cards(auth_client, monkeypatch):
+    from routes import markets
 
-    Assumes:
-    - inventory.scryfall_id joins card_printings.scryfall_id
-    - card_printings.oracle_id joins card_definitions.oracle_id
-    - price_history has scraped_at with either explicit insert support or default timestamp
-    """
-    login_user()
+    sample_spike = {
+        "scryfall_id": "scryfall-spike",
+        "name": "Test Market Spike",
+        "set_code": "TST",
+        "collector_number": "001",
+        "image_url": "test-spike.jpg",
+        "finish": "nonfoil",
+        "qty": 1,
+        "old_price": 1.00,
+        "new_price": 5.00,
+        "location_name": "Unsorted Box",
+        "is_tradeable": 1,
+    }
+    sample_drop = {
+        "scryfall_id": "scryfall-drop",
+        "name": "Test Market Drop",
+        "set_code": "TST",
+        "collector_number": "002",
+        "image_url": "test-drop.jpg",
+        "finish": "nonfoil",
+        "qty": 1,
+        "old_price": 5.00,
+        "new_price": 2.00,
+        "location_name": "Unsorted Box",
+        "is_tradeable": 0,
+    }
 
-    with app.app_context():
-        from db.db_manager import CardDB
+    def fake_market_movers(*args, **kwargs):
+        return [sample_spike], [sample_drop]
 
-        manager = CardDB()
+    monkeypatch.setattr(markets, "get_market_movers", fake_market_movers)
 
-        try:
-            cursor = manager.cursor
-
-            # Card definitions
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO card_definitions (
-                    oracle_id,
-                    name
-                )
-                VALUES (?, ?)
-                """,
-                ("oracle-spike", "Test Market Spike"),
-            )
-
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO card_definitions (
-                    oracle_id,
-                    name
-                )
-                VALUES (?, ?)
-                """,
-                ("oracle-drop", "Test Market Drop"),
-            )
-
-            # Card printings
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO card_printings (
-                    scryfall_id,
-                    oracle_id,
-                    image_url,
-                    set_code,
-                    collector_number,
-                    current_price,
-                    current_price_foil
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "scryfall-spike",
-                    "oracle-spike",
-                    "test-spike.jpg",
-                    "TST",
-                    "001",
-                    5.00,
-                    None,
-                ),
-            )
-
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO card_printings (
-                    scryfall_id,
-                    oracle_id,
-                    image_url,
-                    set_code,
-                    collector_number,
-                    current_price,
-                    current_price_foil
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "scryfall-drop",
-                    "oracle-drop",
-                    "test-drop.jpg",
-                    "TST",
-                    "002",
-                    2.00,
-                    None,
-                ),
-            )
-
-            # Inventory
-            cursor.execute(
-                """
-                INSERT INTO inventory (
-                    scryfall_id,
-                    finish,
-                    condition,
-                    is_tradeable,
-                    purchase_price,
-                    location_id,
-                    is_surplus,
-                    in_deck
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "scryfall-spike",
-                    "nonfoil",
-                    "NM",
-                    1,
-                    1.00,
-                    None,
-                    0,
-                    0,
-                ),
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO inventory (
-                    scryfall_id,
-                    finish,
-                    condition,
-                    is_tradeable,
-                    purchase_price,
-                    location_id,
-                    is_surplus,
-                    in_deck
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "scryfall-drop",
-                    "nonfoil",
-                    "NM",
-                    0,
-                    4.00,
-                    None,
-                    0,
-                    0,
-                ),
-            )
-
-            # Price history: two snapshots per card.
-            # Explicit scraped_at values avoid relying on defaults during tests.
-            cursor.execute(
-                """
-                INSERT INTO price_history (
-                    scryfall_id,
-                    price_usd,
-                    price_foil,
-                    scraped_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                ("scryfall-spike", 1.00, None, "2026-01-01 00:00:00"),
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO price_history (
-                    scryfall_id,
-                    price_usd,
-                    price_foil,
-                    scraped_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                ("scryfall-spike", 5.00, None, "2026-01-02 00:00:00"),
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO price_history (
-                    scryfall_id,
-                    price_usd,
-                    price_foil,
-                    scraped_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                ("scryfall-drop", 5.00, None, "2026-01-01 00:00:00"),
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO price_history (
-                    scryfall_id,
-                    price_usd,
-                    price_foil,
-                    scraped_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                ("scryfall-drop", 2.00, None, "2026-01-02 00:00:00"),
-            )
-
-            manager.commit()
-
-        finally:
-            manager.close()
-
-    response = client.get("/market/dashboard")
+    response = auth_client.get("/market/dashboard")
 
     assert response.status_code == 200
 

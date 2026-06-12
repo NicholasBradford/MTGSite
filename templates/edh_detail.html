@@ -637,6 +637,7 @@
                     <form action="{{ url_for('edh.add_card_to_deck_by_name', deck_id=deck['deck_id']) }}"
                           method="POST"
                           class="add-card-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="text"
                                name="card_name"
                                placeholder="Enter card name..."
@@ -727,12 +728,14 @@
                                 <form action="{{ url_for('edh.remove_card_from_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}"
                                       method="POST"
                                       class="deck-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="vault-btn remove" title="Remove 1">−</button>
                                 </form>
 
                                 <form action="{{ url_for('edh.add_card_to_deck', deck_id=deck['deck_id'], scryfall_id=card['scryfall_id']) }}"
                                       method="POST"
                                       class="deck-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="vault-btn add" title="Add 1">+</button>
                                 </form>
                             </div>

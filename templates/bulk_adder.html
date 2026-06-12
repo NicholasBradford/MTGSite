@@ -84,6 +84,7 @@ input[type="file"], select {
 
         <div class="import-card upload-zone">
             <form action="{{ url_for('adder.bulk_import_page') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="csv_file">Select CSV File:</label>
                     <input type="file" name="file" id="csv_file" accept=".csv" required>

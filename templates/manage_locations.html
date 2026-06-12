@@ -111,6 +111,7 @@
             <h3>Quick Add</h3>
             <p style="color: #bbb; margin-bottom: 15px; font-size: 0.9em;">Create a new storage location in the vault.</p>
             <form method="POST" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="add">
                 <input type="text" name="location_name" placeholder="New Location Name" required class="form-input">
                 <button type="submit" class="btn-teal">Add Location</button>
@@ -137,6 +138,7 @@
                         <td>{{ loc['card_count'] }}</td>
                         <td>
                             <form method="POST" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="update_id">
                                 <input type="hidden" name="old_id" value="{{ loc['location_id'] }}">
                                 <input type="number" name="new_id" value="{{ loc['location_id'] }}" class="form-input form-input-small" required>
@@ -146,6 +148,7 @@
                         </td>
                         <td>
                             <form method="POST" onsubmit="return confirm('Delete this location?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="location_id" value="{{ loc['location_id'] }}">
                                 <button type="submit" class="btn-deny">Delete</button>

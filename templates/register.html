@@ -2,106 +2,15 @@
 
 {% block title %}Register Admin{% endblock %}
 
-{% block style %}
-    .register-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 80vh;
-    }
-
-    .register-card {
-        background-color: #1f1f1f;
-        padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-        width: 100%;
-        max-width: 400px;
-        border: 1px solid #333;
-    }
-
-    .register-card h2 {
-        text-align: center;
-        color: #ffffff;
-        margin-bottom: 10px;
-    }
-
-    .register-card p {
-        text-align: center;
-        color: #888;
-        font-size: 0.9em;
-        margin-bottom: 25px;
-    }
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-group label {
-        display: block;
-        color: #bbb;
-        margin-bottom: 5px;
-        font-size: 0.9em;
-    }
-
-    .form-group input, .form-group select {
-        width: 100%;
-        padding: 12px;
-        background-color: #2a2a2a;
-        border: 1px solid #444;
-        color: white;
-        border-radius: 4px;
-        box-sizing: border-box;
-    }
-
-    .register-btn {
-        width: 100%;
-        padding: 12px;
-        background-color: #3d3d3d;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        transition: background 0.3s;
-        margin-top: 10px;
-    }
-
-    .register-btn:hover {
-        background-color: #505050;
-    }
-
-    .login-link {
-        margin-top: 20px;
-        text-align: center;
-        font-size: 0.85em;
-        color: #888;
-        border-top: 1px solid #333;
-        padding-top: 20px;
-    }
-
-    .login-link a {
-        color: #ffca28;
-        text-decoration: none;
-    }
-
-    .flash-messages {
-        color: #ff5252;
-        text-align: center;
-        margin-bottom: 15px;
-        font-size: 0.9em;
-    }
-{% endblock %}
-
 {% block content %}
-<div class="register-wrapper">
-    <div class="register-card">
+<div class="auth-wrapper">
+    <div class="auth-card">
         <h2>Create Account</h2>
-        <p>Register a new collection manager</p>
+        <p class="auth-card-subtitle">Register a new collection manager</p>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="flash-messages">
+                <div class="auth-flash">
                     {% for message in messages %}
                         {{ message }}
                     {% endfor %}
@@ -110,15 +19,16 @@
         {% endwith %}
 
         <form action="{{ url_for('authentication.register') }}" method="POST">
-            <div class="form-group">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="auth-form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
             </div>
-            <div class="form-group">
+            <div class="auth-form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <div class="form-group">
+            <div class="auth-form-group">
                 <label for="role">Role</label>
                 <select name="role" id="role" onchange="toggleAdminKey()">
                     <option value="guest">Guest (View Only)</option>
@@ -126,14 +36,14 @@
                 </select>
             </div>
 
-            <div id="admin-key-container" class="form-group" style="display: none;">
+            <div id="admin-key-container" class="auth-form-group is-hidden">
                 <label for="admin_key">Admin Registration Key (Required for Admin Role)</label>
                 <input type="password" id="admin_key" name="admin_key" placeholder="Enter secret key">
             </div>
-            <button type="submit" class="register-btn">Create Account</button>
+            <button type="submit" class="auth-button auth-button--spaced">Create Account</button>
         </form>
 
-        <div class="login-link">
+        <div class="auth-footer">
             Already have an account? <a href="{{ url_for('authentication.login') }}">Sign In</a>
         </div>
     </div>
@@ -145,11 +55,7 @@ function toggleAdminKey() {
     const adminKeyContainer = document.getElementById('admin-key-container');
     
     // If the selected value is 'admin', show the field; otherwise, hide it
-    if (roleSelect.value === 'admin') {
-        adminKeyContainer.style.display = 'block';
-    } else {
-        adminKeyContainer.style.display = 'none';
-    }
+    adminKeyContainer.classList.toggle('is-hidden', roleSelect.value !== 'admin');
 }
 </script>
 {% endblock %}

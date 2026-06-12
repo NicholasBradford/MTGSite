@@ -154,7 +154,7 @@ def search(search_query, conditions=None):
         params.append(f'%{val}%')
 
     # Color Identity (Commander Logic)
-    # --- COLOR IDENTITY LOGIC (Inclusions / Subsets) ---
+    # --- COLOR IDENTITY LOGIC (Inclusive contains semantics) ---
     for term in search_params['identities']:
         is_negated = term.startswith('-')
         val = term[1:].upper() if is_negated else term.upper()
@@ -169,13 +169,17 @@ def search(search_query, conditions=None):
             operator = ">" if is_negated else "="
             conditions.append(f"LENGTH(cd.color_identity) {operator} 1")
         else:
-            # Inclusion Rules: Eliminate unrequested colors from the allowable space
-            for c in 'WUBRG':
-                if c not in val:
-                    if not is_negated:
-                        conditions.append("cd.color_identity NOT LIKE ?")
+            if not is_negated:
+                # Match identities that contain any selected color.
+                # Example: identity:U should match U and U,B identities.
+                identity_terms = [c for c in 'WUBRG' if c in val]
+                if identity_terms:
+                    or_clauses = []
+                    for c in identity_terms:
+                        or_clauses.append("cd.color_identity LIKE ?")
                         params.append(f'%{c}%')
-            if is_negated:
+                    conditions.append(f"({' OR '.join(or_clauses)})")
+            else:
                 for c in val:
                     conditions.append("cd.color_identity NOT LIKE ?")
                     params.append(f'%{c}%')
@@ -229,13 +233,16 @@ def search(search_query, conditions=None):
 
     # USD Logic
     for usd_term in search_params['usd']:
-        if usd_term.upper() == "NULL" or usd_term.lower() == "unassigned":
+        is_negated = usd_term.startswith('-')
+        normalized_usd_term = usd_term[1:] if is_negated else usd_term
+
+        if normalized_usd_term.upper() == "NULL" or normalized_usd_term.lower() == "unassigned":
             conditions.append(f"""
                 (CASE WHEN i.finish = 'foil' THEN cp.current_price_foil
                 ELSE cp.current_price END) {'IS NOT' if is_negated else 'IS'} NULL""")
             continue # Skip the rest of the loop and move to the next term
         
-        match = re.match(r'([<>=!]+)?([\d\.]+)', usd_term)
+        match = re.match(r'([<>=!]+)?([\d\.]+)', normalized_usd_term)
         if match:
             op, val = match.group(1) or '=', float(match.group(2))
             if op in ['>', '<', '>=', '<=', '=', '!=']:

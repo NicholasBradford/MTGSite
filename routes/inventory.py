@@ -1,9 +1,18 @@
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
-from flask_login import login_required
-from db.db_manager import CardDB
+from flask_login import login_required, current_user
+from db.db_manager import get_db
 from search import search
 import sqlite3, ScryfallFetcher, db.db_manager, re
-from services.tcgcsv_prices import search_tcgcsv_products_for_finish, update_single_card_price_from_tcgcsv, normalize_finish
+from services.tcgcsv_prices import (
+    normalize_finish,
+    search_tcgcsv_products_for_finish,
+    update_single_card_price_from_tcgcsv,
+)
+
+try:
+    from services.tcgcsv_prices import TCGCSV_SOURCE_LOCAL_ONLY
+except ImportError:
+    TCGCSV_SOURCE_LOCAL_ONLY = "local_only"
 
 sort_options = {
         'name': """
@@ -43,13 +52,14 @@ def get_db_connection():
 inventory_bp = Blueprint('inventory', __name__)
 
 @inventory_bp.route('/inventory', methods=['GET', 'POST'])
+@login_required
 def inventory():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 50 
     offset = (page - 1) * per_page
     
-    manager = CardDB()
+    manager = get_db()
 
     params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
     sort_by = request.args.get('sort', 'name')
@@ -155,7 +165,10 @@ def inventory():
 @inventory_bp.route('/edit_instance/<int:instance_id>', methods=['POST'])
 @login_required
 def edit_instance(instance_id):
-    manager = CardDB()
+    if current_user.role != 'admin':
+        return {"status": "error", "error": "Access denied"}, 403
+
+    manager = get_db()
 
     new_loc = request.form.get('location_id')
     new_trade = request.form.get('is_tradeable')
@@ -188,7 +201,7 @@ def edit_instance(instance_id):
 @inventory_bp.route('/get_instances/<scryfall_id>/<finish>')
 @login_required
 def get_instances(scryfall_id, finish):
-    manager = CardDB()
+    manager = get_db()
     
     query = '''
         SELECT i.scryfall_id, i.instance_id, i.location_id, i.is_tradeable, i.finish,
@@ -318,7 +331,7 @@ def special_finish_candidates():
     if not scryfall_id or not finish:
         return jsonify({"success": False, "error": "Missing scryfall_id or finish."}), 400
 
-    manager = CardDB()
+    manager = get_db()
 
     try:
         candidates = search_tcgcsv_products_for_finish(manager, scryfall_id, finish)
@@ -331,6 +344,9 @@ def special_finish_candidates():
 @inventory_bp.route("/api/tcgcsv/price-override", methods=["POST"])
 @login_required
 def save_price_override():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Access denied"}), 403
+
     data = request.get_json() or {}
 
     scryfall_id = (data.get("scryfall_id") or "").strip()
@@ -342,7 +358,7 @@ def save_price_override():
     if not scryfall_id or not finish or not tcgplayer_id:
         return jsonify({"success": False, "error": "Missing required override data."}), 400
 
-    manager = CardDB()
+    manager = get_db()
 
     try:
         manager.cursor.execute("""
@@ -372,7 +388,12 @@ def save_price_override():
         price_warning = None
 
         try:
-            price_refreshed = update_single_card_price_from_tcgcsv(manager, scryfall_id)
+            price_refreshed = update_single_card_price_from_tcgcsv(
+                manager,
+                scryfall_id,
+                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                allow_remote_group_lookup=False,
+            )
             manager.commit()
         except Exception as error:
             price_warning = (

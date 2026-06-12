@@ -1,268 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard{% endblock %}
 
-{% block style %}
-{{ super() }}
-.admin-page {
-    max-width: 1400px;
-    margin: 0 auto;
-}
-.admin-header {
-    margin-bottom: 24px;
-}
-.admin-header h3 {
-    margin-bottom: 6px;
-}
-.admin-header p {
-    color: #b8bec8;
-    margin: 0;
-}
-.admin-section {
-    margin-bottom: 34px;
-}
-.admin-section-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 14px;
-}
-.admin-section-header h4,
-.admin-section-header h3 {
-    margin: 0;
-}
-.admin-section-header p {
-    color: #9aa3af;
-    margin: 0;
-    font-size: 0.92rem;
-}
-.admin-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
-}
-.admin-grid.wide {
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-}
-.admin-card {
-    background: #1b1f27;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-left: 4px solid #3b82f6;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.26);
-}
-.admin-card.collection { border-left-color: #ffd166; }
-.admin-card.integrity { border-left-color: #22d3ee; }
-.admin-card.health { border-left-color: #22c55e; }
-.admin-card.market { border-left-color: #a78bfa; }
-.admin-card.sync { border-left-color: #fb923c; }
-.admin-card.trade { border-left-color: #facc15; }
-.admin-card.danger { border-left-color: #ef4444; }
-.admin-card h4,
-.admin-card h5 {
-    margin: 0 0 14px;
-    color: #f4f7fb;
-}
-.admin-card h5 {
-    font-size: 1rem;
-}
-.metric-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-    margin-bottom: 9px;
-    color: #d7dce5;
-}
-.metric-row span:first-child {
-    color: #aeb6c2;
-}
-.metric-value {
-    color: #f6f8fb;
-    font-weight: 700;
-    text-align: right;
-}
-.metric-value a {
-    color: inherit;
-    text-decoration: none;
-}
-.metric-value a:hover {
-    text-decoration: underline;
-}
-.card-footer {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    color: #8f98a7;
-    font-size: 0.86rem;
-}
-.text-green { color: #2ecc71; }
-.text-red { color: #ff6b6b; }
-.text-amber { color: #ffc857; }
-.text-blue { color: #60a5fa; }
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 999px;
-    padding: 4px 9px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    background: rgba(148,163,184,0.15);
-    color: #dbe4f0;
-}
-.status-pill.good { background: rgba(34,197,94,0.16); color: #86efac; }
-.status-pill.warning { background: rgba(250,204,21,0.15); color: #fde68a; }
-.status-pill.critical { background: rgba(239,68,68,0.16); color: #fca5a5; }
-.status-pill.info { background: rgba(96,165,250,0.16); color: #bfdbfe; }
-.attention-list {
-    display: grid;
-    gap: 10px;
-}
-.attention-item {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 12px;
-    align-items: center;
-    background: rgba(255,255,255,0.045);
-    border: 1px solid rgba(255,255,255,0.075);
-    border-radius: 12px;
-    padding: 12px 14px;
-}
-.attention-item strong {
-    color: #f5f7fb;
-}
-.attention-item small {
-    display: block;
-    color: #9fa8b6;
-    margin-top: 3px;
-}
-.attention-item a {
-    color: #93c5fd;
-    text-decoration: none;
-}
-.attention-item a:hover {
-    text-decoration: underline;
-}
-.empty-state {
-    background: rgba(255,255,255,0.045);
-    border: 1px solid rgba(255,255,255,0.075);
-    border-radius: 12px;
-    padding: 24px;
-    text-align: center;
-    color: #9da6b6;
-}
-.mini-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.92rem;
-}
-.mini-table th,
-.mini-table td {
-    padding: 8px 6px;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    text-align: left;
-    vertical-align: top;
-}
-.mini-table th {
-    color: #aeb6c2;
-    font-weight: 700;
-}
-.mini-table td {
-    color: #dce2ea;
-}
-.mini-table tr:last-child td {
-    border-bottom: 0;
-}
-.breakdown-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.breakdown-chip {
-    display: inline-flex;
-    gap: 7px;
-    align-items: center;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 999px;
-    padding: 6px 10px;
-    color: #cbd5e1;
-    font-size: 0.88rem;
-}
-.breakdown-chip strong {
-    color: #f8fafc;
-}
-.trade-card {
-    background: #1b1f27;
-    border-left: 4px solid #facc15;
-    padding: 20px;
-    margin-bottom: 18px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
-}
-.trade-card hr {
-    border: 0;
-    border-top: 1px solid rgba(255,255,255,0.09);
-    margin: 15px 0;
-}
-.trade-columns {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
-}
-.trade-card ul {
-    color: #cbd5e1;
-    line-height: 1.6;
-    padding-left: 20px;
-}
-.form-group {
-    margin-top: 15px;
-}
-.form-group label {
-    font-weight: bold;
-    color: #ddd;
-}
-.form-group textarea {
-    width: 100%;
-    margin-top: 8px;
-    background: #111827;
-    color: white;
-    border: 1px solid #374151;
-    border-radius: 8px;
-    padding: 10px;
-    font-family: inherit;
-}
-.btn-row {
-    margin-top: 18px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: filter 0.2s;
-}
-.btn:hover { filter: brightness(1.15); }
-.btn-accept { background: #22c55e; color: white; }
-.btn-deny { background: #dc3545; color: white; }
-@media (max-width: 720px) {
-    .admin-section-header,
-    .attention-item {
-        display: block;
-    }
-    .attention-item .status-pill,
-    .attention-item .metric-value {
-        margin-top: 8px;
-    }
-}
-{% endblock style %}
-
 {% block content %}
 <div class="admin-page">
     <div class="admin-header">
@@ -344,6 +82,32 @@
                 <div class="metric-row"><span>Debug Mode</span><span class="metric-value {% if infrastructure_health.debug_mode %}text-amber{% else %}text-green{% endif %}">{{ 'On' if infrastructure_health.debug_mode else 'Off' }}</span></div>
                 <div class="card-footer">DB path is {{ 'configured' if infrastructure_health.db_path_known else 'not visible from DB_PATH' }}.</div>
             </div>
+
+            <div class="admin-card health">
+                <h4>TCGCSV Price Snapshot</h4>
+                {% set snap = tcgcsv_snapshot_health|default({}) %}
+                <div class="metric-row">
+                    <span>Snapshot Present</span>
+                    <span class="metric-value {% if snap.exists %}text-green{% else %}text-red{% endif %}">
+                        {{ 'Yes' if snap.exists else 'No' }}
+                    </span>
+                </div>
+                <div class="metric-row">
+                    <span>Remote Last Updated</span>
+                    <span class="metric-value">{{ snap.last_updated|default('Unknown') }}</span>
+                </div>
+                <div class="metric-row">
+                    <span>Captured At</span>
+                    <span class="metric-value">{{ snap.captured_at|default('Unknown') }}</span>
+                </div>
+                <div class="metric-row">
+                    <span>Snapshot Age</span>
+                    <span class="metric-value {% if snap.age_days is not none and snap.age_days > 1 %}text-amber{% elif snap.exists %}text-green{% else %}text-red{% endif %}">
+                        {% if snap.age_days is not none %}{{ snap.age_days }} day(s){% else %}Unknown{% endif %}
+                    </span>
+                </div>
+                <div class="card-footer">Run <code>scripts/refresh_tcgcsv_snapshot.py</code> to update. Prices sync from this local file only.</div>
+            </div>
         </div>
     </section>
 
@@ -416,7 +180,7 @@
                                     <td>{{ log.cards_updated }}</td>
                                 </tr>
                                 {% if log.message %}
-                                    <tr><td></td><td colspan="3" style="color: #9fa8b6;">{{ log.message }}</td></tr>
+                                    <tr><td></td><td colspan="3" class="log-message-cell">{{ log.message }}</td></tr>
                                 {% endif %}
                             {% endfor %}
                         </tbody>
@@ -453,20 +217,20 @@
         {% if pending_trades %}
             {% for trade in pending_trades %}
             <div class="trade-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <h4 style="margin: 0; color: #facc15;">Trade ID: {{ trade.trade_id }}</h4>
-                    <span style="color: #aaa; font-size: 0.9em;">{{ trade.created_at }}</span>
+                <div class="trade-card-header">
+                    <h4 class="trade-card-title">Trade ID: {{ trade.trade_id }}</h4>
+                    <span class="trade-card-meta">{{ trade.created_at }}</span>
                 </div>
-                <p style="margin-top: 5px;"><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
+                <p class="trade-submitter"><strong>Submitted By:</strong> {{ trade.submitter_name }}</p>
 
                 <hr>
 
                 <div class="trade-columns">
                     <div>
-                        <h5 style="color: #ff7b7b; margin-bottom: 10px;">Cards Requested from You</h5>
+                        <h5 class="trade-col-title trade-col-title--requested">Cards Requested from You</h5>
                         <ul>
                             {% for item in trade.requested_cards %}
-                                <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                                <li><strong>{{ item.quantity }}x</strong> {{ item.name }} ({{ item.set_code|upper }} #{{ item.collector_number }}) - <em class="trade-finish">{{ item.finish }}</em></li>
                             {% else %}
                                 <li><em>None</em></li>
                             {% endfor %}
@@ -474,10 +238,10 @@
                     </div>
 
                     <div>
-                        <h5 style="color: #86efac; margin-bottom: 10px;">Cards Offered to You</h5>
+                        <h5 class="trade-col-title trade-col-title--offered">Cards Offered to You</h5>
                         <ul>
                             {% for item in trade.offered_cards %}
-                                <li><strong>{{ item.quantity }}x</strong> {{ item.name|default('Unknown Card') }} ({{ item.set_code|default('?')|upper }} #{{ item.collector_number|default('?') }}) - <em style="color: #aaa;">{{ item.finish }}</em></li>
+                                <li><strong>{{ item.quantity }}x</strong> {{ item.name|default('Unknown Card') }} ({{ item.set_code|default('?')|upper }} #{{ item.collector_number|default('?') }}) - <em class="trade-finish">{{ item.finish }}</em></li>
                             {% else %}
                                 <li><em>None</em></li>
                             {% endfor %}
@@ -488,6 +252,7 @@
                 <hr>
 
                 <form action="{{ url_for('admin.manage_trade') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="trade_id" value="{{ trade.trade_id }}">
 
                     <div class="form-group">
@@ -496,8 +261,8 @@
                     </div>
 
                     <div class="btn-row">
-                        <button type="button" class="btn btn-accept" onclick="respondToTrade('{{ trade.trade_id }}', 'accept')">Accept Trade</button>
-                        <button type="button" class="btn btn-deny" onclick="respondToTrade('{{ trade.trade_id }}', 'decline')">Deny Trade</button>
+                        <button type="button" class="site-button site-button--success" onclick="respondToTrade('{{ trade.trade_id }}', 'accept')">Accept Trade</button>
+                        <button type="button" class="site-button site-button--danger" onclick="respondToTrade('{{ trade.trade_id }}', 'decline')">Deny Trade</button>
                     </div>
                 </form>
             </div>
@@ -515,7 +280,7 @@
 
         fetch('/api/manage_trade', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ trade_id: tradeId, action: action })
         })
         .then(res => res.json())
