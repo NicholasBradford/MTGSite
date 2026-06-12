@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, abort, redirect, url_for,
 from flask_login import login_required, current_user
 from functools import wraps
 # Import your database connection utility here, e.g., get_db
-from db.db_manager import CardDB           
+from db.db_manager import get_db          
 from ScryfallFetcher import ScryfallFetcher
 
 # Initialize Blueprint
@@ -96,7 +96,7 @@ def process_and_import_deck(file_path, deck_name, color_identity, commander_name
     """Orchestrates parsing the file, fetching missing data, and saving to the DB."""
     
     # Use the CardDB class directly so it plays nicely with ScryfallFetcher
-    db = CardDB() 
+    db = get_db() 
     fetcher = ScryfallFetcher(db,setting=1)
     
     try:
@@ -206,7 +206,7 @@ def import_deck():
 @edh_bp.route('/edh/gallery')
 def edh_gallery():
     """Renders the EDH Gallery View."""
-    db = CardDB() 
+    db = get_db() 
     
     decks = db.cursor.execute('''
         SELECT 
@@ -230,7 +230,7 @@ def edh_view(deck_name):
     if not deck_name:
         abort(404, description="Deck name is required.")
         
-    db = CardDB()
+    db = get_db()
     
     # 1. Get Deck & Commander Info
     deck = db.cursor.execute('''
@@ -371,7 +371,7 @@ def edh_view(deck_name):
 @admin_required
 def add_card_to_deck(deck_id, scryfall_id):
     """Increments the quantity of a card in the deck."""
-    db = CardDB()
+    db = get_db()
     
     # 1. Fetch deck_name for the redirect 
     deck_row = db.cursor.execute("SELECT deck_name FROM edh_decks WHERE deck_id = ?", (deck_id,)).fetchone()
@@ -409,7 +409,7 @@ def add_card_to_deck(deck_id, scryfall_id):
 @admin_required
 def remove_card_from_deck(deck_id, scryfall_id):
     """Decrements the quantity of a card in the deck or removes it if 0."""
-    db = CardDB()
+    db = get_db()
 
     # 1. Fetch deck_name for the redirect
     deck_row = db.cursor.execute("SELECT deck_name FROM edh_decks WHERE deck_id = ?", (deck_id,)).fetchone()
@@ -457,9 +457,9 @@ def add_card_to_deck_by_name(deck_id):
     card_name = request.form.get('card_name')
     if not card_name:
         flash('Please enter a card name.', 'error')
-        return redirect(request.referrer)
+        return redirect(url_for('edh.edh_gallery'))
 
-    db = CardDB()
+    db = get_db()
     
     # 1. Fetch deck_name for the redirect
     deck_row = db.cursor.execute("SELECT deck_name FROM edh_decks WHERE deck_id = ?", (deck_id,)).fetchone()
@@ -503,7 +503,13 @@ def add_card_to_deck_by_name(deck_id):
 @edh_bp.route('/edh/assign_card/<int:deck_id>/<oracle_id>', methods=['POST'])
 @login_required
 def assign_card_to_deck(deck_id, oracle_id):
-    db = CardDB()
+    db = get_db()
+
+    deck_row = db.cursor.execute("SELECT deck_name FROM edh_decks WHERE deck_id = ?", (deck_id,)).fetchone()
+    if not deck_row:
+        db.close()
+        abort(404, description="Deck not found.")
+    deck_name = deck_row['deck_name']
     
     # 1. Find the best available physical copy of this card
     best_copy = db.cursor.execute('''
@@ -520,7 +526,7 @@ def assign_card_to_deck(deck_id, oracle_id):
     if not best_copy:
         flash("No available copies found in your inventory.", "error")
         db.close()
-        return redirect(url_for('edh.edh_view', deck_id=deck_id))
+        return redirect(url_for('edh.edh_view', deck_name=deck_name))
 
     # 2. Lock this specific instance to the deck
     instance_id = best_copy['instance_id']
@@ -537,4 +543,4 @@ def assign_card_to_deck(deck_id, oracle_id):
     db.close()
     
     flash("Card successfully assigned to deck!", "success")
-    return redirect(url_for('edh.edh_view', deck_id=deck_id))
+    return redirect(url_for('edh.edh_view', deck_name=deck_name))

@@ -3,7 +3,16 @@ from flask import Blueprint, Response, request, flash, redirect, url_for, render
 from functools import wraps
 import ScryfallFetcher
 from flask_login import login_required, current_user
-from db.db_manager import CardDB
+from db.db_manager import get_db
+try:
+    from services.tcgcsv_prices import get_local_snapshot_metadata, local_snapshot_exists
+except ImportError:
+    # Keep admin dashboard functional on branches where snapshot helpers are not present.
+    def get_local_snapshot_metadata():
+        return {}
+
+    def local_snapshot_exists():
+        return False
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -24,8 +33,9 @@ def admin():
 
 @admin_bp.route('/admin/locations', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def manage_locations():
-    manager = CardDB()
+    manager = get_db()
     
     if request.method == 'POST':
         action = request.form.get('action')
@@ -132,7 +142,7 @@ def _add_attention(attention_items, severity, label, count=None, detail=None, hr
 @login_required
 @admin_required
 def admin_dashboard():
-    manager = CardDB()
+    manager = get_db()
     growth = 0
     fall = 0
     total_cards = 0
@@ -465,7 +475,39 @@ def admin_dashboard():
         _add_attention(attention_items, "warning", "Card printings without images", data_integrity["cards_without_images"], "May show broken or blank card art.")
         _add_attention(attention_items, "info", "Pending trade requests", len(pending_trades), "Trade queue needs review.")
 
+        snapshot_metadata = get_local_snapshot_metadata()
+        snapshot_present = local_snapshot_exists()
+        snapshot_last_updated = snapshot_metadata.get("last_updated") or "Never"
+        snapshot_captured_at = snapshot_metadata.get("captured_at") or "Unknown"
+        snapshot_age_days = None
+        if snapshot_metadata.get("captured_at"):
+            try:
+                captured = datetime.datetime.fromisoformat(snapshot_metadata["captured_at"])
+                snapshot_age_days = (datetime.datetime.utcnow() - captured).days
+            except Exception:
+                pass
+        tcgcsv_snapshot_health = {
+            "exists": snapshot_present,
+            "last_updated": snapshot_last_updated,
+            "captured_at": snapshot_captured_at,
+            "age_days": snapshot_age_days,
+        }
+
+        if not snapshot_present:
+            _add_attention(
+                attention_items, "critical",
+                "No local TCGCSV price snapshot", 1,
+                "Run scripts/refresh_tcgcsv_snapshot.py to enable price sync.",
+            )
+        elif snapshot_age_days is not None and snapshot_age_days > 1:
+            _add_attention(
+                attention_items, "warning",
+                "Local TCGCSV snapshot is stale", snapshot_age_days,
+                f"Last captured {snapshot_age_days} day(s) ago. Run refresh_tcgcsv_snapshot.py.",
+            )
+
     except Exception as e:
+        tcgcsv_snapshot_health = {"exists": False, "last_updated": "Unknown", "captured_at": "Unknown", "age_days": None}
         flash(f"Error loading dashboard data: {e}", "error")
         collection_health = {}
         finish_breakdown = []
@@ -497,10 +539,12 @@ def admin_dashboard():
                            sync_health=sync_health,
                            trade_health=trade_health,
                            infrastructure_health=infrastructure_health,
+                           tcgcsv_snapshot_health=tcgcsv_snapshot_health,
                            attention_items=attention_items)
 
 @admin_bp.route('/api/manage_trade', methods=['POST'])
 @login_required
+@admin_required
 def manage_trade():
     data = request.json
     trade_id = data.get('trade_id')
@@ -509,7 +553,7 @@ def manage_trade():
     if not trade_id or action not in ['accept', 'decline']:
         return jsonify({'success': False, 'error': 'Invalid request parameters.'}), 400
 
-    manager = CardDB()
+    manager = get_db()
     
     try:
         if action == 'accept':
@@ -567,11 +611,10 @@ def search_api():
      return render_template('search_api.html')
  
 @admin_bp.route('/add/wishlist', methods=['GET', 'POST'])
+@login_required
+@admin_required
 def wishlist_add():
-    if current_user.role != 'admin':
-        return "Access Denied", 403
-    
-    manager = CardDB()
+    manager = get_db()
     fetcher = ScryfallFetcher.ScryfallFetcher(manager, setting=1)
 
     query = '''
@@ -639,8 +682,10 @@ def wishlist_add():
     return render_template('/wishlist_adder.html', cards=cards,)
 
 @admin_bp.route('/delete_wish/<int:wish_id>', methods=['POST'])
+@login_required
+@admin_required
 def delete_wish(wish_id):
-    manager = CardDB()
+    manager = get_db()
     try:
        
         manager.cursor.execute("DELETE FROM wishlist WHERE wish_id = ?", (wish_id,))

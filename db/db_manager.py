@@ -1,4 +1,5 @@
 import sqlite3, os, random, traceback
+from flask import g
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,6 +12,7 @@ class CardDB:
         # traceback.print_stack(limit=3)
         if db_path is None:
             db_path = os.environ.get('DB_PATH')
+        self.db_path = db_path
         self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
         self.cursor = self.conn.cursor()
@@ -297,6 +299,8 @@ class CardDB:
         # print(f"[-] CLOSING connection {self.trace_id}")
         if self.conn:
             self.conn.close()
+            self.conn = None
+            self.cursor = None
             
     def nuke(self):
         self.wipe_db()
@@ -308,3 +312,37 @@ class CardDB:
         self.create_tables()
         self.initialize_locations()
         self.commit()
+
+
+def get_db():
+    """Return the request-scoped CardDB handle.
+
+    SQLite connections must not live across Gunicorn requests or they can pin
+    the WAL and shm files open for the lifetime of the worker.
+    """
+    manager = g.get("db_manager")
+
+    if manager is None or getattr(manager, "conn", None) is None:
+        manager = CardDB()
+        g.db_manager = manager
+
+    return manager
+
+
+def close_db(error=None):
+    manager = g.pop("db_manager", None)
+
+    if manager is not None:
+        manager.close()
+
+
+def checkpoint_db(db_path, verbose=False):
+    if not db_path:
+        return
+
+    with sqlite3.connect(db_path, timeout=30) as conn:
+        result = conn.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+        if verbose:
+            print(
+                f"WAL checkpoint: busy={result[0]}, log={result[1]}, checkpointed={result[2]}"
+            )

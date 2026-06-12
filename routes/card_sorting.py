@@ -1,6 +1,6 @@
 import re
 from flask import Blueprint, request, redirect, url_for, render_template, flash
-from db.db_manager import CardDB
+from db.db_manager import get_db
 from flask_login import login_required, current_user
 
 ALPHABET_BINS = [
@@ -15,7 +15,6 @@ COLORLESS_BINS = [
 ]
 
 sorter_bp = Blueprint('sorter', __name__)
-manager = CardDB()
 
 def clean_sort_name(name):
     """ Removes leading articles ('A ', 'An ', 'The ') for accurate alphabetical sorting. """
@@ -86,6 +85,7 @@ def sort_and_relocate_inventory(source_location_id):
         flash("Unauthorized access.", "danger")
         return redirect(url_for('admin.admin_dashboard'))
 
+    manager = get_db()
     cursor = manager.conn.cursor()
     try:
         # 1. Fetch source dataset 

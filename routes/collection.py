@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request
-from db.db_manager import CardDB
+from db.db_manager import get_db
 
 collection_bp = Blueprint('collection', __name__)
 
@@ -11,7 +11,7 @@ def planeswalker_collection():
     per_page = 50 
     offset = (page - 1) * per_page
 
-    manager = CardDB()
+    manager = get_db()
     binder_location_id = 97
     
     base_query = '''

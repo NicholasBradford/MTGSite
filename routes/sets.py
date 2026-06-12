@@ -1,5 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, render_template
-from db.db_manager import CardDB
+from db.db_manager import get_db
 from datetime import datetime, timedelta
 
 sets_bp = Blueprint('sets', __name__)
@@ -7,7 +7,7 @@ sets_bp = Blueprint('sets', __name__)
 
 @sets_bp.route('/sets', methods=['GET', 'POST'])
 def set_gallery():
-    manager = CardDB()
+    manager = get_db()
 
     query = """
         WITH target_cards AS (
@@ -199,7 +199,7 @@ def set_gallery():
 
 @sets_bp.route('/set/<set_code>')
 def set_detail(set_code):
-    manager = CardDB()
+    manager = get_db()
 
     query_set_info = """
         SELECT

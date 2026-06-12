@@ -5,7 +5,7 @@ from flask import request, Blueprint, redirect, url_for, render_template, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from db.db_manager import CardDB
+from db.db_manager import get_db
 from db.user_manager import User
 
 authentication_bp = Blueprint('authentication', __name__)
@@ -63,7 +63,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        manager = CardDB()
+        manager = get_db()
         user = manager.cursor.execute(
             "SELECT * FROM users WHERE username = ?",
             (username,)
@@ -126,12 +126,18 @@ def register():
         hashed_pw = generate_password_hash(password)
         secret_admin_phrase = os.environ.get('ADMIN_REGISTRATION_KEY')
 
-        manager = CardDB()
+        manager = get_db()
 
-        if role == "admin" and admin_key != secret_admin_phrase:
-            manager.close()
-            flash('Cannot create ADMIN account without site owner authorization')
-            return redirect(url_for('authentication.login'))
+        if role == "admin":
+            if not secret_admin_phrase:
+                manager.close()
+                flash('Admin registration is disabled until ADMIN_REGISTRATION_KEY is configured.')
+                return redirect(url_for('authentication.login'))
+
+            if not admin_key or admin_key != secret_admin_phrase:
+                manager.close()
+                flash('Cannot create ADMIN account without site owner authorization')
+                return redirect(url_for('authentication.login'))
 
         try:
             manager.cursor.execute(

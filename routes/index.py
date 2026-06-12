@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template
-from db.db_manager import CardDB
+from db.db_manager import get_db
 from routes.markets import get_market_summary
 
 main_bp = Blueprint('main', __name__)
@@ -32,7 +32,7 @@ def get_collection_value(manager):
 
 @main_bp.route('/')
 def index():
-    manager = CardDB()
+    manager = get_db()
 
     try:
         # Keep route paths centralized so public landing-page links are easy to adjust

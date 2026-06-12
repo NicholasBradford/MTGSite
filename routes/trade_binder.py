@@ -2,7 +2,7 @@ import sqlite3, db.db_manager, uuid, requests,datetime, ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
 from search import search
-from db.db_manager import CardDB
+from db.db_manager import get_db
 sort_options = {
         'name': """
             LOWER(
@@ -31,13 +31,14 @@ def get_db_connection():
 trade_bp = Blueprint('trade_binder', __name__)
 
 @trade_bp.route('/binder/trades', methods=['GET', 'POST'])
+@login_required
 def trade():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 50 
     offset = (page - 1) * per_page
     
-    manager = CardDB()
+    manager = get_db()
     # conditions = 
     params, filter_sql, having_sql, having_params, sort_sql = search(search_query,["i.is_tradeable = 1"])
     # params.append("i.is_tradeable = 1")
@@ -99,7 +100,7 @@ def trade():
     '''    
     
     # Execute main query passing the search params PLUS the limit and offset params
-    cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
+    cards = manager.cursor.execute(main_query, params + having_params + [per_page, offset]).fetchall()
     
     query_locs = 'SELECT location_id as id, name FROM locations ORDER BY name'
     locs = manager.cursor.execute(query_locs).fetchall()
@@ -171,7 +172,7 @@ def submit_trade():
     
     user_id = current_user.id
 
-    manager = CardDB()
+    manager = get_db()
     
     fetcher = ScryfallFetcher.ScryfallFetcher(manager)
     
@@ -217,7 +218,7 @@ def wishlist():
     per_page = 50
     offset = (page - 1) * per_page
 
-    manager = CardDB()
+    manager = get_db()
 
     params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
 
@@ -278,7 +279,7 @@ def wishlist():
         LIMIT ? OFFSET ?
     """
 
-    cards = manager.cursor.execute(main_query, params + [per_page, offset]).fetchall()
+    cards = manager.cursor.execute(main_query, params + having_params + [per_page, offset]).fetchall()
 
     manager.close()
 
@@ -332,7 +333,7 @@ def update_wishlist_item(wish_id):
 
     priority = max(1, min(priority, 5))
 
-    manager = CardDB()
+    manager = get_db()
 
     try:
         result = manager.cursor.execute("""
@@ -383,7 +384,7 @@ def search_tradeable_cards():
     if not query:
         return jsonify([])
 
-    manager = CardDB()
+    manager = get_db()
     # Search for cards in inventory where is_tradeable is true (1)
     # Note: If your column is still technically 'is_surplus' in the DB schema, change it here.
     sql = """
@@ -412,34 +413,62 @@ def search_tradeable_cards():
 
 @trade_bp.route('/api/fetch_incoming', methods=['POST'])
 def fetch_incoming_card():
-    data = request.json
-    set_code = data.get('set_code', '').lower()
-    cn = data.get('cn', '').lower()
-    finish = data.get('finish', 'nonfoil')
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    set_code = str(data.get('set_code', '')).strip().lower()
+    cn = str(data.get('cn', '')).strip().lower()
+    finish = str(data.get('finish', 'nonfoil')).strip().lower() or 'nonfoil'
 
-    # Fetch directly from Scryfall to just get the image/data without adding to DB yet
-    url = f"https://api.scryfall.com/cards/{set_code}/{cn}"
-    response = requests.get(url)
-    
+    if not set_code or not cn:
+        return jsonify({'success': False, 'error': 'Set code and collector number are required.'}), 400
+
+    scryfall_headers = {
+        "User-Agent": "MTGSite/1.0 (+http://localhost)",
+        "Accept": "application/json",
+    }
+
+    # First try the direct Scryfall card endpoint.
+    response = requests.get(
+        f"https://api.scryfall.com/cards/{set_code}/{cn}",
+        headers=scryfall_headers,
+        timeout=20,
+    )
+    card_data = None
+
     if response.status_code == 200:
         card_data = response.json()
-        
-        # Handle double-faced cards for images
-        if 'image_uris' in card_data:
-            image_url = card_data['image_uris'].get('normal', '')
-        elif 'card_faces' in card_data and 'image_uris' in card_data['card_faces'][0]:
-            image_url = card_data['card_faces'][0]['image_uris'].get('normal', '')
-        else:
-            image_url = ""
-
-        return jsonify({
-            'success': True,
-            'name': card_data['name'],
-            'scryfall_id': card_data['id'],
-            'set_code': set_code,
-            'cn': cn,
-            'finish': finish,
-            'image_url': image_url
-        })
     else:
+        # Fall back to a search query so collector-number formatting differences
+        # do not break incoming card lookup.
+        search_query = f"set:{set_code} cn:{cn}"
+        search_response = requests.get(
+            "https://api.scryfall.com/cards/search",
+            params={"q": search_query},
+            headers=scryfall_headers,
+            timeout=20,
+        )
+        if search_response.status_code == 200:
+            search_data = search_response.json()
+            results = search_data.get('data', [])
+            if results:
+                card_data = results[0]
+
+    if not card_data:
         return jsonify({'success': False, 'error': 'Card not found on Scryfall.'}), 404
+
+    # Handle double-faced cards for images
+    if 'image_uris' in card_data:
+        image_url = card_data['image_uris'].get('normal', '')
+    elif 'card_faces' in card_data and card_data['card_faces'] and 'image_uris' in card_data['card_faces'][0]:
+        image_url = card_data['card_faces'][0]['image_uris'].get('normal', '')
+    else:
+        image_url = ""
+
+    return jsonify({
+        'success': True,
+        'name': card_data['name'],
+        'scryfall_id': card_data['id'],
+        'set_code': card_data.get('set', set_code),
+        'cn': card_data.get('collector_number', cn),
+        'finish': finish,
+        'image_url': image_url
+    })
