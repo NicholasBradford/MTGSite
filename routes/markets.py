@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from collections import defaultdict
 from services.tcgcsv_prices import *
 
-from db.db_manager import CardDB, get_db, checkpoint_db
+from db.db_manager import CardDB, get_db
 
 
 markets_bp = Blueprint("markets", __name__)
@@ -90,9 +90,6 @@ MARKET_SORT_SQL = {
     "owned_impact": "ABS(owned_impact) DESC, ABS(new_price - old_price) DESC",
     "newest": "latest_scraped_at DESC, ABS(new_price - old_price) DESC",
 }
-
-# Keep the full request comfortably below Gunicorn's hard timeout.
-WEB_SNAPSHOT_REFRESH_BUDGET_SECONDS = 210
 
 
 # =========================================================
@@ -1368,91 +1365,21 @@ def update_prices():
     session.headers.update(TCGCSV_HEADERS)
 
     try:
-        yield sse_message(3, "Checking TCGCSV for available updates...")
+        yield sse_message(5, "Checking TCGCSV daily build timestamp...")
 
-        # --- Phase 1: Refresh the local TCGCSV snapshot ---
         try:
-            last_remote = None
+            tcgcsv_timestamp = tcgcsv_get_text(session, TCGCSV_LAST_UPDATED_URL)
+        except Exception as error:
+            manager.log_update(
+                task_name="TCGCSV Price Sync",
+                cards_updated=0,
+                status="Error",
+                message=f"Could not reach TCGCSV: {error}"
+            )
+            yield sse_message(100, f"Could not reach TCGCSV: {error}")
+            return
 
-            for (done, total, skipped, remote_ts, status) in stream_refresh_daily_price_snapshot_if_needed(
-                max_duration_seconds=WEB_SNAPSHOT_REFRESH_BUDGET_SECONDS,
-            ):
-                last_remote = remote_ts
-
-                if status == "unchanged":
-                    yield sse_message(
-                        15,
-                        f"Snapshot already current (remote last-updated: {remote_ts}).",
-                    )
-                    break
-
-                if status == "complete":
-                    yield sse_message(
-                        40,
-                        f"Snapshot downloaded (remote last-updated: {remote_ts}). {skipped} groups skipped.",
-                    )
-                    break
-
-                if total > 0:
-                    pct = int(5 + (done / total) * 33)
-                    yield sse_message(
-                        pct,
-                        f"Downloading TCGCSV snapshot: {done}/{total} groups ({skipped} skipped)...",
-                    )
-
-        except TimeoutError as refresh_timeout:
-            if local_snapshot_exists():
-                yield sse_message(
-                    15,
-                    (
-                        f"Snapshot refresh hit time budget ({WEB_SNAPSHOT_REFRESH_BUDGET_SECONDS}s). "
-                        f"Using existing local snapshot. Details: {refresh_timeout}"
-                    ),
-                )
-            else:
-                manager.log_update(
-                    task_name="TCGCSV Price Sync",
-                    cards_updated=0,
-                    status="Error",
-                    message=(
-                        "Snapshot refresh timed out and no local snapshot exists. "
-                        f"Details: {refresh_timeout}"
-                    ),
-                )
-                yield sse_message(
-                    100,
-                    (
-                        "Snapshot refresh timed out before first usable snapshot. "
-                        "Retry during lower load or pre-refresh snapshot first."
-                    ),
-                )
-                return
-
-        except Exception as refresh_error:
-            if local_snapshot_exists():
-                yield sse_message(
-                    15,
-                    f"Could not reach TCGCSV ({refresh_error}). Proceeding with existing local snapshot.",
-                )
-            else:
-                manager.log_update(
-                    task_name="TCGCSV Price Sync",
-                    cards_updated=0,
-                    status="Error",
-                    message=(
-                        f"Could not download TCGCSV snapshot and no local snapshot exists: {refresh_error}"
-                    ),
-                )
-                yield sse_message(
-                    100,
-                    f"No snapshot available and TCGCSV is unreachable: {refresh_error}",
-                )
-                return
-
-        # --- Phase 2: Sync prices from the local snapshot ---
-        tcgcsv_timestamp = get_local_snapshot_last_updated() or datetime.datetime.utcnow().isoformat(timespec="seconds")
-
-        yield sse_message(42, "Gathering local TCGplayer product ids...")
+        yield sse_message(10, "Gathering local TCGplayer product ids...")
 
         local_rows = get_local_cards_needing_prices(manager)
 
@@ -1475,15 +1402,14 @@ def update_prices():
         missing_count = 0
 
         yield sse_message(
-            45,
-            f"Preparing local TCGCSV group lookup for {total_cards} local cards..."
+            15,
+            f"Preparing TCGCSV group lookup for {total_cards} local cards..."
         )
 
         grouped_targets = get_grouped_local_price_targets(
             manager,
             session,
             local_rows,
-            allow_remote_group_lookup=False,
         )
 
         if not grouped_targets:
@@ -1504,21 +1430,17 @@ def update_prices():
         total_groups = len(group_items)
 
         yield sse_message(
-            50,
-            f"Updating prices from local TCGCSV snapshot across {total_groups} groups..."
+            20,
+            f"Updating prices across {total_groups} TCGCSV groups..."
         )
 
         for group_index, (group_id, targets_by_scryfall_id) in enumerate(group_items, start=1):
-            prices = get_tcgcsv_prices_for_group_with_fallback(
-                session,
-                group_id,
-                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
-            )
+            prices = get_tcgcsv_prices_for_group(session, group_id)
 
             if not prices:
                 yield sse_message(
-                    int(50 + (group_index / total_groups) * 48),
-                    f"Skipped group {group_id}; no prices found in local snapshot.",
+                    int(20 + (group_index / total_groups) * 78),
+                    f"Skipped group {group_id}; no prices found."
                 )
                 time.sleep(TCGCSV_RATE_LIMIT_DELAY)
                 continue
@@ -1547,7 +1469,6 @@ def update_prices():
                     product_prices = prices_by_product_id.get(normal_product_id, {})
 
                     if has_price_override and is_foil_like_finish(inventory_finish):
-                        # Product itself is the alt-finish product, even if TCGCSV subtype says Normal.
                         foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
                     else:
                         nonfoil_price = product_prices.get("nonfoil")
@@ -1584,7 +1505,7 @@ def update_prices():
             manager.commit()
 
             yield sse_message(
-                int(50 + (group_index / total_groups) * 48),
+                int(20 + (group_index / total_groups) * 78),
                 f"Processed {group_index}/{total_groups} TCGCSV groups."
             )
 
@@ -1613,7 +1534,6 @@ def update_prices():
 
     finally:
         manager.close()
-        checkpoint_db(getattr(manager, "db_path", None))
 
 
 

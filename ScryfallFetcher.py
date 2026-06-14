@@ -9,6 +9,7 @@ import requests
 
 from services.tcgcsv_prices import (
     TCGCSV_SOURCE_LOCAL_ONLY,
+    TCGCSV_SOURCE_REMOTE_FALLBACK_LOCAL,
     update_prices_for_scryfall_ids_from_tcgcsv,
     update_single_card_price_from_tcgcsv,
 )
@@ -272,7 +273,7 @@ class ScryfallOrchestrator:
                 self.db,
                 scryfall_ids,
                 data_source=TCGCSV_SOURCE_LOCAL_ONLY,
-                allow_remote_group_lookup=False,
+                allow_remote_group_lookup=True,
             )
 
         return sync_fn(self.db, scryfall_ids)
@@ -374,8 +375,8 @@ class ScryfallOrchestrator:
                         update_single_card_price_from_tcgcsv(
                             self.db,
                             normalized.scryfall_id,
-                            data_source=TCGCSV_SOURCE_LOCAL_ONLY,
-                            allow_remote_group_lookup=False,
+                            data_source=TCGCSV_SOURCE_REMOTE_FALLBACK_LOCAL,
+                            allow_remote_group_lookup=True,
                         )
                     self.persistence.commit()
                 except Exception as error:
