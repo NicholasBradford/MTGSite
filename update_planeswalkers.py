@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import requests
 
-from db.db_manager import CardDB
+from db.db_manager import CardDB, checkpoint_db
 
 
 # ---------------------------------------------------------------------------
@@ -545,6 +545,7 @@ def update_planeswalker_backbone():
 
     finally:
         manager.close()
+        checkpoint_db(manager.db_path)
 
 
 if __name__ == "__main__":

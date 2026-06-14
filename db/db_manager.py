@@ -313,7 +313,6 @@ class CardDB:
         self.initialize_locations()
         self.commit()
 
-
 def get_db():
     """Return the request-scoped CardDB handle.
 

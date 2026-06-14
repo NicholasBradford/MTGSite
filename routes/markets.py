@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from collections import defaultdict
 from services.tcgcsv_prices import *
 
-from db.db_manager import CardDB
+from db.db_manager import CardDB, get_db
 
 
 markets_bp = Blueprint("markets", __name__)
@@ -1250,7 +1250,7 @@ def format_signed_percent(value):
 @markets_bp.route("/market/dashboard", methods=["GET"])
 @login_required
 def market_dashboard():
-    manager = CardDB()
+    manager = get_db()
 
     market_filter = get_market_filter()
     market_sort = get_market_sort()
@@ -1376,7 +1376,6 @@ def update_prices():
                 status="Error",
                 message=f"Could not reach TCGCSV: {error}"
             )
-
             yield sse_message(100, f"Could not reach TCGCSV: {error}")
             return
 
@@ -1407,7 +1406,11 @@ def update_prices():
             f"Preparing TCGCSV group lookup for {total_cards} local cards..."
         )
 
-        grouped_targets = get_grouped_local_price_targets(manager, session, local_rows)
+        grouped_targets = get_grouped_local_price_targets(
+            manager,
+            session,
+            local_rows,
+        )
 
         if not grouped_targets:
             manager.log_update(
@@ -1427,17 +1430,17 @@ def update_prices():
         total_groups = len(group_items)
 
         yield sse_message(
-            25,
-            f"Updating prices from TCGCSV across {total_groups} groups..."
+            20,
+            f"Updating prices across {total_groups} TCGCSV groups..."
         )
 
         for group_index, (group_id, targets_by_scryfall_id) in enumerate(group_items, start=1):
-            try:
-                prices = get_tcgcsv_prices_for_group(session, group_id)
-            except Exception as error:
+            prices = get_tcgcsv_prices_for_group(session, group_id)
+
+            if not prices:
                 yield sse_message(
-                    int(25 + (group_index / total_groups) * 70),
-                    f"Skipped group {group_id} after error: {error}"
+                    int(20 + (group_index / total_groups) * 78),
+                    f"Skipped group {group_id}; no prices found."
                 )
                 time.sleep(TCGCSV_RATE_LIMIT_DELAY)
                 continue
@@ -1466,7 +1469,6 @@ def update_prices():
                     product_prices = prices_by_product_id.get(normal_product_id, {})
 
                     if has_price_override and is_foil_like_finish(inventory_finish):
-                        # Product itself is the alt-finish product, even if TCGCSV subtype says Normal.
                         foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
                     else:
                         nonfoil_price = product_prices.get("nonfoil")
@@ -1503,7 +1505,7 @@ def update_prices():
             manager.commit()
 
             yield sse_message(
-                int(25 + (group_index / total_groups) * 70),
+                int(20 + (group_index / total_groups) * 78),
                 f"Processed {group_index}/{total_groups} TCGCSV groups."
             )
 
