@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+import inspect
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -249,17 +250,32 @@ class ScryfallOrchestrator:
 
     def _update_batch_prices(self, scryfall_ids):
         try:
-            updated_count = update_prices_for_scryfall_ids_from_tcgcsv(
-                self.db,
-                scryfall_ids,
-                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
-                allow_remote_group_lookup=False,
+            updated_count = self._call_update_prices_for_scryfall_ids_from_tcgcsv(
+                scryfall_ids
             )
             self.persistence.commit()
             return updated_count
         except Exception as error:
             print(f"TCGCSV batch price sync skipped: {error}")
             return 0
+
+    def _call_update_prices_for_scryfall_ids_from_tcgcsv(self, scryfall_ids):
+        sync_fn = update_prices_for_scryfall_ids_from_tcgcsv
+
+        try:
+            parameters = inspect.signature(sync_fn).parameters
+        except (TypeError, ValueError):
+            parameters = {}
+
+        if "data_source" in parameters or "allow_remote_group_lookup" in parameters:
+            return sync_fn(
+                self.db,
+                scryfall_ids,
+                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                allow_remote_group_lookup=False,
+            )
+
+        return sync_fn(self.db, scryfall_ids)
 
     def ensure_set_is_fully_populated(self, set_code):
         result = {
@@ -351,11 +367,8 @@ class ScryfallOrchestrator:
 
             if sync_prices:
                 try:
-                    updated = update_prices_for_scryfall_ids_from_tcgcsv(
-                        self.db,
-                        [normalized.scryfall_id],
-                        data_source=TCGCSV_SOURCE_LOCAL_ONLY,
-                        allow_remote_group_lookup=False,
+                    updated = self._call_update_prices_for_scryfall_ids_from_tcgcsv(
+                        [normalized.scryfall_id]
                     )
                     if not updated:
                         update_single_card_price_from_tcgcsv(
