@@ -329,7 +329,7 @@ class ScryfallOrchestrator:
         print(f"Set {set_code.upper()} fully synchronized.")
         return result
 
-    def fetch_and_add(self, set_code, collector_number, sync_prices=True):
+    def fetch_and_add(self, set_code, collector_number, sync_prices=True, return_context=False):
         data = self.api.get_card_by_set_collector(set_code, collector_number)
         if not data:
             print(f"Error: Could not find {set_code} {collector_number}")
@@ -339,6 +339,10 @@ class ScryfallOrchestrator:
         if not normalized:
             print(f"Error: Missing oracle_id/scryfall_id for {set_code} {collector_number}")
             return False
+
+        scryfall_prices = data.get('prices', {}) if isinstance(data, dict) else {}
+        scryfall_price_usd = scryfall_prices.get('usd')
+        scryfall_price_foil = scryfall_prices.get('usd_foil')
 
         try:
             self.persistence.upsert_card_definition(normalized)
@@ -365,6 +369,13 @@ class ScryfallOrchestrator:
                     print(f"TCGCSV price update skipped for {normalized.scryfall_id}: {error}")
 
             time.sleep(RATE_LIMIT_DELAY_SECONDS)
+            if return_context:
+                return {
+                    'scryfall_id': normalized.scryfall_id,
+                    'scryfall_price_usd': scryfall_price_usd,
+                    'scryfall_price_foil': scryfall_price_foil,
+                }
+
             return normalized.scryfall_id
         except Exception as error:
             print(f"DB Error: {error}")
@@ -391,10 +402,15 @@ class ScryfallFetcher:
         """Checks if a set is in the DB; if not, pulls every card printing for that set."""
         return self.orchestrator.ensure_set_is_fully_populated(set_code.lower())
 
-    def fetch_and_add(self, set_code, collector_number, sync_prices=True):     
+    def fetch_and_add(self, set_code, collector_number, sync_prices=True, return_context=False):     
         set_code = set_code.lower()
         # Trigger the full set sync first to ensure checklist is ready
         if self.setting == 0:
             self.ensure_set_is_fully_populated(set_code)
 
-        return self.orchestrator.fetch_and_add(set_code, collector_number, sync_prices=sync_prices)
+        return self.orchestrator.fetch_and_add(
+            set_code,
+            collector_number,
+            sync_prices=sync_prices,
+            return_context=return_context,
+        )
