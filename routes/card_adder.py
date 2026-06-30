@@ -4,7 +4,7 @@ from db.db_manager import get_db
 from flask_login import login_required, current_user
 from io import TextIOWrapper
 from functools import wraps
-from services.card_importer import CardImporterService
+from services.card_fetcher import CardImporterService, DEFAULT_LOCATION_ID
 
 def get_db_connection():
     # Points to your db folder
@@ -29,8 +29,7 @@ def admin_required(f):
 @admin_required
 def adder():
     manager = get_db()
-    importer = CardImporterService(manager, fetcher=ScryfallFetcher.ScryfallFetcher(manager))
-    
+    importer = CardImporterService(manager)    
     page = int(request.args.get('page', 1))
     per_page = 25  # Number of cards to load per batch
     offset = (page - 1) * per_page
@@ -40,25 +39,34 @@ def adder():
         FROM inventory i 
         JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
-        JOIN locations l ON i.location_id = l.location_id
-        JOIN price_history ph ON ph.scryfall_id = cp.scryfall_id
+        LEFT JOIN locations l ON i.location_id = l.location_id
     '''
     count_result = manager.cursor.execute(count_query).fetchone()
     total_cards = count_result[0] if count_result else 0
     total_pages = max(1, math.ceil(total_cards / per_page))
 
     query = '''
-        SELECT i.instance_id, cd.name, cp.set_code, cp.collector_number, i.added, i.finish, l.name AS location_name, ph.price_usd as nonfoil, ph.price_foil as foil
+        SELECT
+            i.instance_id,
+            cd.name,
+            cp.set_code,
+            cp.collector_number,
+            i.added,
+            i.finish,
+            l.name AS location_name,
+            COALESCE(ph.price_usd, cp.current_price) AS nonfoil,
+            COALESCE(ph.price_foil, cp.current_price_foil) AS foil
         FROM inventory i 
         JOIN card_printings cp ON i.scryfall_id = cp.scryfall_id
         JOIN card_definitions cd ON cp.oracle_id = cd.oracle_id
-        JOIN locations l ON i.location_id = l.location_id
-        JOIN price_history ph ON ph.scryfall_id = cp.scryfall_id
-        WHERE ph.scraped_At = (
-            SELECT MAX(scraped_at) 
-            FROM price_history 
-            WHERE scryfall_id = cp.scryfall_id
-        )
+        LEFT JOIN locations l ON i.location_id = l.location_id
+        LEFT JOIN price_history ph
+            ON ph.scryfall_id = cp.scryfall_id
+            AND ph.scraped_at = (
+                SELECT MAX(scraped_at)
+                FROM price_history
+                WHERE scryfall_id = cp.scryfall_id
+            )
         ORDER BY i.added DESC
         LIMIT ? OFFSET ?
     '''
@@ -190,9 +198,8 @@ def bulk_import_action():
     
     file = request.files['file']
     # Capture default location from the form if specific rows don't have one
-    default_loc_id = request.form.get('location_id') if request.form.get('location_id') else 1
-    # print(request.form.get('location_id'))
-
+    default_loc_id = request.form.get("location_id") or DEFAULT_LOCATION_ID
+    
     if file and file.filename.endswith('.csv'):
         csv_file = TextIOWrapper(file.stream, encoding='utf-8')
         reader = csv.DictReader(csv_file)
@@ -200,12 +207,15 @@ def bulk_import_action():
         manager = get_db()
         importer = CardImporterService(
             manager,
-            fetcher=ScryfallFetcher.ScryfallFetcher(manager, setting=1),
             commit_batch_size=50,
         )
 
         try:
-            importer.import_bulk_rows(reader, default_location_id=default_loc_id)
+            result = importer.import_bulk_rows(reader, default_location_id=default_loc_id)
+            print(f"Bulk import: {result.imported}/{result.requested} imported, {result.failed} failed")
+
+            for failed in result.failed_cards:
+                print(f"Failed {failed.request.set_code} #{failed.request.collector_number}: {failed.reason}")
                         
         except Exception as e:
             print(f"Bulk Import Error: {e}")
