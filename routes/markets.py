@@ -1,4 +1,4 @@
-import datetime
+
 import json
 import time
 import requests
@@ -9,6 +9,7 @@ from flask import Blueprint, Response, render_template, abort, request
 from flask_login import login_required, current_user
 from collections import defaultdict
 from services.tcgcsv_prices import *
+import datetime as dt
 
 from db.db_manager import CardDB, get_db
 
@@ -1365,21 +1366,23 @@ def update_prices():
     session.headers.update(TCGCSV_HEADERS)
 
     try:
-        yield sse_message(5, "Checking TCGCSV daily build timestamp...")
+        yield sse_message(5, "Checking for newest local TCGCSV price CSV...")
 
-        try:
-            tcgcsv_timestamp = tcgcsv_get_text(session, TCGCSV_LAST_UPDATED_URL)
-        except Exception as error:
-            manager.log_update(
-                task_name="TCGCSV Price Sync",
-                cards_updated=0,
-                status="Error",
-                message=f"Could not reach TCGCSV: {error}"
-            )
-            yield sse_message(100, f"Could not reach TCGCSV: {error}")
-            return
+        refresh_result = refresh_current_day_history_csv_if_due()
 
-        yield sse_message(10, "Gathering local TCGplayer product ids...")
+        if refresh_result.get("attempted"):
+            yield sse_message(7, refresh_result.get("message", "Checked for current-day CSV."))
+        else:
+            yield sse_message(7, refresh_result.get("message", "Using newest existing local CSV."))
+
+        current_snapshot_path = resolve_local_price_snapshot_path()
+        tcgcsv_price_date = get_price_date_for_snapshot(current_snapshot_path)
+        tcgcsv_timestamp = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+        yield sse_message(
+            10,
+            f"Using local TCGCSV file {current_snapshot_path} for price date {tcgcsv_price_date}."
+        )
 
         local_rows = get_local_cards_needing_prices(manager)
 
@@ -1390,7 +1393,6 @@ def update_prices():
                 status="Warning",
                 message="No cards with TCGplayer IDs found. Run the TCGCSV/Scryfall ID migration first."
             )
-
             yield sse_message(
                 100,
                 "No cards with TCGplayer IDs found. Run the TCGCSV/Scryfall ID migration first."
@@ -1400,16 +1402,19 @@ def update_prices():
         total_cards = len(local_rows)
         updated_count = 0
         missing_count = 0
+        updated_scryfall_ids = set()
 
         yield sse_message(
             15,
-            f"Preparing TCGCSV group lookup for {total_cards} local cards..."
+            f"Preparing local TCGCSV group lookup for {total_cards} local card targets..."
         )
 
         grouped_targets = get_grouped_local_price_targets(
             manager,
             session,
             local_rows,
+            allow_remote_group_lookup=False,
+            snapshot_path=current_snapshot_path,
         )
 
         if not grouped_targets:
@@ -1417,12 +1422,11 @@ def update_prices():
                 task_name="TCGCSV Price Sync",
                 cards_updated=0,
                 status="Warning",
-                message="No TCGCSV group matches found for your local TCGplayer product IDs."
+                message="No TCGCSV group matches found in local CSV for your local TCGplayer product IDs."
             )
-
             yield sse_message(
                 100,
-                "No TCGCSV group matches found for your local TCGplayer product IDs."
+                "No TCGCSV group matches found in local CSV for your local TCGplayer product IDs."
             )
             return
 
@@ -1431,52 +1435,30 @@ def update_prices():
 
         yield sse_message(
             20,
-            f"Updating prices across {total_groups} TCGCSV groups..."
+            f"Updating prices across {total_groups} local TCGCSV groups..."
         )
 
         for group_index, (group_id, targets_by_scryfall_id) in enumerate(group_items, start=1):
-            prices = get_tcgcsv_prices_for_group(session, group_id)
+            prices = get_tcgcsv_prices_for_group_with_fallback(
+                session,
+                group_id,
+                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                snapshot_path=current_snapshot_path,
+            )
 
             if not prices:
                 yield sse_message(
                     int(20 + (group_index / total_groups) * 78),
-                    f"Skipped group {group_id}; no prices found."
+                    f"Skipped group {group_id}; no local prices found."
                 )
                 time.sleep(TCGCSV_RATE_LIMIT_DELAY)
                 continue
 
-            prices_by_product_id = defaultdict(dict)
+            prices_by_product_id = build_prices_by_product_id(prices)
 
-            for price_obj in prices:
-                product_id = price_obj.get("productId")
-                finish = price_finish_from_subtype(price_obj.get("subTypeName"))
-                selected_price = choose_tcgcsv_price(price_obj)
-
-                if product_id and selected_price is not None:
-                    prices_by_product_id[product_id][finish] = selected_price
-
-            for target_key, target in targets_by_scryfall_id.items():
+            for target in targets_by_scryfall_id.values():
                 scryfall_id = target["scryfall_id"]
-                inventory_finish = target.get("finish")
-                has_price_override = target.get("has_price_override", False)
-                normal_product_id = target.get("normal_product_id")
-                etched_product_id = target.get("etched_product_id")
-
-                nonfoil_price = None
-                foil_price = None
-
-                if normal_product_id:
-                    product_prices = prices_by_product_id.get(normal_product_id, {})
-
-                    if has_price_override and is_foil_like_finish(inventory_finish):
-                        foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
-                    else:
-                        nonfoil_price = product_prices.get("nonfoil")
-                        foil_price = product_prices.get("foil")
-
-                if etched_product_id:
-                    etched_prices = prices_by_product_id.get(etched_product_id, {})
-                    foil_price = etched_prices.get("foil") or etched_prices.get("nonfoil") or foil_price
+                nonfoil_price, foil_price = prices_for_target(target, prices_by_product_id)
 
                 if nonfoil_price is None and foil_price is None:
                     missing_count += 1
@@ -1495,32 +1477,61 @@ def update_prices():
                         scryfall_id,
                         price_usd,
                         price_foil,
+                        scraped_at,
                         source
                     )
-                    VALUES (?, ?, ?, ?)
-                """, (scryfall_id, nonfoil_price, foil_price, "tcgcsv"))
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    scryfall_id,
+                    nonfoil_price,
+                    foil_price,
+                    tcgcsv_price_date,
+                    "tcgcsv",
+                ))
 
                 updated_count += 1
+                updated_scryfall_ids.add(scryfall_id)
 
             manager.commit()
 
             yield sse_message(
                 int(20 + (group_index / total_groups) * 78),
-                f"Processed {group_index}/{total_groups} TCGCSV groups."
+                f"Processed {group_index}/{total_groups} local TCGCSV groups."
             )
 
             time.sleep(TCGCSV_RATE_LIMIT_DELAY)
+
+        backfilled_count = 0
+
+        if updated_scryfall_ids:
+            backfilled_count = backfill_prior_history_if_needed(
+                manager=manager,
+                session=session,
+                grouped_targets=grouped_targets,
+                updated_scryfall_ids=updated_scryfall_ids,
+                current_snapshot_path=current_snapshot_path,
+                min_history_points=2,
+            )
+            manager.commit()
 
         manager.log_update(
             task_name="TCGCSV Price Sync",
             cards_updated=updated_count,
             status="Success",
-            message=f"Updated {updated_count} cards. Missing prices for {missing_count} cards."
+            message=(
+                f"Updated {updated_count} cards from local CSV date {tcgcsv_price_date}. "
+                f"Backfilled {backfilled_count} prior history rows. "
+                f"Missing prices for {missing_count} cards."
+            )
         )
 
         yield sse_message(
             100,
-            f"TCGCSV sync complete. Updated {updated_count} cards. Missing prices for {missing_count} cards."
+            (
+                f"TCGCSV sync complete. Updated {updated_count} cards from local CSV date "
+                f"{tcgcsv_price_date}. Backfilled {backfilled_count} prior rows. "
+                f"Missing prices for {missing_count} cards."
+            )
         )
 
     except Exception as error:
