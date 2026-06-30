@@ -2,8 +2,11 @@ import csv
 import json
 import os
 import time, requests
+import subprocess
+import sys
+from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 from collections import defaultdict
-from datetime import datetime
 from requests.exceptions import ConnectionError, Timeout, ChunkedEncodingError, RequestException
 
 TCGCSV_BASE_URL = "https://tcgcsv.com/tcgplayer"
@@ -19,12 +22,23 @@ TCGCSV_REQUEST_COOLDOWN_SECONDS = 300
 TCGCSV_SNAPSHOT_DIR = os.path.join("var", "data", "tcgcsv")
 TCGCSV_LOCAL_PRICE_SNAPSHOT = os.path.join(TCGCSV_SNAPSHOT_DIR, "daily_prices_latest.csv")
 TCGCSV_LOCAL_SNAPSHOT_METADATA = os.path.join(TCGCSV_SNAPSHOT_DIR, "snapshot_metadata.json")
+TCGCSV_HISTORY_DIR = "tcg_history"
+TCGCSV_HISTORY_FILE_PREFIX = "prices_category_1_"
+TCGCSV_HISTORY_FILE_SUFFIX = ".csv"
+TCGCSV_LOCAL_TIMEZONE = os.environ.get("TCGCSV_LOCAL_TIMEZONE", "America/Chicago")
+TCGCSV_DAILY_RELEASE_HOUR_LOCAL = int(os.environ.get("TCGCSV_DAILY_RELEASE_HOUR_LOCAL", "15"))
+TCGCSV_FETCH_SCRIPT_PATH = os.environ.get("TCGCSV_FETCH_SCRIPT_PATH", "_get_tcgcsv.py")
+TCGCSV_FETCH_TIMEOUT_SECONDS = int(os.environ.get("TCGCSV_FETCH_TIMEOUT_SECONDS", "600"))
 
 TCGCSV_SOURCE_LOCAL_ONLY = "local_only"
 TCGCSV_SOURCE_REMOTE_FALLBACK_LOCAL = "remote_fallback_local"
 
 _TCGCSV_COOLDOWN_UNTIL = 0.0
-_LOCAL_SNAPSHOT_CACHE = {"mtime": None, "group_prices": {}}
+_LOCAL_SNAPSHOT_CACHE = {
+    "path": None,
+    "mtime": None,
+    "group_prices": {},
+}
 
 TCGCSV_HEADERS = {
     "User-Agent": "MTGSitePriceUpdater/1.0",
@@ -102,6 +116,236 @@ def get_local_snapshot_last_updated(
 
     return None
 
+def parse_tcgcsv_history_file_date(path):
+    filename = os.path.basename(path)
+
+    if not filename.startswith(TCGCSV_HISTORY_FILE_PREFIX):
+        return None
+
+    if not filename.endswith(TCGCSV_HISTORY_FILE_SUFFIX):
+        return None
+
+    date_part = filename[
+        len(TCGCSV_HISTORY_FILE_PREFIX):-len(TCGCSV_HISTORY_FILE_SUFFIX)
+    ]
+
+    # Only accept single-day files for this logic.
+    # Example: prices_category_1_2026-06-26.csv
+    if "_" in date_part:
+        return None
+
+    try:
+        return datetime.strptime(date_part, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def find_tcgcsv_history_file_for_date(price_date, history_dir=TCGCSV_HISTORY_DIR):
+    filename = (
+        f"{TCGCSV_HISTORY_FILE_PREFIX}"
+        f"{price_date.isoformat()}"
+        f"{TCGCSV_HISTORY_FILE_SUFFIX}"
+    )
+    path = os.path.join(history_dir, filename)
+
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        return path
+
+    return None
+
+
+def get_tcgcsv_history_file_candidates(history_dir=TCGCSV_HISTORY_DIR):
+    """
+    Return available single-day tcg_history CSVs as:
+        (price_date, modified_time, path)
+
+    Sorted newest first by CSV date, then file modified time.
+    """
+    if not os.path.isdir(history_dir):
+        return []
+
+    candidates = []
+
+    for filename in os.listdir(history_dir):
+        path = os.path.join(history_dir, filename)
+
+        if not os.path.isfile(path):
+            continue
+
+        if os.path.getsize(path) <= 0:
+            continue
+
+        file_date = parse_tcgcsv_history_file_date(path)
+        if file_date is None:
+            continue
+
+        candidates.append((file_date, os.path.getmtime(path), path))
+
+    return sorted(candidates, key=lambda item: (item[0], item[1]), reverse=True)
+
+
+def find_latest_tcgcsv_history_file(history_dir=TCGCSV_HISTORY_DIR):
+    candidates = get_tcgcsv_history_file_candidates(history_dir=history_dir)
+    if not candidates:
+        return None
+
+    return candidates[0][2]
+
+
+def find_prior_tcgcsv_history_files(
+    before_date,
+    history_dir=TCGCSV_HISTORY_DIR,
+    limit=None,
+):
+    """
+    Return local history CSVs older than before_date, newest first.
+
+    This anchors backfill to the newest CSV being imported. For example, if the
+    newest available file is 2026-06-26, backfill looks at 2026-06-25, then
+    2026-06-24, and so on if files exist.
+    """
+    candidates = [
+        (file_date, modified_time, path)
+        for file_date, modified_time, path in get_tcgcsv_history_file_candidates(history_dir=history_dir)
+        if file_date < before_date
+    ]
+
+    paths = [path for _, _, path in candidates]
+    if limit is not None:
+        return paths[:limit]
+
+    return paths
+
+def refresh_current_day_history_csv_if_due(now=None):
+    """
+    After the expected daily TCGCSV archive release time, try to fetch today's
+    local CSV if it is not already present.
+
+    This does not replace the normal local CSV resolver. It only gives
+    _get_tcgcsv.py a chance to create a newer CSV before the sync uses the
+    newest available local file.
+    """
+    timezone = ZoneInfo(TCGCSV_LOCAL_TIMEZONE)
+    local_now = now or datetime.now(timezone)
+    today = local_now.date()
+
+    if local_now.hour < TCGCSV_DAILY_RELEASE_HOUR_LOCAL:
+        return {
+            "attempted": False,
+            "updated": False,
+            "status": "before_release_cutoff",
+            "message": (
+                f"Local time is before {TCGCSV_DAILY_RELEASE_HOUR_LOCAL}:00; "
+                "using newest existing local CSV."
+            ),
+            "date": today.isoformat(),
+            "path": find_latest_tcgcsv_history_file(),
+        }
+
+    existing_today_path = find_tcgcsv_history_file_for_date(today)
+
+    if existing_today_path:
+        return {
+            "attempted": False,
+            "updated": False,
+            "status": "current_day_csv_exists",
+            "message": f"Current-day local CSV already exists: {existing_today_path}",
+            "date": today.isoformat(),
+            "path": existing_today_path,
+        }
+
+    script_path = TCGCSV_FETCH_SCRIPT_PATH
+
+    if not os.path.exists(script_path):
+        return {
+            "attempted": False,
+            "updated": False,
+            "status": "fetch_script_missing",
+            "message": f"Could not find TCGCSV fetch script: {script_path}",
+            "date": today.isoformat(),
+            "path": find_latest_tcgcsv_history_file(),
+        }
+
+    command = [
+        sys.executable,
+        script_path,
+        "--date",
+        today.isoformat(),
+        "--outdir",
+        TCGCSV_HISTORY_DIR,
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=TCGCSV_FETCH_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except Exception as error:
+        return {
+            "attempted": True,
+            "updated": False,
+            "status": "fetch_failed",
+            "message": f"Failed to run _get_tcgcsv.py: {error}",
+            "date": today.isoformat(),
+            "path": find_latest_tcgcsv_history_file(),
+        }
+
+    today_path_after_fetch = find_tcgcsv_history_file_for_date(today)
+
+    if today_path_after_fetch:
+        return {
+            "attempted": True,
+            "updated": True,
+            "status": "current_day_csv_downloaded",
+            "message": f"Downloaded current-day local CSV: {today_path_after_fetch}",
+            "date": today.isoformat(),
+            "path": today_path_after_fetch,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+        }
+
+    latest_path = find_latest_tcgcsv_history_file()
+
+    return {
+        "attempted": True,
+        "updated": False,
+        "status": "current_day_csv_unavailable",
+        "message": (
+            f"No current-day CSV was created for {today.isoformat()}; "
+            f"continuing with newest available local CSV: {latest_path}"
+        ),
+        "date": today.isoformat(),
+        "path": latest_path,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "returncode": result.returncode,
+    }
+
+def resolve_local_price_snapshot_path(snapshot_path=None):
+    if snapshot_path:
+        return snapshot_path
+
+    history_path = find_latest_tcgcsv_history_file()
+    if history_path:
+        return history_path
+
+    return TCGCSV_LOCAL_PRICE_SNAPSHOT
+
+
+def get_price_date_for_snapshot(snapshot_path):
+    history_date = parse_tcgcsv_history_file_date(snapshot_path)
+    if history_date:
+        return history_date.isoformat()
+
+    snapshot_last_updated = get_local_snapshot_last_updated(snapshot_path=snapshot_path)
+    if snapshot_last_updated:
+        return snapshot_last_updated[:10]
+
+    return datetime.utcnow().date().isoformat()
 
 def get_remote_tcgcsv_last_updated(session=None, timeout=15):
     local_session = session or requests.Session()
@@ -232,17 +476,18 @@ def _fetch_group_prices_for_bulk(
 
     return []
 
+def load_local_group_prices(snapshot_path=None):
+    snapshot_path = resolve_local_price_snapshot_path(snapshot_path)
 
-def load_local_group_prices(snapshot_path=TCGCSV_LOCAL_PRICE_SNAPSHOT):
-    """
-    Loads a local daily snapshot generated by scripts/refresh_tcgcsv_snapshot.py.
-    Returns a groupId -> [price objects] mapping that mirrors remote TCGCSV shape.
-    """
     if not os.path.exists(snapshot_path):
         return {}
 
     mtime = os.path.getmtime(snapshot_path)
-    if _LOCAL_SNAPSHOT_CACHE["mtime"] == mtime:
+
+    if (
+        _LOCAL_SNAPSHOT_CACHE["path"] == snapshot_path
+        and _LOCAL_SNAPSHOT_CACHE["mtime"] == mtime
+    ):
         return _LOCAL_SNAPSHOT_CACHE["group_prices"]
 
     grouped = defaultdict(list)
@@ -251,42 +496,197 @@ def load_local_group_prices(snapshot_path=TCGCSV_LOCAL_PRICE_SNAPSHOT):
         reader = csv.DictReader(handle)
 
         for row in reader:
-            product_id = row.get("product_id")
-            group_id = row.get("group_id")
-
-            if not product_id or not group_id:
+            normalized = normalize_local_price_snapshot_row(row)
+            if normalized is None:
                 continue
 
-            try:
-                product_id = int(product_id)
-            except (TypeError, ValueError):
-                continue
+            group_id = normalized.pop("group_id")
+            grouped[group_id].append(normalized)
 
-            grouped[str(group_id)].append({
-                "productId": product_id,
-                "subTypeName": row.get("sub_type_name") or "",
-                "marketPrice": row.get("market_price"),
-                "midPrice": row.get("mid_price"),
-                "lowPrice": row.get("low_price"),
-            })
-
+    _LOCAL_SNAPSHOT_CACHE["path"] = snapshot_path
     _LOCAL_SNAPSHOT_CACHE["mtime"] = mtime
     _LOCAL_SNAPSHOT_CACHE["group_prices"] = dict(grouped)
+
     return _LOCAL_SNAPSHOT_CACHE["group_prices"]
 
+def int_or_none(value):
+    if value in (None, ""):
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_product_to_group_map_from_local_snapshot(snapshot_path=None):
+    """
+    Build productId -> group_id from the local CSV.
+
+    This lets local-only mode resolve missing tcgcsv_group_id without touching
+    the live TCGCSV API.
+    """
+    grouped_prices = load_local_group_prices(snapshot_path=snapshot_path)
+    product_to_group = {}
+
+    for group_id, prices in grouped_prices.items():
+        for price_obj in prices:
+            product_id = int_or_none(price_obj.get("productId"))
+            if product_id is not None:
+                product_to_group[product_id] = str(group_id)
+
+    return product_to_group
+
+def get_tcgcsv_history_point_count(manager, scryfall_id):
+    row = manager.cursor.execute("""
+        SELECT COUNT(DISTINCT scraped_at) AS point_count
+        FROM price_history
+        WHERE scryfall_id = ?
+          AND source = 'tcgcsv'
+          AND scraped_at IS NOT NULL
+    """, (scryfall_id,)).fetchone()
+
+    return row["point_count"] if row else 0
+
+
+def build_prices_by_product_id(prices):
+    prices_by_product_id = defaultdict(dict)
+
+    for price_obj in prices:
+        product_id = price_obj.get("productId")
+        finish = price_finish_from_subtype(price_obj.get("subTypeName"))
+        selected_price = choose_tcgcsv_price(price_obj)
+
+        if product_id and selected_price is not None:
+            prices_by_product_id[product_id][finish] = selected_price
+
+    return prices_by_product_id
+
+
+def prices_for_target(target, prices_by_product_id):
+    normal_product_id = int_or_none(target.get("normal_product_id"))
+    etched_product_id = int_or_none(target.get("etched_product_id"))
+    inventory_finish = target.get("finish")
+    has_price_override = bool(target.get("has_price_override", False))
+
+    nonfoil_price = None
+    foil_price = None
+
+    if normal_product_id is not None:
+        product_prices = prices_by_product_id.get(normal_product_id, {})
+
+        if has_price_override and is_foil_like_finish(inventory_finish):
+            foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
+        else:
+            nonfoil_price = product_prices.get("nonfoil")
+            foil_price = product_prices.get("foil")
+
+    if etched_product_id is not None:
+        etched_prices = prices_by_product_id.get(etched_product_id, {})
+        foil_price = etched_prices.get("foil") or etched_prices.get("nonfoil") or foil_price
+
+    return nonfoil_price, foil_price
+
+
+def backfill_prior_history_if_needed(
+    manager,
+    session,
+    grouped_targets,
+    updated_scryfall_ids,
+    current_snapshot_path,
+    min_history_points=2,
+):
+    """
+    Backfill price_history from older local CSVs until updated cards have at
+    least min_history_points TCGCSV dates.
+
+    This is anchored to the current snapshot file, not today's date. If the
+    current import uses tcg_history/prices_category_1_2026-06-26.csv, this
+    searches older available files such as 2026-06-25, then 2026-06-24.
+    """
+    current_price_date = parse_tcgcsv_history_file_date(current_snapshot_path)
+    if current_price_date is None:
+        return 0
+
+    prior_snapshot_paths = find_prior_tcgcsv_history_files(current_price_date)
+    if not prior_snapshot_paths:
+        return 0
+
+    remaining_scryfall_ids = set(updated_scryfall_ids)
+    backfilled = 0
+
+    for prior_snapshot_path in prior_snapshot_paths:
+        if not remaining_scryfall_ids:
+            break
+
+        prior_price_date = parse_tcgcsv_history_file_date(prior_snapshot_path)
+        if prior_price_date is None:
+            continue
+
+        for group_id, targets_by_key in grouped_targets.items():
+            if not remaining_scryfall_ids:
+                break
+
+            prices = get_tcgcsv_prices_for_group_with_fallback(
+                session,
+                group_id,
+                data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+                snapshot_path=prior_snapshot_path,
+            )
+            prices_by_product_id = build_prices_by_product_id(prices)
+
+            for target in targets_by_key.values():
+                scryfall_id = target.get("scryfall_id")
+
+                if scryfall_id not in remaining_scryfall_ids:
+                    continue
+
+                if get_tcgcsv_history_point_count(manager, scryfall_id) >= min_history_points:
+                    remaining_scryfall_ids.discard(scryfall_id)
+                    continue
+
+                nonfoil_price, foil_price = prices_for_target(target, prices_by_product_id)
+
+                if nonfoil_price is None and foil_price is None:
+                    continue
+
+                manager.cursor.execute("""
+                    INSERT INTO price_history (
+                        scryfall_id,
+                        price_usd,
+                        price_foil,
+                        scraped_at,
+                        source
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    scryfall_id,
+                    nonfoil_price,
+                    foil_price,
+                    prior_price_date.isoformat(),
+                    "tcgcsv",
+                ))
+
+                backfilled += 1
+
+                if get_tcgcsv_history_point_count(manager, scryfall_id) >= min_history_points:
+                    remaining_scryfall_ids.discard(scryfall_id)
+
+    return backfilled
 
 def get_tcgcsv_prices_for_group_with_fallback(
     session,
     group_id,
     data_source=TCGCSV_SOURCE_LOCAL_ONLY,
+    snapshot_path=None,
 ):
     if data_source == TCGCSV_SOURCE_LOCAL_ONLY:
-        return load_local_group_prices().get(str(group_id), [])
+        return load_local_group_prices(snapshot_path=snapshot_path).get(str(group_id), [])
 
     try:
         return get_tcgcsv_prices_for_group(session, group_id)
     except Exception:
-        local = load_local_group_prices().get(str(group_id), [])
+        local = load_local_group_prices(snapshot_path=snapshot_path).get(str(group_id), [])
         if local:
             return local
         raise
@@ -386,6 +786,7 @@ def stream_export_daily_price_snapshot(
             )
 
         os.replace(tmp_path, snapshot_path)
+        _LOCAL_SNAPSHOT_CACHE["path"] = None
         _LOCAL_SNAPSHOT_CACHE["mtime"] = None
         write_snapshot_metadata(last_updated=timestamp, snapshot_path=snapshot_path)
     except Exception:
@@ -736,27 +1137,54 @@ def get_grouped_local_price_targets(
     session,
     local_rows,
     allow_remote_group_lookup=False,
+    snapshot_path=None,
 ):
     wanted_product_ids = set()
 
     for row in local_rows:
-        if row["tcgplayer_id"]:
-            wanted_product_ids.add(row["tcgplayer_id"])
-        if row["tcgplayer_etched_id"]:
-            wanted_product_ids.add(row["tcgplayer_etched_id"])
+        tcgplayer_id = int_or_none(row["tcgplayer_id"])
+        etched_id = int_or_none(row["tcgplayer_etched_id"])
+
+        if tcgplayer_id is not None:
+            wanted_product_ids.add(tcgplayer_id)
+        if etched_id is not None:
+            wanted_product_ids.add(etched_id)
 
     product_to_group = {}
 
     for row in local_rows:
-        if row["tcgcsv_group_id"] and row["tcgplayer_id"]:
-            product_to_group[row["tcgplayer_id"]] = row["tcgcsv_group_id"]
-        if row["tcgcsv_group_id"] and row["tcgplayer_etched_id"]:
-            product_to_group[row["tcgplayer_etched_id"]] = row["tcgcsv_group_id"]
+        tcgplayer_id = int_or_none(row["tcgplayer_id"])
+        etched_id = int_or_none(row["tcgplayer_etched_id"])
+        group_id = row["tcgcsv_group_id"]
+
+        if group_id and tcgplayer_id is not None:
+            product_to_group[tcgplayer_id] = str(group_id)
+
+        if group_id and etched_id is not None:
+            product_to_group[etched_id] = str(group_id)
 
     missing_product_ids = wanted_product_ids - set(product_to_group.keys())
 
+    if missing_product_ids and snapshot_path:
+        local_product_to_group = build_product_to_group_map_from_local_snapshot(
+            snapshot_path=snapshot_path
+        )
+
+        for product_id in missing_product_ids:
+            group_id = local_product_to_group.get(product_id)
+            if group_id:
+                product_to_group[product_id] = group_id
+
+        missing_product_ids = wanted_product_ids - set(product_to_group.keys())
+
     if missing_product_ids and allow_remote_group_lookup:
         found_map = build_group_map_from_tcgcsv(session, missing_product_ids)
+        found_map = {
+            int_or_none(product_id): str(group_id)
+            for product_id, group_id in found_map.items()
+            if int_or_none(product_id) is not None and group_id
+        }
+
         product_to_group.update(found_map)
 
         for product_id, group_id in found_map.items():
@@ -781,8 +1209,8 @@ def get_grouped_local_price_targets(
     for row in local_rows:
         scryfall_id = row["scryfall_id"]
         finish = row["finish"]
-        normal_product_id = row["tcgplayer_id"]
-        etched_product_id = row["tcgplayer_etched_id"]
+        normal_product_id = int_or_none(row["tcgplayer_id"])
+        etched_product_id = int_or_none(row["tcgplayer_etched_id"])
         has_price_override = bool(row["has_price_override"])
 
         group_id = None
@@ -817,13 +1245,23 @@ def update_single_card_price_from_tcgcsv(
     session = requests.Session()
     session.headers.update(TCGCSV_HEADERS)
 
+    current_snapshot_path = None
+    tcgcsv_scraped_at = datetime.utcnow().date().isoformat()
+
     if data_source == TCGCSV_SOURCE_LOCAL_ONLY:
-        tcgcsv_timestamp = get_local_snapshot_last_updated() or datetime.utcnow().isoformat(timespec="seconds")
+        current_snapshot_path = resolve_local_price_snapshot_path()
+        tcgcsv_timestamp = (
+            get_local_snapshot_last_updated(snapshot_path=current_snapshot_path)
+            or datetime.utcnow().isoformat(timespec="seconds")
+        )
+        tcgcsv_scraped_at = get_price_date_for_snapshot(current_snapshot_path)
     else:
         try:
             tcgcsv_timestamp = tcgcsv_get_text(session, TCGCSV_LAST_UPDATED_URL)
+            tcgcsv_scraped_at = tcgcsv_timestamp[:10]
         except Exception:
             tcgcsv_timestamp = datetime.utcnow().isoformat(timespec="seconds")
+            tcgcsv_scraped_at = datetime.utcnow().date().isoformat()
 
     rows = manager.cursor.execute("""
         SELECT DISTINCT
@@ -854,50 +1292,25 @@ def update_single_card_price_from_tcgcsv(
         session,
         rows,
         allow_remote_group_lookup=allow_remote_group_lookup,
+        snapshot_path=current_snapshot_path,
     )
 
-    updated_any = False
-    
-    for group_id, targets_by_scryfall_id in grouped_targets.items():
+    updated_scryfall_ids = set()
+
+    for group_id, targets_by_key in grouped_targets.items():
         prices = get_tcgcsv_prices_for_group_with_fallback(
             session,
             group_id,
             data_source=data_source,
+            snapshot_path=current_snapshot_path,
         )
-        prices_by_product_id = defaultdict(dict)
+        prices_by_product_id = build_prices_by_product_id(prices)
 
-        for price_obj in prices:
-            product_id = price_obj.get("productId")
-            finish = price_finish_from_subtype(price_obj.get("subTypeName"))
-            selected_price = choose_tcgcsv_price(price_obj)
-
-            if product_id and selected_price is not None:
-                prices_by_product_id[product_id][finish] = selected_price
-
-        for target_key, target in targets_by_scryfall_id.items():
+        for target in targets_by_key.values():
             if target["scryfall_id"] != scryfall_id:
                 continue
 
-            normal_product_id = target.get("normal_product_id")
-            etched_product_id = target.get("etched_product_id")
-            inventory_finish = target.get("finish")
-            has_price_override = target.get("has_price_override", False)
-
-            nonfoil_price = None
-            foil_price = None
-
-            if normal_product_id:
-                product_prices = prices_by_product_id.get(normal_product_id, {})
-
-                if has_price_override and is_foil_like_finish(inventory_finish):
-                    foil_price = product_prices.get("foil") or product_prices.get("nonfoil")
-                else:
-                    nonfoil_price = product_prices.get("nonfoil")
-                    foil_price = product_prices.get("foil")
-
-            if etched_product_id:
-                etched_prices = prices_by_product_id.get(etched_product_id, {})
-                foil_price = etched_prices.get("foil") or etched_prices.get("nonfoil") or foil_price
+            nonfoil_price, foil_price = prices_for_target(target, prices_by_product_id)
 
             if nonfoil_price is None and foil_price is None:
                 continue
@@ -915,15 +1328,68 @@ def update_single_card_price_from_tcgcsv(
                     scryfall_id,
                     price_usd,
                     price_foil,
+                    scraped_at,
                     source
                 )
-                VALUES (?, ?, ?, ?)
-            """, (scryfall_id, nonfoil_price, foil_price, "tcgcsv"))
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                scryfall_id,
+                nonfoil_price,
+                foil_price,
+                tcgcsv_scraped_at,
+                "tcgcsv",
+            ))
 
-            updated_any = True
+            updated_scryfall_ids.add(scryfall_id)
 
-    return updated_any
+    if data_source == TCGCSV_SOURCE_LOCAL_ONLY and current_snapshot_path and updated_scryfall_ids:
+        backfill_prior_history_if_needed(
+            manager=manager,
+            session=session,
+            grouped_targets=grouped_targets,
+            updated_scryfall_ids=updated_scryfall_ids,
+            current_snapshot_path=current_snapshot_path,
+            min_history_points=2,
+        )
 
+    return bool(updated_scryfall_ids)
+
+def _first_present(row, *names):
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def normalize_local_price_snapshot_row(row):
+    """
+    Normalize either local CSV shape into the internal price object shape.
+
+    Supports:
+    - old local snapshot: product_id, sub_type_name, market_price, mid_price, low_price
+    - archive export: productId, subTypeName, marketPrice, midPrice, lowPrice
+    """
+    product_id = _first_present(row, "product_id", "productId")
+    group_id = _first_present(row, "group_id", "groupId")
+    subtype_name = _first_present(row, "sub_type_name", "subTypeName") or ""
+
+    if not product_id or not group_id:
+        return None
+
+    try:
+        product_id = int(product_id)
+    except (TypeError, ValueError):
+        return None
+
+    return {
+        "group_id": str(group_id),
+        "productId": product_id,
+        "subTypeName": subtype_name,
+        "marketPrice": _first_present(row, "market_price", "marketPrice"),
+        "midPrice": _first_present(row, "mid_price", "midPrice"),
+        "lowPrice": _first_present(row, "low_price", "lowPrice"),
+    }
 
 def update_prices_for_scryfall_ids_from_tcgcsv(
     manager,
@@ -934,6 +1400,10 @@ def update_prices_for_scryfall_ids_from_tcgcsv(
     """
     Batch updates prices for explicit card printings, even if they are not yet
     present in inventory.
+
+    Local-only mode reads the latest exported tcg_history CSV, writes that file's
+    date into price_history.scraped_at, and then tries to backfill the previous
+    day for cards that still have fewer than two TCGCSV history points.
     """
     if not scryfall_ids:
         return 0
@@ -963,55 +1433,47 @@ def update_prices_for_scryfall_ids_from_tcgcsv(
     session = requests.Session()
     session.headers.update(TCGCSV_HEADERS)
 
+    current_snapshot_path = None
+    tcgcsv_scraped_at = datetime.utcnow().date().isoformat()
+
     if data_source == TCGCSV_SOURCE_LOCAL_ONLY:
-        tcgcsv_timestamp = get_local_snapshot_last_updated() or datetime.utcnow().isoformat(timespec="seconds")
+        current_snapshot_path = resolve_local_price_snapshot_path()
+        tcgcsv_timestamp = (
+            get_local_snapshot_last_updated(snapshot_path=current_snapshot_path)
+            or datetime.utcnow().isoformat(timespec="seconds")
+        )
+        tcgcsv_scraped_at = get_price_date_for_snapshot(current_snapshot_path)
     else:
         try:
             tcgcsv_timestamp = tcgcsv_get_text(session, TCGCSV_LAST_UPDATED_URL)
+            tcgcsv_scraped_at = tcgcsv_timestamp[:10]
         except Exception:
             tcgcsv_timestamp = datetime.utcnow().isoformat(timespec="seconds")
+            tcgcsv_scraped_at = datetime.utcnow().date().isoformat()
 
     grouped_targets = get_grouped_local_price_targets(
         manager,
         session,
         rows,
         allow_remote_group_lookup=allow_remote_group_lookup,
+        snapshot_path=current_snapshot_path,
     )
 
     updated_cards = 0
+    updated_scryfall_ids = set()
 
     for group_id, targets_by_key in grouped_targets.items():
         prices = get_tcgcsv_prices_for_group_with_fallback(
             session,
             group_id,
             data_source=data_source,
+            snapshot_path=current_snapshot_path,
         )
-        prices_by_product_id = defaultdict(dict)
-
-        for price_obj in prices:
-            product_id = price_obj.get("productId")
-            finish = price_finish_from_subtype(price_obj.get("subTypeName"))
-            selected_price = choose_tcgcsv_price(price_obj)
-
-            if product_id and selected_price is not None:
-                prices_by_product_id[product_id][finish] = selected_price
+        prices_by_product_id = build_prices_by_product_id(prices)
 
         for target in targets_by_key.values():
             scryfall_id = target.get("scryfall_id")
-            normal_product_id = target.get("normal_product_id")
-            etched_product_id = target.get("etched_product_id")
-
-            nonfoil_price = None
-            foil_price = None
-
-            if normal_product_id:
-                product_prices = prices_by_product_id.get(normal_product_id, {})
-                nonfoil_price = product_prices.get("nonfoil")
-                foil_price = product_prices.get("foil")
-
-            if etched_product_id:
-                etched_prices = prices_by_product_id.get(etched_product_id, {})
-                foil_price = etched_prices.get("foil") or etched_prices.get("nonfoil") or foil_price
+            nonfoil_price, foil_price = prices_for_target(target, prices_by_product_id)
 
             if nonfoil_price is None and foil_price is None:
                 continue
@@ -1029,13 +1491,31 @@ def update_prices_for_scryfall_ids_from_tcgcsv(
                     scryfall_id,
                     price_usd,
                     price_foil,
+                    scraped_at,
                     source
                 )
-                VALUES (?, ?, ?, ?)
-            """, (scryfall_id, nonfoil_price, foil_price, "tcgcsv"))
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                scryfall_id,
+                nonfoil_price,
+                foil_price,
+                tcgcsv_scraped_at,
+                "tcgcsv",
+            ))
 
             updated_cards += 1
+            updated_scryfall_ids.add(scryfall_id)
 
         time.sleep(TCGCSV_RATE_LIMIT_DELAY)
+
+    if data_source == TCGCSV_SOURCE_LOCAL_ONLY and current_snapshot_path:
+        backfill_prior_history_if_needed(
+            manager=manager,
+            session=session,
+            grouped_targets=grouped_targets,
+            updated_scryfall_ids=updated_scryfall_ids,
+            current_snapshot_path=current_snapshot_path,
+            min_history_points=2,
+        )
 
     return updated_cards
