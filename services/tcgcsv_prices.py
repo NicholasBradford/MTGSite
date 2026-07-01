@@ -5,10 +5,13 @@ import time, requests
 import subprocess
 import sys
 import re
+from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from collections import defaultdict
 from requests.exceptions import ConnectionError, Timeout, ChunkedEncodingError, RequestException
+
+load_dotenv()
 
 TCGCSV_BASE_URL = "https://tcgcsv.com/tcgplayer"
 TCGCSV_LAST_UPDATED_URL = "https://tcgcsv.com/last-updated.txt"
@@ -30,6 +33,7 @@ TCGCSV_LOCAL_TIMEZONE = os.environ.get("TCGCSV_LOCAL_TIMEZONE", "America/Chicago
 TCGCSV_DAILY_RELEASE_HOUR_LOCAL = int(os.environ.get("TCGCSV_DAILY_RELEASE_HOUR_LOCAL", "15"))
 TCGCSV_FETCH_SCRIPT_PATH = os.environ.get("TCGCSV_FETCH_SCRIPT_PATH", "_get_tcgcsv.py")
 TCGCSV_FETCH_TIMEOUT_SECONDS = int(os.environ.get("TCGCSV_FETCH_TIMEOUT_SECONDS", "600"))
+TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS = int(os.environ.get("TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS", "900"))
 
 TCGCSV_LOCAL_PRODUCTS_CACHE = os.path.join(
     TCGCSV_HISTORY_DIR,
@@ -41,6 +45,13 @@ _LOCAL_PRODUCTS_CACHE = {
     "mtime": None,
     "by_product_id": {},
     "by_group_id": {},
+}
+
+_TCGCSV_HISTORY_REFRESH_CACHE = {
+    "checked_at": 0.0,
+    "date": None,
+    "after_release": None,
+    "result": None,
 }
 
 TCGCSV_SOURCE_LOCAL_ONLY = "local_only"
@@ -357,9 +368,46 @@ def refresh_current_day_history_csv_if_due(now=None):
         "returncode": result.returncode,
     }
 
-def resolve_local_price_snapshot_path(snapshot_path=None):
+def ensure_current_day_history_csv_if_due(now=None, force=False):
+    """
+    Give _get_tcgcsv.py a chance to create today's tcg_history CSV before
+    resolving local prices. Results are cached briefly so one price sync does
+    not spawn the fetch script repeatedly.
+    """
+    timezone = ZoneInfo(TCGCSV_LOCAL_TIMEZONE)
+    local_now = now or datetime.now(timezone)
+    today_iso = local_now.date().isoformat()
+    after_release = local_now.hour >= TCGCSV_DAILY_RELEASE_HOUR_LOCAL
+
+    if (
+        not force
+        and _TCGCSV_HISTORY_REFRESH_CACHE["date"] == today_iso
+        and _TCGCSV_HISTORY_REFRESH_CACHE["after_release"] == after_release
+        and _TCGCSV_HISTORY_REFRESH_CACHE["result"] is not None
+        and time.monotonic() - _TCGCSV_HISTORY_REFRESH_CACHE["checked_at"] < TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS
+    ):
+        return _TCGCSV_HISTORY_REFRESH_CACHE["result"]
+
+    result = refresh_current_day_history_csv_if_due(now=local_now)
+
+    _TCGCSV_HISTORY_REFRESH_CACHE["checked_at"] = time.monotonic()
+    _TCGCSV_HISTORY_REFRESH_CACHE["date"] = today_iso
+    _TCGCSV_HISTORY_REFRESH_CACHE["after_release"] = after_release
+    _TCGCSV_HISTORY_REFRESH_CACHE["result"] = result
+
+    if result.get("updated"):
+        _LOCAL_SNAPSHOT_CACHE["path"] = None
+        _LOCAL_SNAPSHOT_CACHE["mtime"] = None
+        _LOCAL_SNAPSHOT_CACHE["group_prices"] = {}
+
+    return result
+
+def resolve_local_price_snapshot_path(snapshot_path=None, refresh_if_due=True):
     if snapshot_path:
         return snapshot_path
+    
+    if refresh_if_due:
+        ensure_current_day_history_csv_if_due()
 
     history_path = find_latest_tcgcsv_history_file()
     if history_path:
