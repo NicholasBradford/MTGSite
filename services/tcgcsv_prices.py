@@ -4,10 +4,14 @@ import os
 import time, requests
 import subprocess
 import sys
+import re
+from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from collections import defaultdict
 from requests.exceptions import ConnectionError, Timeout, ChunkedEncodingError, RequestException
+
+load_dotenv()
 
 TCGCSV_BASE_URL = "https://tcgcsv.com/tcgplayer"
 TCGCSV_LAST_UPDATED_URL = "https://tcgcsv.com/last-updated.txt"
@@ -29,9 +33,30 @@ TCGCSV_LOCAL_TIMEZONE = os.environ.get("TCGCSV_LOCAL_TIMEZONE", "America/Chicago
 TCGCSV_DAILY_RELEASE_HOUR_LOCAL = int(os.environ.get("TCGCSV_DAILY_RELEASE_HOUR_LOCAL", "15"))
 TCGCSV_FETCH_SCRIPT_PATH = os.environ.get("TCGCSV_FETCH_SCRIPT_PATH", "_get_tcgcsv.py")
 TCGCSV_FETCH_TIMEOUT_SECONDS = int(os.environ.get("TCGCSV_FETCH_TIMEOUT_SECONDS", "600"))
+TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS = int(os.environ.get("TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS", "900"))
+
+TCGCSV_LOCAL_PRODUCTS_CACHE = os.path.join(
+    TCGCSV_HISTORY_DIR,
+    "products_category_1_latest.csv",
+)
+
+_LOCAL_PRODUCTS_CACHE = {
+    "path": None,
+    "mtime": None,
+    "by_product_id": {},
+    "by_group_id": {},
+}
+
+_TCGCSV_HISTORY_REFRESH_CACHE = {
+    "checked_at": 0.0,
+    "date": None,
+    "after_release": None,
+    "result": None,
+}
 
 TCGCSV_SOURCE_LOCAL_ONLY = "local_only"
 TCGCSV_SOURCE_REMOTE_FALLBACK_LOCAL = "remote_fallback_local"
+AUTO_FINISH_OVERRIDE_NOTE_PREFIX = "Auto-mapped from local TCGCSV price CSV"
 
 _TCGCSV_COOLDOWN_UNTIL = 0.0
 _LOCAL_SNAPSHOT_CACHE = {
@@ -52,6 +77,24 @@ SPECIAL_FINISHES = {
     "etched foil",
     "textured foil",
     "double rainbow foil",
+}
+
+SUPPORTED_TCGCSV_FINISHES = {
+    "foil",
+    "rainbow foil",
+    "surge foil",
+    "galaxy foil",
+    "etched foil",
+    "textured foil",
+    "double rainbow foil",
+}
+
+PRICE_FIELD_ALIASES = {
+    "low_price": ("lowPrice", "low_price", "lowprice"),
+    "mid_price": ("midPrice", "mid_price", "midprice"),
+    "high_price": ("highPrice", "high_price", "highprice"),
+    "market_price": ("marketPrice", "market_price", "marketprice"),
+    "direct_low_price": ("directLowPrice", "direct_low_price", "directlowprice"),
 }
 
 def tcgcsv_get_json(session, url, timeout=30):
@@ -325,9 +368,46 @@ def refresh_current_day_history_csv_if_due(now=None):
         "returncode": result.returncode,
     }
 
-def resolve_local_price_snapshot_path(snapshot_path=None):
+def ensure_current_day_history_csv_if_due(now=None, force=False):
+    """
+    Give _get_tcgcsv.py a chance to create today's tcg_history CSV before
+    resolving local prices. Results are cached briefly so one price sync does
+    not spawn the fetch script repeatedly.
+    """
+    timezone = ZoneInfo(TCGCSV_LOCAL_TIMEZONE)
+    local_now = now or datetime.now(timezone)
+    today_iso = local_now.date().isoformat()
+    after_release = local_now.hour >= TCGCSV_DAILY_RELEASE_HOUR_LOCAL
+
+    if (
+        not force
+        and _TCGCSV_HISTORY_REFRESH_CACHE["date"] == today_iso
+        and _TCGCSV_HISTORY_REFRESH_CACHE["after_release"] == after_release
+        and _TCGCSV_HISTORY_REFRESH_CACHE["result"] is not None
+        and time.monotonic() - _TCGCSV_HISTORY_REFRESH_CACHE["checked_at"] < TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS
+    ):
+        return _TCGCSV_HISTORY_REFRESH_CACHE["result"]
+
+    result = refresh_current_day_history_csv_if_due(now=local_now)
+
+    _TCGCSV_HISTORY_REFRESH_CACHE["checked_at"] = time.monotonic()
+    _TCGCSV_HISTORY_REFRESH_CACHE["date"] = today_iso
+    _TCGCSV_HISTORY_REFRESH_CACHE["after_release"] = after_release
+    _TCGCSV_HISTORY_REFRESH_CACHE["result"] = result
+
+    if result.get("updated"):
+        _LOCAL_SNAPSHOT_CACHE["path"] = None
+        _LOCAL_SNAPSHOT_CACHE["mtime"] = None
+        _LOCAL_SNAPSHOT_CACHE["group_prices"] = {}
+
+    return result
+
+def resolve_local_price_snapshot_path(snapshot_path=None, refresh_if_due=True):
     if snapshot_path:
         return snapshot_path
+    
+    if refresh_if_due:
+        ensure_current_day_history_csv_if_due()
 
     history_path = find_latest_tcgcsv_history_file()
     if history_path:
@@ -984,6 +1064,91 @@ def build_group_map_from_tcgcsv(session, wanted_product_ids, progress_callback=N
 
     return product_to_group
 
+def _normalize_tcgcsv_text(value):
+    if value is None:
+        return ""
+    return re.sub(
+        r"\s+",
+        " ",
+        re.sub(r"[^a-z0-9]+", " ", str(value).lower())
+    ).strip()
+
+
+def _canonical_finish_for_tcgcsv_match(value):
+    """
+    Converts inventory finishes and TCGCSV subTypeName values into the same
+    conservative finish vocabulary.
+
+    Important:
+    - "rainbow foil" does NOT match "double rainbow foil"
+    - "foil" / "normal foil" does NOT match etched, surge, galaxy, etc.
+    """
+    raw_text = _normalize_tcgcsv_text(value)
+    normalized_text = _normalize_tcgcsv_text(normalize_finish(value))
+    text = f"{raw_text} {normalized_text}".strip()
+    tokens = set(text.split())
+    compact = text.replace(" ", "")
+
+    if not text:
+        return ""
+
+    if "nonfoil" in compact or ("non" in tokens and "foil" in tokens):
+        return "normal"
+
+    if "double" in tokens and "rainbow" in tokens and "foil" in tokens:
+        return "double rainbow foil"
+
+    if "rainbow" in tokens and "foil" in tokens:
+        return "rainbow foil"
+
+    if "surge" in tokens and "foil" in tokens:
+        return "surge foil"
+
+    if "galaxy" in tokens and "foil" in tokens:
+        return "galaxy foil"
+
+    if "textured" in tokens and "foil" in tokens:
+        return "textured foil"
+
+    if "etched" in tokens:
+        return "etched foil"
+
+    if "traditional" in tokens and "foil" in tokens:
+        return "foil"
+
+    if "normal" in tokens and "foil" in tokens:
+        return "foil"
+
+    if text == "foil" or tokens == {"foil"}:
+        return "foil"
+
+    if text == "normal" or tokens == {"normal"}:
+        return "normal"
+
+    return text
+
+
+def subtype_matches_finish(subtype_name, requested_finish):
+    """
+    Returns True only when a TCGCSV subTypeName safely matches the requested
+    inventory finish.
+
+    Examples:
+    - Rainbow Foil matches rainbow foil
+    - Double Rainbow Foil matches double rainbow foil
+    - Double Rainbow Foil does NOT match rainbow foil
+    - Etched / Etched Foil match etched foil
+    - Foil / Normal Foil match normal foil
+    - Etched Foil does NOT match normal foil
+    """
+    requested = _canonical_finish_for_tcgcsv_match(requested_finish)
+    subtype = _canonical_finish_for_tcgcsv_match(subtype_name)
+
+    if requested not in SUPPORTED_TCGCSV_FINISHES:
+        return False
+
+    return subtype == requested
+
 def normalize_finish(value):
     return (value or "nonfoil").strip().lower().replace("_", " ")
 
@@ -1004,6 +1169,374 @@ def product_finish_from_name(product_name):
 
     return "nonfoil"
 
+def _row_get(row, *keys, default=None):
+    """
+    Reads from dict-like rows, sqlite3.Row, or similar objects while tolerating
+    productId/product_id style naming differences.
+    """
+    for key in keys:
+        try:
+            value = row[key]
+            if value is not None:
+                return value
+        except (KeyError, IndexError, TypeError):
+            pass
+
+    try:
+        row_keys = row.keys()
+    except AttributeError:
+        return default
+
+    lower_key_map = {str(key).lower(): key for key in row_keys}
+
+    for key in keys:
+        matched_key = lower_key_map.get(str(key).lower())
+        if matched_key is None:
+            continue
+
+        try:
+            value = row[matched_key]
+            if value is not None:
+                return value
+        except (KeyError, IndexError, TypeError):
+            pass
+
+    return default
+
+
+def _coerce_int(value):
+    if value is None or value == "":
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_price(value):
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value = value.strip().replace("$", "").replace(",", "")
+        if value == "" or value.lower() in {"none", "null", "nan"}:
+            return None
+
+    try:
+        price = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    return price if price > 0 else None
+
+
+def _row_product_id(row):
+    return _coerce_int(
+        _row_get(row, "productId", "product_id", "productid", "tcgplayer_id")
+    )
+
+
+def _row_group_id(row):
+    return _coerce_int(
+        _row_get(row, "group_id", "groupId", "groupid", "tcgcsv_group_id")
+    )
+
+
+def _row_subtype_name(row):
+    return str(
+        _row_get(
+            row,
+            "subTypeName",
+            "subtypeName",
+            "subtype_name",
+            "subtypename",
+            default=""
+        ) or ""
+    ).strip()
+
+
+def _row_price(row, canonical_price_key):
+    return _coerce_price(
+        _row_get(row, *PRICE_FIELD_ALIASES[canonical_price_key])
+    )
+
+
+def _best_usable_price(row):
+    for price_key in (
+        "market_price",
+        "mid_price",
+        "low_price",
+        "direct_low_price",
+        "high_price",
+    ):
+        price = _row_price(row, price_key)
+        if price is not None:
+            return price
+
+    return None
+
+
+def _row_has_usable_price(row):
+    return _best_usable_price(row) is not None
+
+
+def _candidate_from_price_row(row):
+    return {
+        "product_id": _row_product_id(row),
+        "group_id": _row_group_id(row),
+        "subtype_name": _row_subtype_name(row),
+        "low_price": _row_price(row, "low_price"),
+        "mid_price": _row_price(row, "mid_price"),
+        "high_price": _row_price(row, "high_price"),
+        "market_price": _row_price(row, "market_price"),
+        "direct_low_price": _row_price(row, "direct_low_price"),
+        "usable_price": _best_usable_price(row),
+        "has_usable_price": _row_has_usable_price(row),
+    }
+
+
+def _dedupe_candidates_by_product_id(rows):
+    """
+    TCGCSV should usually have one row per product/finish in this context,
+    but this keeps the result stable if duplicated rows appear.
+    """
+    candidates_by_product_id = {}
+
+    for row in rows:
+        candidate = _candidate_from_price_row(row)
+        product_id = candidate["product_id"]
+
+        if product_id is None:
+            continue
+
+        existing = candidates_by_product_id.get(product_id)
+
+        if (
+            existing is None
+            or candidate["has_usable_price"] and not existing["has_usable_price"]
+        ):
+            candidates_by_product_id[product_id] = candidate
+
+    return list(candidates_by_product_id.values())
+
+
+def _finish_lookup_result(
+    status,
+    reason,
+    base_product_id,
+    requested_finish,
+    product_id=None,
+    group_id=None,
+    candidates=None,
+):
+    return {
+        "status": status,
+        "reason": reason,
+        "base_product_id": base_product_id,
+        "requested_finish": _canonical_finish_for_tcgcsv_match(requested_finish),
+        "product_id": product_id,
+        "group_id": group_id,
+        "candidates": candidates or [],
+    }
+
+
+def find_finish_product_id_from_local_prices(
+    base_product_id,
+    requested_finish,
+    snapshot_path=None,
+):
+    """
+    Conservative local-only lookup for finish-specific TCGPlayer product IDs.
+
+    This uses only the local TCGCSV price snapshot. It does not use product names,
+    does not call live TCGCSV/Scryfall endpoints, and does not write to the DB.
+    """
+    base_product_id = _coerce_int(base_product_id)
+
+    if base_product_id is None:
+        return _finish_lookup_result(
+            "base_product_not_found",
+            "Base product ID was empty or not an integer.",
+            base_product_id,
+            requested_finish,
+        )
+
+    price_rows = list(_iter_local_price_rows_with_group_id(snapshot_path=snapshot_path))
+
+    base_rows = [
+        row for row in price_rows
+        if _row_product_id(row) == base_product_id
+    ]
+
+    if not base_rows:
+        return _finish_lookup_result(
+            "base_product_not_found",
+            f"Base product ID {base_product_id} was not found in the local TCGCSV snapshot.",
+            base_product_id,
+            requested_finish,
+        )
+
+    group_ids = sorted({
+        _row_group_id(row)
+        for row in base_rows
+        if _row_group_id(row) is not None
+    })
+
+    if len(group_ids) != 1:
+        return _finish_lookup_result(
+            "ambiguous",
+            f"Base product ID {base_product_id} did not resolve to exactly one group_id.",
+            base_product_id,
+            requested_finish,
+            candidates=_dedupe_candidates_by_product_id(base_rows),
+        )
+
+    group_id = group_ids[0]
+
+    group_rows = [
+        row for row in price_rows
+        if _row_group_id(row) == group_id
+    ]
+
+    matching_finish_rows = [
+        row for row in group_rows
+        if subtype_matches_finish(_row_subtype_name(row), requested_finish)
+    ]
+
+    candidates = _dedupe_candidates_by_product_id(matching_finish_rows)
+
+    if not candidates:
+        return _finish_lookup_result(
+            "no_finish_candidate",
+            f"No local TCGCSV rows in group {group_id} matched finish {requested_finish!r}.",
+            base_product_id,
+            requested_finish,
+            group_id=group_id,
+        )
+
+    same_product_candidates = [
+        candidate for candidate in candidates
+        if candidate["product_id"] == base_product_id
+    ]
+
+    if same_product_candidates:
+        usable_same_product_candidates = [
+            candidate for candidate in same_product_candidates
+            if candidate["has_usable_price"]
+        ]
+
+        if usable_same_product_candidates:
+            candidate = usable_same_product_candidates[0]
+
+            return _finish_lookup_result(
+                "matched_same_product",
+                "Base product ID already has a matching finish row with a usable price.",
+                base_product_id,
+                requested_finish,
+                product_id=candidate["product_id"],
+                group_id=group_id,
+                candidates=candidates,
+            )
+
+        return _finish_lookup_result(
+            "no_usable_price",
+            "Base product ID has a matching finish row, but it has no usable local price.",
+            base_product_id,
+            requested_finish,
+            group_id=group_id,
+            candidates=candidates,
+        )
+
+    usable_candidates = [
+        candidate for candidate in candidates
+        if candidate["has_usable_price"]
+    ]
+
+    if not usable_candidates:
+        return _finish_lookup_result(
+            "no_usable_price",
+            f"Group {group_id} has matching finish candidate rows, but none has a usable local price.",
+            base_product_id,
+            requested_finish,
+            group_id=group_id,
+            candidates=candidates,
+        )
+
+    if len(usable_candidates) == 1:
+        candidate = usable_candidates[0]
+
+        return _finish_lookup_result(
+            "matched_single_candidate",
+            "Exactly one matching finish candidate in the base product group has a usable price.",
+            base_product_id,
+            requested_finish,
+            product_id=candidate["product_id"],
+            group_id=group_id,
+            candidates=candidates,
+        )
+
+    return _finish_lookup_result(
+        "ambiguous",
+        f"Group {group_id} has multiple matching finish candidates with usable prices.",
+        base_product_id,
+        requested_finish,
+        group_id=group_id,
+        candidates=usable_candidates,
+    )
+    
+def _finish_filter_sql_and_params(finish):
+    if finish:
+        return "AND LOWER(REPLACE(i.finish, '_', ' ')) = ?", [normalize_finish(finish)]
+
+    special_finishes = sorted(SPECIAL_FINISHES)
+    placeholders = ",".join("?" for _ in special_finishes)
+
+    return (
+        f"AND LOWER(REPLACE(i.finish, '_', ' ')) IN ({placeholders})",
+        special_finishes,
+    )
+
+
+def get_inventory_special_finish_rows(manager, finish=None):
+    """
+    Returns distinct inventory card/finish rows that may need finish-specific
+    TCGPlayer price overrides.
+
+    This does not mutate the DB.
+    """
+    finish_sql, finish_params = _finish_filter_sql_and_params(finish)
+
+    return manager.cursor.execute(f"""
+        SELECT DISTINCT
+            cp.scryfall_id,
+            cd.name,
+            cp.set_code,
+            cp.collector_number,
+            i.finish,
+            cp.tcgplayer_id AS base_tcgplayer_id,
+            cp.tcgcsv_group_id AS base_tcgcsv_group_id,
+            o.tcgplayer_id AS existing_override_tcgplayer_id,
+            o.tcgcsv_group_id AS existing_override_group_id,
+            o.note AS existing_override_note
+        FROM inventory i
+        JOIN card_printings cp
+            ON i.scryfall_id = cp.scryfall_id
+        LEFT JOIN card_definitions cd
+            ON cp.oracle_id = cd.oracle_id
+        LEFT JOIN tcgplayer_price_overrides o
+            ON cp.scryfall_id = o.scryfall_id
+            AND LOWER(REPLACE(i.finish, '_', ' ')) = LOWER(REPLACE(o.finish, '_', ' '))
+        WHERE i.scryfall_id IS NOT NULL
+          AND cp.tcgplayer_id IS NOT NULL
+          {finish_sql}
+        ORDER BY
+            LOWER(cd.name),
+            cp.set_code,
+            cp.collector_number,
+            LOWER(i.finish)
+    """, tuple(finish_params)).fetchall()
+    
 def tcgcsv_request(session, url, timeout=30, attempts=4):
     global _TCGCSV_COOLDOWN_UNTIL
 
@@ -1368,7 +1901,7 @@ def normalize_local_price_snapshot_row(row):
 
     Supports:
     - old local snapshot: product_id, sub_type_name, market_price, mid_price, low_price
-    - archive export: productId, subTypeName, marketPrice, midPrice, lowPrice
+    - archive export: productId, subTypeName, marketPrice, midPrice, lowPrice, highPrice, directLowPrice
     """
     product_id = _first_present(row, "product_id", "productId")
     group_id = _first_present(row, "group_id", "groupId")
@@ -1389,6 +1922,8 @@ def normalize_local_price_snapshot_row(row):
         "marketPrice": _first_present(row, "market_price", "marketPrice"),
         "midPrice": _first_present(row, "mid_price", "midPrice"),
         "lowPrice": _first_present(row, "low_price", "lowPrice"),
+        "highPrice": _first_present(row, "high_price", "highPrice"),
+        "directLowPrice": _first_present(row, "direct_low_price", "directLowPrice"),
     }
 
 def update_prices_for_scryfall_ids_from_tcgcsv(
@@ -1519,3 +2054,471 @@ def update_prices_for_scryfall_ids_from_tcgcsv(
         )
 
     return updated_cards
+
+def _iter_local_price_rows_with_group_id(snapshot_path=None):
+    """
+    Flatten load_local_group_prices() from:
+        {group_id: [price_row, price_row]}
+
+    into rows that also carry group_id, because load_local_group_prices()
+    intentionally pops group_id off the normalized row before grouping.
+    """
+    grouped_prices = load_local_group_prices(snapshot_path=snapshot_path)
+
+    for group_id, rows in grouped_prices.items():
+        for row in rows:
+            row_with_group = dict(row)
+            row_with_group["group_id"] = group_id
+            yield row_with_group
+            
+def preview_local_finish_product_mappings(manager, finish="rainbow foil", snapshot_path=None):
+    """
+    Preview special-finish TCGPlayer product mappings from local TCGCSV data.
+
+    This does not write to the DB.
+    """
+    rows = get_inventory_special_finish_rows(manager, finish=finish)
+    results = []
+
+    for row in rows:
+        normalized_finish = normalize_finish(row["finish"])
+        existing_override_id = int_or_none(row["existing_override_tcgplayer_id"])
+
+        if existing_override_id is not None:
+            lookup = {
+                "status": "existing_override",
+                "reason": "A finish-specific TCGPlayer price override already exists.",
+                "base_product_id": int_or_none(row["base_tcgplayer_id"]),
+                "requested_finish": normalized_finish,
+                "product_id": existing_override_id,
+                "group_id": int_or_none(row["existing_override_group_id"]),
+                "candidates": [],
+            }
+        else:
+            lookup = find_finish_product_id_from_local_prices(
+                base_product_id=row["base_tcgplayer_id"],
+                requested_finish=normalized_finish,
+                snapshot_path=snapshot_path,
+            )
+
+        results.append({
+            "scryfall_id": row["scryfall_id"],
+            "name": row["name"],
+            "set_code": row["set_code"],
+            "collector_number": row["collector_number"],
+            "finish": normalized_finish,
+            "base_tcgplayer_id": int_or_none(row["base_tcgplayer_id"]),
+            "base_tcgcsv_group_id": int_or_none(row["base_tcgcsv_group_id"]),
+            "existing_override_tcgplayer_id": existing_override_id,
+            "existing_override_group_id": int_or_none(row["existing_override_group_id"]),
+            "status": lookup["status"],
+            "reason": lookup["reason"],
+            "mapped_tcgplayer_id": lookup["product_id"],
+            "mapped_tcgcsv_group_id": lookup["group_id"],
+            "candidates": lookup["candidates"],
+        })
+
+    return results
+
+def auto_insert_finish_price_overrides(
+    manager,
+    finish="rainbow foil",
+    snapshot_path=None,
+    dry_run=True,
+):
+    """
+    Insert safe local-only special-finish mappings into tcgplayer_price_overrides.
+
+    Safe statuses:
+    - matched_same_product
+    - matched_single_candidate
+
+    This deliberately does not overwrite existing manual overrides.
+    """
+    preview_rows = preview_local_finish_product_mappings(
+        manager=manager,
+        finish=finish,
+        snapshot_path=snapshot_path,
+    )
+
+    safe_statuses = {"matched_same_product", "matched_single_candidate"}
+
+    inserted = 0
+    skipped_existing = 0
+    skipped_unsafe = 0
+    would_insert = []
+
+    for row in preview_rows:
+        if row["status"] == "existing_override":
+            skipped_existing += 1
+            continue
+
+        if row["status"] not in safe_statuses:
+            skipped_unsafe += 1
+            continue
+
+        mapped_tcgplayer_id = int_or_none(row["mapped_tcgplayer_id"])
+        mapped_group_id = int_or_none(row["mapped_tcgcsv_group_id"])
+
+        if mapped_tcgplayer_id is None:
+            skipped_unsafe += 1
+            continue
+
+        note = (
+            f"{AUTO_FINISH_OVERRIDE_NOTE_PREFIX}: "
+            f"{row['status']} for {row['finish']}"
+        )
+
+        insert_payload = {
+            "scryfall_id": row["scryfall_id"],
+            "finish": row["finish"],
+            "tcgplayer_id": mapped_tcgplayer_id,
+            "tcgcsv_group_id": mapped_group_id,
+            "note": note,
+            "name": row["name"],
+            "set_code": row["set_code"],
+            "collector_number": row["collector_number"],
+        }
+
+        would_insert.append(insert_payload)
+
+        if dry_run:
+            continue
+
+        manager.cursor.execute("""
+            INSERT INTO tcgplayer_price_overrides (
+                scryfall_id,
+                finish,
+                tcgplayer_id,
+                tcgcsv_group_id,
+                note
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, finish) DO NOTHING
+        """, (
+            row["scryfall_id"],
+            row["finish"],
+            mapped_tcgplayer_id,
+            mapped_group_id,
+            note,
+        ))
+
+        if manager.cursor.rowcount:
+            inserted += 1
+        else:
+            skipped_existing += 1
+
+    if not dry_run:
+        manager.commit()
+
+    return {
+        "dry_run": dry_run,
+        "finish": normalize_finish(finish) if finish else None,
+        "previewed": len(preview_rows),
+        "inserted": inserted,
+        "would_insert": len(would_insert),
+        "skipped_existing": skipped_existing,
+        "skipped_unsafe": skipped_unsafe,
+        "rows": preview_rows,
+        "insert_rows": would_insert,
+    }
+    
+def search_local_tcgcsv_price_candidates_for_finish(
+    manager,
+    scryfall_id,
+    finish,
+    snapshot_path=None,
+    nearby_window=25,
+    max_candidates=75,
+):
+    """
+    Local-price-CSV-only candidate finder for manual special-finish mapping.
+
+    This does not use live TCGCSV product endpoints.
+
+    Important limitation:
+    The local price CSV has no product names, so this can only return productId,
+    group_id, subTypeName, and prices. It is intended for manual/admin review,
+    not automatic mapping.
+    """
+    row = manager.cursor.execute("""
+        SELECT
+            cp.scryfall_id,
+            cp.tcgplayer_id,
+            cp.tcgplayer_etched_id,
+            cp.tcgcsv_group_id,
+            cd.name
+        FROM card_printings cp
+        LEFT JOIN card_definitions cd
+            ON cp.oracle_id = cd.oracle_id
+        WHERE cp.scryfall_id = ?
+    """, (scryfall_id,)).fetchone()
+
+    if not row:
+        return []
+
+    base_product_id = int_or_none(row["tcgplayer_id"])
+    etched_product_id = int_or_none(row["tcgplayer_etched_id"])
+    group_id = row["tcgcsv_group_id"]
+
+    if not group_id:
+        product_to_group = build_product_to_group_map_from_local_snapshot(
+            snapshot_path=snapshot_path
+        )
+
+        if base_product_id is not None:
+            group_id = product_to_group.get(base_product_id)
+
+        if not group_id and etched_product_id is not None:
+            group_id = product_to_group.get(etched_product_id)
+
+    if not group_id:
+        return []
+
+    group_id = str(group_id)
+    grouped_prices = load_local_group_prices(snapshot_path=snapshot_path)
+    group_rows = grouped_prices.get(group_id, [])
+
+    if not group_rows:
+        return []
+
+    requested_finish = normalize_finish(finish)
+    requested_is_special = requested_finish in SPECIAL_FINISHES
+
+    candidates = []
+
+    for price_row in group_rows:
+        product_id = int_or_none(price_row.get("productId"))
+        if product_id is None:
+            continue
+
+        subtype_name = price_row.get("subTypeName") or ""
+        selected_price = choose_tcgcsv_price(price_row)
+
+        if selected_price is None:
+            continue
+
+        exact_finish_match = subtype_matches_finish(subtype_name, requested_finish)
+
+        # TCGCSV often stores Secret Lair rainbow foils as generic "Foil".
+        # This is only for manual candidate display, not automatic insertion.
+        generic_foil_fallback = (
+            requested_is_special
+            and not exact_finish_match
+            and price_finish_from_subtype(subtype_name) == "foil"
+        )
+
+        if not exact_finish_match and not generic_foil_fallback:
+            continue
+
+        distance_from_base = None
+        if base_product_id is not None:
+            distance_from_base = abs(product_id - base_product_id)
+
+            # Keeps Secret Lair groups from dumping hundreds/thousands of foil rows.
+            # The admin can still manually paste an exact override separately if needed.
+            if (
+                generic_foil_fallback
+                and nearby_window is not None
+                and distance_from_base > nearby_window
+            ):
+                continue
+
+        match_quality = "exact_subtype" if exact_finish_match else "generic_foil_same_group"
+
+        candidates.append({
+            "productId": product_id,
+            "groupId": group_id,
+            "name": (
+                f"Local CSV product {product_id} "
+                f"({subtype_name or 'Unknown subtype'}, "
+                f"market={price_row.get('marketPrice')}, "
+                f"mid={price_row.get('midPrice')}, "
+                f"low={price_row.get('lowPrice')})"
+            ),
+            "cleanName": f"Local CSV product {product_id}",
+            "url": None,
+            "imageUrl": None,
+            "subTypeName": subtype_name,
+            "marketPrice": price_row.get("marketPrice"),
+            "midPrice": price_row.get("midPrice"),
+            "lowPrice": price_row.get("lowPrice"),
+            "selectedPrice": selected_price,
+            "matchQuality": match_quality,
+            "distanceFromBaseProductId": distance_from_base,
+            "warning": (
+                "Local price CSV does not include product names. "
+                "Confirm this product ID manually before saving."
+            ),
+        })
+
+    candidates.sort(key=lambda candidate: (
+        0 if candidate["matchQuality"] == "exact_subtype" else 1,
+        candidate["distanceFromBaseProductId"]
+            if candidate["distanceFromBaseProductId"] is not None
+            else 999999,
+        candidate["productId"],
+    ))
+
+    return candidates[:max_candidates]
+
+def load_local_products_cache(products_path=TCGCSV_LOCAL_PRODUCTS_CACHE):
+    if not os.path.exists(products_path):
+        return {}, {}
+
+    mtime = os.path.getmtime(products_path)
+
+    if (
+        _LOCAL_PRODUCTS_CACHE["path"] == products_path
+        and _LOCAL_PRODUCTS_CACHE["mtime"] == mtime
+    ):
+        return (
+            _LOCAL_PRODUCTS_CACHE["by_product_id"],
+            _LOCAL_PRODUCTS_CACHE["by_group_id"],
+        )
+
+    by_product_id = {}
+    by_group_id = defaultdict(list)
+
+    with open(products_path, "r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+
+        for row in reader:
+            product_id = int_or_none(row.get("productId"))
+            group_id = row.get("group_id") or row.get("groupId")
+
+            if product_id is None or not group_id:
+                continue
+
+            product = {
+                "productId": product_id,
+                "groupId": str(group_id),
+                "name": row.get("name") or "",
+                "cleanName": row.get("cleanName") or "",
+                "url": row.get("url") or "",
+                "imageUrl": row.get("imageUrl") or "",
+                "modifiedOn": row.get("modifiedOn") or "",
+                "extendedData_json": row.get("extendedData_json") or "[]",
+            }
+
+            by_product_id[product_id] = product
+            by_group_id[str(group_id)].append(product)
+
+    _LOCAL_PRODUCTS_CACHE["path"] = products_path
+    _LOCAL_PRODUCTS_CACHE["mtime"] = mtime
+    _LOCAL_PRODUCTS_CACHE["by_product_id"] = by_product_id
+    _LOCAL_PRODUCTS_CACHE["by_group_id"] = dict(by_group_id)
+
+    return by_product_id, dict(by_group_id)
+
+def search_local_tcgcsv_products_for_finish(
+    manager,
+    scryfall_id,
+    finish,
+    snapshot_path=None,
+    products_path=TCGCSV_LOCAL_PRODUCTS_CACHE,
+):
+    row = manager.cursor.execute("""
+        SELECT
+            cp.scryfall_id,
+            cp.tcgplayer_id,
+            cp.tcgplayer_etched_id,
+            cp.tcgcsv_group_id,
+            cd.name
+        FROM card_printings cp
+        LEFT JOIN card_definitions cd
+            ON cp.oracle_id = cd.oracle_id
+        WHERE cp.scryfall_id = ?
+    """, (scryfall_id,)).fetchone()
+
+    if not row:
+        return []
+
+    card_name = normalize_finish(row["name"])
+    requested_finish = normalize_finish(finish)
+    base_product_id = int_or_none(row["tcgplayer_id"])
+    etched_product_id = int_or_none(row["tcgplayer_etched_id"])
+
+    product_to_group = build_product_to_group_map_from_local_snapshot(
+        snapshot_path=snapshot_path
+    )
+
+    group_id = row["tcgcsv_group_id"]
+
+    if not group_id and base_product_id is not None:
+        group_id = product_to_group.get(base_product_id)
+
+    if not group_id and etched_product_id is not None:
+        group_id = product_to_group.get(etched_product_id)
+
+    if not group_id:
+        return []
+
+    group_id = str(group_id)
+
+    products_by_id, products_by_group = load_local_products_cache(products_path)
+    products = products_by_group.get(group_id, [])
+
+    price_rows = load_local_group_prices(snapshot_path=snapshot_path).get(group_id, [])
+    prices_by_id = defaultdict(list)
+
+    for price_row in price_rows:
+        product_id = int_or_none(price_row.get("productId"))
+        if product_id is not None:
+            prices_by_id[product_id].append(price_row)
+
+    candidates = []
+
+    for product in products:
+        product_id = int_or_none(product.get("productId"))
+        if product_id is None:
+            continue
+
+        product_name = normalize_finish(product.get("name"))
+        clean_name = normalize_finish(product.get("cleanName"))
+
+        name_matches = (
+            card_name in product_name
+            or card_name in clean_name
+            or product_name in card_name
+            or clean_name in card_name
+        )
+
+        finish_matches = (
+            requested_finish in product_name
+            or requested_finish in clean_name
+        )
+
+        if not name_matches or not finish_matches:
+            continue
+
+        usable_price_rows = [
+            price_row
+            for price_row in prices_by_id.get(product_id, [])
+            if choose_tcgcsv_price(price_row) is not None
+        ]
+
+        if not usable_price_rows:
+            continue
+
+        best_price_row = usable_price_rows[0]
+
+        candidates.append({
+            "productId": product_id,
+            "groupId": group_id,
+            "name": product.get("name") or "",
+            "cleanName": product.get("cleanName") or "",
+            "url": product.get("url"),
+            "imageUrl": product.get("imageUrl"),
+            "subTypeName": best_price_row.get("subTypeName"),
+            "marketPrice": best_price_row.get("marketPrice"),
+            "midPrice": best_price_row.get("midPrice"),
+            "lowPrice": best_price_row.get("lowPrice"),
+            "selectedPrice": choose_tcgcsv_price(best_price_row),
+            "source": "local_products_cache_plus_local_price_csv",
+        })
+
+    return sorted(candidates, key=lambda candidate: (
+        candidate["productId"] != base_product_id,
+        candidate["productId"],
+    ))
