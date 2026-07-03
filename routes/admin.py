@@ -503,7 +503,7 @@ def admin_dashboard():
             _add_attention(
                 attention_items, "warning",
                 "Local TCGCSV snapshot is stale", snapshot_age_days,
-                f"Last captured {snapshot_age_days} day(s) ago. Run refresh_tcgcsv_snapshot.py.",
+                f"Last captured {snapshot_age_days} day(s) ago.",
             )
 
     except Exception as e:

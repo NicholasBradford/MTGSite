@@ -49,3 +49,4 @@ DESIGN_RULES.md
 tests/logs/log.txt
 tests/logs/log.txt
 /tests/logs
+/scripts
