@@ -120,26 +120,33 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        role = request.form['role']
-        admin_key = request.form.get('admin_key')
 
+        requested_role = request.form.get('role', 'user')
+        admin_key = request.form.get('admin_key')
         hashed_pw = generate_password_hash(password)
-        secret_admin_phrase = os.environ.get('ADMIN_REGISTRATION_KEY')
 
         manager = get_db()
 
-        if role == "admin":
-            if not secret_admin_phrase:
-                manager.close()
-                flash('Admin registration is disabled until ADMIN_REGISTRATION_KEY is configured.')
-                return redirect(url_for('authentication.login'))
-
-            if not admin_key or admin_key != secret_admin_phrase:
-                manager.close()
-                flash('Cannot create ADMIN account without site owner authorization')
-                return redirect(url_for('authentication.login'))
-
         try:
+            user_count = manager.cursor.execute(
+                "SELECT COUNT(*) FROM users"
+            ).fetchone()[0]
+
+            local_app_mode = os.environ.get("LOCAL_APP_MODE") == "1"
+
+            if local_app_mode and user_count == 0:
+                # Packaged local app: first account owns the local install.
+                role = "admin"
+            else:
+                role = requested_role
+
+                if role == "admin":
+                    secret_admin_phrase = os.environ.get('ADMIN_REGISTRATION_KEY')
+
+                    if not secret_admin_phrase or admin_key != secret_admin_phrase:
+                        flash('Cannot create ADMIN account without site owner authorization')
+                        return redirect(url_for('authentication.login'))
+
             manager.cursor.execute(
                 "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
                 (username, hashed_pw, role)
