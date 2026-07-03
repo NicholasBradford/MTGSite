@@ -4,7 +4,7 @@ import requests
 import time
 from pathlib import Path
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from dotenv import load_dotenv
@@ -24,6 +24,8 @@ SCRYFALL_BASE_URL = "https://api.scryfall.com"
 SCRYFALL_TIMEOUT_SECONDS = 20
 RATE_LIMIT_DELAY_SECONDS = 0.12
 DEFAULT_LOCATION_ID = 5
+RECENT_SET_WINDOW_DAYS = 1095
+STANDARD_SET_TYPES = {"expansion", "core"}
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -132,6 +134,41 @@ class ScryfallCardAccess:
         url = f"{self.base_url}/cards/{set_code}/{collector_number}"
         return self._request_json(url)
     
+    def get_set(self, set_code: str) -> dict[str, Any] | None:
+        set_code = set_code.lower().strip()
+
+        if not set_code:
+            return None
+
+        url = f"{self.base_url}/sets/{set_code}"
+        return self._request_json(url)
+
+    def iter_set_cards(self, set_code: str):
+        set_code = set_code.lower().strip()
+
+        if not set_code:
+            return
+
+        # unique=prints keeps alternate printings/collector numbers distinct.
+        url = (
+            f"{self.base_url}/cards/search"
+            f"?order=set&unique=prints&q=e%3A{set_code}"
+        )
+
+        while url:
+            page = self._request_json(url)
+
+            if not page:
+                return
+
+            for card_data in page.get("data", []):
+                yield card_data
+
+            url = page.get("next_page") if page.get("has_more") else None
+
+            if url:
+                time.sleep(RATE_LIMIT_DELAY_SECONDS)
+
     def _decimal_or_none(self, value: str | None) -> Decimal | None:
         if value is None or value == "":
             return None
@@ -279,6 +316,84 @@ class CardImporter:
             or "static/images"
         )
         
+    def download_binary(self, source_url: str, local_path: str, stream: bool = False) -> bool:
+        if not source_url or not local_path:
+            return False
+
+        destination = self.image_root / local_path
+
+        if destination.exists():
+            return True
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            response = requests.get(
+                source_url,
+                headers=SCRYFALL_HEADERS,
+                timeout=IMAGE_TIMEOUT_SECONDS,
+                stream=stream,
+            )
+
+            if response.status_code != 200:
+                return False
+
+            if stream:
+                with destination.open("wb") as file_handle:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            file_handle.write(chunk)
+            else:
+                destination.write_bytes(response.content)
+
+            return True
+
+        except requests.RequestException:
+            return False
+
+    def set_exists(self, set_code: str) -> bool:
+        row = self.db.cursor.execute(
+            "SELECT 1 FROM sets WHERE set_code = ? LIMIT 1",
+            (set_code.lower().strip(),),
+        ).fetchone()
+
+        return row is not None
+
+    def upsert_set(
+        self,
+        set_code: str,
+        set_data: dict[str, Any],
+        is_standard_legal: int,
+        icon_svg_uri: str,
+    ) -> None:
+        self.db.cursor.execute(
+            """
+            INSERT INTO sets (
+                set_code,
+                set_name,
+                set_type,
+                standard_legal,
+                released_at,
+                icon_svg_uri
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(set_code) DO UPDATE SET
+                set_name = excluded.set_name,
+                set_type = excluded.set_type,
+                standard_legal = excluded.standard_legal,
+                released_at = excluded.released_at,
+                icon_svg_uri = excluded.icon_svg_uri
+            """,
+            (
+                set_code.lower().strip(),
+                set_data.get("name") or set_code.upper(),
+                set_data.get("set_type") or "",
+                is_standard_legal,
+                set_data.get("released_at"),
+                icon_svg_uri,
+            ),
+        )
+
     def upsert_card_definition(self, card: ImportedCard) -> None:
         self.db.cursor.execute(
             """
@@ -393,11 +508,13 @@ class CardImporter:
         except requests.RequestException:
             return
         
-    def import_card(self, card: ImportedCard) -> None:
+    def import_card(self, card: ImportedCard, commit: bool = True) -> None:
         self.download_card_image(card)
         self.upsert_card_definition(card)
         self.upsert_card_printing(card)
-        self.db.commit()
+
+        if commit:
+            self.db.commit()
         
     def add_inventory_copy(
         self,
@@ -446,12 +563,15 @@ class CardImporter:
         self,
         card: ImportedCard,
         request: InventoryImportRequest,
+        commit: bool = True,
     ) -> None:
         self.download_card_image(card)
         self.upsert_card_definition(card)
         self.upsert_card_printing(card)
         self.add_inventory_copies(card, request)
-        self.db.commit()
+
+        if commit:
+            self.db.commit()
         
         
 # MASS IMPORT
@@ -552,6 +672,109 @@ class CardImporterService:
             self.card_importer,
         )
         self.commit_batch_size = commit_batch_size
+
+    def _is_recent_standard_expansion(self, set_data: dict[str, Any]) -> tuple[bool, bool]:
+        set_type = set_data.get("set_type")
+        is_expansion = set_type in STANDARD_SET_TYPES
+        release_date_str = set_data.get("released_at")
+        is_recent = False
+
+        if release_date_str:
+            try:
+                release_date = datetime.strptime(release_date_str, "%Y-%m-%d")
+                is_recent = release_date > (datetime.now() - timedelta(days=RECENT_SET_WINDOW_DAYS))
+            except ValueError:
+                is_recent = False
+
+        return is_expansion, is_recent
+
+    def _count_card_with_scryfall_price(self, card: ImportedCard) -> int:
+        return int(
+            card.current_reg_price is not None
+            or card.current_foil_price is not None
+            or card.current_etched_price is not None
+            or card.current_rainbow_price is not None
+        )
+
+    def ensure_set_is_fully_populated(self, set_code: str) -> dict[str, Any]:
+        set_code = set_code.lower().strip()
+
+        result: dict[str, Any] = {
+            "set_code": set_code,
+            "set_inserted": False,
+            "cards_synced": 0,
+            "cards_failed": 0,
+            "prices_updated": 0,
+            "skipped": False,
+        }
+
+        if not set_code:
+            result["skipped"] = True
+            return result
+
+        if self.card_importer.set_exists(set_code):
+            result["skipped"] = True
+            return result
+
+        set_data = self.card_access.get_set(set_code)
+
+        if not set_data:
+            result["skipped"] = True
+            return result
+
+        is_expansion, is_recent = self._is_recent_standard_expansion(set_data)
+        is_standard_legal = 1 if is_expansion and is_recent else 0
+
+        icon_url = set_data.get("icon_svg_uri") or ""
+        local_icon_path = f"img/icons/{set_code}.svg" if icon_url else ""
+
+        if icon_url:
+            self.card_importer.download_binary(icon_url, local_icon_path, stream=False)
+
+        self.card_importer.upsert_set(
+            set_code=set_code,
+            set_data=set_data,
+            is_standard_legal=is_standard_legal,
+            icon_svg_uri=local_icon_path or icon_url,
+        )
+        self.db.commit()
+        result["set_inserted"] = True
+
+        if not (is_expansion and is_recent):
+            print(f"Skipping bulk card download for {set_code.upper()} (not a recent expansion/core set).")
+            result["skipped"] = True
+            return result
+
+        print(f"Standard expansion/core set confirmed: {set_code.upper()}. Syncing all cards...")
+
+        since_last_commit = 0
+
+        for raw_card in self.card_access.iter_set_cards(set_code):
+            card = self.card_access.build_imported_card(raw_card)
+
+            if card is None:
+                result["cards_failed"] += 1
+                continue
+
+            try:
+                self.card_importer.import_card(card, commit=False)
+                result["cards_synced"] += 1
+                result["prices_updated"] += self._count_card_with_scryfall_price(card)
+                since_last_commit += 1
+
+                if since_last_commit >= self.commit_batch_size:
+                    self.db.commit()
+                    since_last_commit = 0
+
+            except Exception as error:
+                result["cards_failed"] += 1
+                print(f"Card persistence skipped for {raw_card.get('name', 'unknown')}: {error}")
+
+            time.sleep(RATE_LIMIT_DELAY_SECONDS)
+
+        self.db.commit()
+        print(f"Set {set_code.upper()} fully synchronized.")
+        return result
 
     def import_single_card(
         self,
@@ -708,7 +931,15 @@ class CardImporterService:
             if request is not None:
                 inventory_requests.append(request)
 
+        seen_set_codes = set()
+
+        for request in inventory_requests:
+            if request.set_code not in seen_set_codes:
+                self.ensure_set_is_fully_populated(request.set_code)
+                seen_set_codes.add(request.set_code)
+
         return self.mass_importer.import_owned_many(inventory_requests)
+
 if __name__ == "__main__":
     from db.db_manager import CardDB
 

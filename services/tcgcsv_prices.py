@@ -26,7 +26,7 @@ TCGCSV_REQUEST_COOLDOWN_SECONDS = 300
 TCGCSV_SNAPSHOT_DIR = os.path.join("var", "data", "tcgcsv")
 TCGCSV_LOCAL_PRICE_SNAPSHOT = os.path.join(TCGCSV_SNAPSHOT_DIR, "daily_prices_latest.csv")
 TCGCSV_LOCAL_SNAPSHOT_METADATA = os.path.join(TCGCSV_SNAPSHOT_DIR, "snapshot_metadata.json")
-TCGCSV_HISTORY_DIR = "tcg_history"
+TCGCSV_HISTORY_DIR = os.environ.get("TCGCSV_HISTORY_DIR", "tcg_history")
 TCGCSV_HISTORY_FILE_PREFIX = "prices_category_1_"
 TCGCSV_HISTORY_FILE_SUFFIX = ".csv"
 TCGCSV_LOCAL_TIMEZONE = os.environ.get("TCGCSV_LOCAL_TIMEZONE", "America/Chicago")
@@ -259,44 +259,7 @@ def find_prior_tcgcsv_history_files(
 
     return paths
 
-def refresh_current_day_history_csv_if_due(now=None):
-    """
-    After the expected daily TCGCSV archive release time, try to fetch today's
-    local CSV if it is not already present.
-
-    This does not replace the normal local CSV resolver. It only gives
-    _get_tcgcsv.py a chance to create a newer CSV before the sync uses the
-    newest available local file.
-    """
-    timezone = ZoneInfo(TCGCSV_LOCAL_TIMEZONE)
-    local_now = now or datetime.now(timezone)
-    today = local_now.date()
-
-    if local_now.hour < TCGCSV_DAILY_RELEASE_HOUR_LOCAL:
-        return {
-            "attempted": False,
-            "updated": False,
-            "status": "before_release_cutoff",
-            "message": (
-                f"Local time is before {TCGCSV_DAILY_RELEASE_HOUR_LOCAL}:00; "
-                "using newest existing local CSV."
-            ),
-            "date": today.isoformat(),
-            "path": find_latest_tcgcsv_history_file(),
-        }
-
-    existing_today_path = find_tcgcsv_history_file_for_date(today)
-
-    if existing_today_path:
-        return {
-            "attempted": False,
-            "updated": False,
-            "status": "current_day_csv_exists",
-            "message": f"Current-day local CSV already exists: {existing_today_path}",
-            "date": today.isoformat(),
-            "path": existing_today_path,
-        }
-
+def fetch_tcgcsv_history_csv_for_date(target_date):
     script_path = TCGCSV_FETCH_SCRIPT_PATH
 
     if not os.path.exists(script_path):
@@ -305,7 +268,7 @@ def refresh_current_day_history_csv_if_due(now=None):
             "updated": False,
             "status": "fetch_script_missing",
             "message": f"Could not find TCGCSV fetch script: {script_path}",
-            "date": today.isoformat(),
+            "date": target_date.isoformat(),
             "path": find_latest_tcgcsv_history_file(),
         }
 
@@ -313,9 +276,10 @@ def refresh_current_day_history_csv_if_due(now=None):
         sys.executable,
         script_path,
         "--date",
-        today.isoformat(),
+        target_date.isoformat(),
         "--outdir",
         TCGCSV_HISTORY_DIR,
+        "--no-fallback-previous-day",
     ]
 
     try:
@@ -331,41 +295,122 @@ def refresh_current_day_history_csv_if_due(now=None):
             "attempted": True,
             "updated": False,
             "status": "fetch_failed",
-            "message": f"Failed to run _get_tcgcsv.py: {error}",
-            "date": today.isoformat(),
+            "message": f"Failed to run _get_tcgcsv.py for {target_date.isoformat()}: {error}",
+            "date": target_date.isoformat(),
             "path": find_latest_tcgcsv_history_file(),
         }
 
-    today_path_after_fetch = find_tcgcsv_history_file_for_date(today)
+    path_after_fetch = find_tcgcsv_history_file_for_date(target_date)
 
-    if today_path_after_fetch:
+    if path_after_fetch:
         return {
             "attempted": True,
             "updated": True,
-            "status": "current_day_csv_downloaded",
-            "message": f"Downloaded current-day local CSV: {today_path_after_fetch}",
-            "date": today.isoformat(),
-            "path": today_path_after_fetch,
+            "status": "csv_downloaded",
+            "message": f"Downloaded local CSV for {target_date.isoformat()}: {path_after_fetch}",
+            "date": target_date.isoformat(),
+            "path": path_after_fetch,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "returncode": result.returncode,
         }
 
-    latest_path = find_latest_tcgcsv_history_file()
-
     return {
         "attempted": True,
         "updated": False,
-        "status": "current_day_csv_unavailable",
+        "status": "csv_unavailable",
         "message": (
-            f"No current-day CSV was created for {today.isoformat()}; "
-            f"continuing with newest available local CSV: {latest_path}"
+            f"No CSV was created for {target_date.isoformat()}; "
+            f"continuing with newest available local CSV: {find_latest_tcgcsv_history_file()}"
         ),
-        "date": today.isoformat(),
-        "path": latest_path,
+        "date": target_date.isoformat(),
+        "path": find_latest_tcgcsv_history_file(),
         "stdout": result.stdout,
         "stderr": result.stderr,
         "returncode": result.returncode,
+    }
+
+def refresh_current_day_history_csv_if_due(now=None):
+    """
+    After the expected daily TCGCSV archive release time, try to fetch today's
+    local CSV if it is not already present.
+
+    If today's CSV is not expected yet or cannot be fetched, make sure
+    yesterday's CSV exists locally and download it if it does not.
+
+    This does not replace the normal local CSV resolver. It only gives
+    _get_tcgcsv.py a chance to create a newer CSV before the sync uses the
+    newest available local file.
+    """
+    timezone = ZoneInfo(TCGCSV_LOCAL_TIMEZONE)
+    local_now = now or datetime.now(timezone)
+    today = local_now.date()
+    yesterday = today - timedelta(days=1)
+
+    def ensure_yesterday_csv(reason_status):
+        existing_yesterday_path = find_tcgcsv_history_file_for_date(yesterday)
+
+        if existing_yesterday_path:
+            return {
+                "attempted": False,
+                "updated": False,
+                "status": f"{reason_status}_previous_day_csv_exists",
+                "message": f"Previous-day local CSV already exists: {existing_yesterday_path}",
+                "date": yesterday.isoformat(),
+                "path": existing_yesterday_path,
+            }
+
+        result = fetch_tcgcsv_history_csv_for_date(yesterday)
+
+        return {
+            **result,
+            "status": f"{reason_status}_{result['status']}",
+            "message": (
+                f"Previous-day CSV was missing for {yesterday.isoformat()}. "
+                f"{result['message']}"
+            ),
+        }
+
+    if local_now.hour < TCGCSV_DAILY_RELEASE_HOUR_LOCAL:
+        return ensure_yesterday_csv("before_release_cutoff")
+
+    existing_today_path = find_tcgcsv_history_file_for_date(today)
+
+    if existing_today_path:
+        return {
+            "attempted": False,
+            "updated": False,
+            "status": "current_day_csv_exists",
+            "message": f"Current-day local CSV already exists: {existing_today_path}",
+            "date": today.isoformat(),
+            "path": existing_today_path,
+        }
+
+    today_result = fetch_tcgcsv_history_csv_for_date(today)
+
+    today_path_after_fetch = find_tcgcsv_history_file_for_date(today)
+
+    if today_path_after_fetch:
+        return {
+            **today_result,
+            "status": "current_day_csv_downloaded",
+            "message": f"Downloaded current-day local CSV: {today_path_after_fetch}",
+            "date": today.isoformat(),
+            "path": today_path_after_fetch,
+        }
+
+    yesterday_result = ensure_yesterday_csv("current_day_unavailable")
+
+    return {
+        **yesterday_result,
+        "current_day_fetch": {
+            "date": today.isoformat(),
+            "status": today_result.get("status"),
+            "message": today_result.get("message"),
+            "stdout": today_result.get("stdout"),
+            "stderr": today_result.get("stderr"),
+            "returncode": today_result.get("returncode"),
+        },
     }
 
 def ensure_current_day_history_csv_if_due(now=None, force=False):
