@@ -31,7 +31,6 @@ def get_db_connection():
 trade_bp = Blueprint('trade_binder', __name__)
 
 @trade_bp.route('/binder/trades', methods=['GET', 'POST'])
-@login_required
 def trade():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
