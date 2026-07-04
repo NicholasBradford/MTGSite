@@ -260,6 +260,12 @@ def find_prior_tcgcsv_history_files(
     return paths
 
 def fetch_tcgcsv_history_csv_for_date(target_date):
+    """
+    Run _get_tcgcsv.py for exactly one target date.
+
+    This helper deliberately passes --no-fallback-previous-day so this parent
+    module controls fallback behavior and status reporting stays accurate.
+    """
     script_path = TCGCSV_FETCH_SCRIPT_PATH
 
     if not os.path.exists(script_path):
@@ -332,11 +338,10 @@ def fetch_tcgcsv_history_csv_for_date(target_date):
 
 def refresh_current_day_history_csv_if_due(now=None):
     """
-    After the expected daily TCGCSV archive release time, try to fetch today's
-    local CSV if it is not already present.
+    Before the daily TCGCSV release cutoff, ensure yesterday's archive CSV exists.
 
-    If today's CSV is not expected yet or cannot be fetched, make sure
-    yesterday's CSV exists locally and download it if it does not.
+    After the release cutoff, try today's archive CSV first. If today's archive
+    is unavailable, ensure yesterday's archive CSV exists.
 
     This does not replace the normal local CSV resolver. It only gives
     _get_tcgcsv.py a chance to create a newer CSV before the sync uses the
@@ -387,7 +392,6 @@ def refresh_current_day_history_csv_if_due(now=None):
         }
 
     today_result = fetch_tcgcsv_history_csv_for_date(today)
-
     today_path_after_fetch = find_tcgcsv_history_file_for_date(today)
 
     if today_path_after_fetch:

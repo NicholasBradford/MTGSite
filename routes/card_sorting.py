@@ -1,7 +1,9 @@
 import re
-from flask import Blueprint, request, redirect, url_for, render_template, flash
+from flask import Blueprint, request, redirect, url_for, render_template, flash, current_app
 from db.db_manager import get_db
 from flask_login import login_required, current_user
+from services.feature_flags import require_feature
+
 
 ALPHABET_BINS = [
     ('A', 'G', 'A:G'),
@@ -77,6 +79,163 @@ def get_or_create_location_id(cursor, box_name):
     cursor.execute("INSERT INTO locations (name) VALUES (?)", (box_name,))
     return cursor.lastrowid
 
+def get_autosorter_settings():
+    """
+    Reads autosorter settings from app_settings.json through SettingsManager.
+
+    Expected JSON:
+    "autosorter": {
+        "enabled": true,
+        "strategy": "default"
+    }
+    """
+    manager = current_app.extensions.get("settings_manager")
+
+    if not manager:
+        return {
+            "enabled": True,
+            "strategy": "default",
+        }
+
+    return {
+        "enabled": manager.get("autosorter", "enabled", True),
+        "strategy": str(manager.get("autosorter", "strategy", "default")).strip().lower(),
+    }
+
+
+def get_row_value(row, key, default=""):
+    try:
+        value = row[key]
+    except (KeyError, IndexError):
+        return default
+
+    if value is None:
+        return default
+
+    return value
+
+
+def default_sort_profile(item):
+    """
+    Current behavior:
+    - Basic lands -> Land (Basic)
+    - Other lands -> Land (Util)
+    - Everything else -> color prefix + alphabet range
+      Example: W-A:G, U-H:R, C-A:M
+    """
+    cleaned_name = clean_sort_name(get_row_value(item, "name"))
+    first_letter = cleaned_name[0] if cleaned_name else "A"
+    type_line = get_row_value(item, "type_line")
+    collector_number = get_row_value(item, "collector_number")
+
+    if "Basic Land" in type_line:
+        box_name = "Land (Basic)"
+    elif "Land" in type_line:
+        box_name = "Land (Util)"
+    else:
+        color_prefix = determine_color_prefix(get_row_value(item, "color"))
+        alpha_range = determine_box_range(first_letter, color_prefix == "C")
+        box_name = f"{color_prefix}-{alpha_range}"
+
+    sort_key = (
+        box_name,
+        cleaned_name.lower(),
+        parse_collector_number(collector_number),
+    )
+
+    return box_name, sort_key
+
+
+def alphabetical_sort_profile(item):
+    """
+    Ignores color and sorts by name range only.
+    """
+    cleaned_name = clean_sort_name(get_row_value(item, "name"))
+    first_letter = cleaned_name[0] if cleaned_name else "A"
+    collector_number = get_row_value(item, "collector_number")
+
+    alpha_range = determine_box_range(first_letter, colorless=False)
+    box_name = f"Name-{alpha_range}"
+
+    sort_key = (
+        box_name,
+        cleaned_name.lower(),
+        parse_collector_number(collector_number),
+    )
+
+    return box_name, sort_key
+
+
+def color_only_sort_profile(item):
+    """
+    Sorts nonlands into broad color boxes only.
+    """
+    cleaned_name = clean_sort_name(get_row_value(item, "name"))
+    type_line = get_row_value(item, "type_line")
+    collector_number = get_row_value(item, "collector_number")
+
+    if "Basic Land" in type_line:
+        box_name = "Land (Basic)"
+    elif "Land" in type_line:
+        box_name = "Land (Util)"
+    else:
+        color_prefix = determine_color_prefix(get_row_value(item, "color"))
+        color_names = {
+            "W": "White",
+            "U": "Blue",
+            "B": "Black",
+            "R": "Red",
+            "G": "Green",
+            "M": "Multicolor",
+            "C": "Colorless",
+        }
+        box_name = color_names.get(color_prefix, "Colorless")
+
+    sort_key = (
+        box_name,
+        cleaned_name.lower(),
+        parse_collector_number(collector_number),
+    )
+
+    return box_name, sort_key
+
+
+def set_sort_profile(item):
+    """
+    Sorts cards into one location per set.
+    Example: Set-MKM, Set-SOS
+    """
+    cleaned_name = clean_sort_name(get_row_value(item, "name"))
+    set_code = get_row_value(item, "set_code", "unknown")
+    collector_number = get_row_value(item, "collector_number")
+
+    box_name = f"Set-{str(set_code).upper()}"
+
+    sort_key = (
+        box_name,
+        parse_collector_number(collector_number),
+        cleaned_name.lower(),
+    )
+
+    return box_name, sort_key
+
+
+SORT_STRATEGIES = {
+    "default": default_sort_profile,
+    "color_alpha": default_sort_profile,
+    "color_alphabetical": default_sort_profile,
+
+    "alphabetical": alphabetical_sort_profile,
+    "alpha": alphabetical_sort_profile,
+    "name": alphabetical_sort_profile,
+
+    "color_only": color_only_sort_profile,
+    "color": color_only_sort_profile,
+
+    "set": set_sort_profile,
+    "set_code": set_sort_profile,
+}
+
 @sorter_bp.route('/sort/<int:source_location_id>', methods=['POST'])
 @login_required
 def sort_and_relocate_inventory(source_location_id):
@@ -84,13 +243,36 @@ def sort_and_relocate_inventory(source_location_id):
     if current_user.role != 'admin':
         flash("Unauthorized access.", "danger")
         return redirect(url_for('admin.admin_dashboard'))
+    
+    autosorter_settings = get_autosorter_settings()
+
+    if not autosorter_settings["enabled"]:
+        flash("Autosorter is disabled in app_settings.json.", "warning")
+        return redirect(url_for('admin.admin_dashboard'))
+
+    strategy_name = autosorter_settings["strategy"]
+    strategy_func = SORT_STRATEGIES.get(strategy_name)
+
+    if not strategy_func:
+        flash(
+            f"Unknown autosorter strategy '{strategy_name}'. Falling back to default.",
+            "warning"
+        )
+        strategy_name = "default"
+        strategy_func = SORT_STRATEGIES["default"]
 
     manager = get_db()
     cursor = manager.conn.cursor()
     try:
         # 1. Fetch source dataset 
         query = '''
-            SELECT i.instance_id AS inventory_id, cd.name, cd.color, c.collector_number, cd.type_line
+            SELECT
+                i.instance_id AS inventory_id,
+                cd.name,
+                cd.color,
+                c.set_code,
+                c.collector_number,
+                cd.type_line
             FROM inventory i
             JOIN card_printings c ON i.scryfall_id = c.scryfall_id
             JOIN card_definitions cd ON c.oracle_id = cd.oracle_id
@@ -105,29 +287,14 @@ def sort_and_relocate_inventory(source_location_id):
 
         # 2. Assign box routing destination profiles 
         processed_items = []
+
         for item in inventory_items:
-            cleaned_name = clean_sort_name(item['name'])
-            first_letter = cleaned_name[0] if cleaned_name else "A"
-            
-            if 'Basic Land' in item['type_line']:
-                box_name = "Land (Basic)"
-            elif 'Land' in item['type_line']:
-                box_name = "Land (Util)"
-            else:  
-                color_prefix = determine_color_prefix(item['color'])
-                alpha_range = determine_box_range(first_letter, color_prefix == "C" )
-                box_name = f"{color_prefix}-{alpha_range}"
-                
-            sort_key = (
-                box_name,
-                cleaned_name.lower(),
-                parse_collector_number(item['collector_number'])
-            )
-                
+            box_name, sort_key = strategy_func(item)
+
             processed_items.append({
                 'inventory_id': item['inventory_id'],
                 'box_name': box_name,
-                'sort_key': sort_key
+                'sort_key': sort_key,
             })
 
         # 3. Apply alphabetical layout sort weights
@@ -146,8 +313,11 @@ def sort_and_relocate_inventory(source_location_id):
             updated_count += 1
             
         manager.conn.commit()
-        flash(f"Successfully sorted and migrated {updated_count} cards into color/alphabetical boxes!", "success")
-
+        flash(
+            f"Successfully sorted and migrated {updated_count} cards using the '{strategy_name}' autosorter strategy!",
+            "success"
+        )
+        
     except Exception as e:
         manager.conn.rollback()
         flash(f"Database operation failed: {str(e)}", "danger")

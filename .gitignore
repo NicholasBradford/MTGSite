@@ -56,4 +56,7 @@ local_launcher.py
 /build
 MTGSiteLocal-v0.1.0-windows.zip
 MTGSiteLocal.spec
+
+# Ignore files for executables
 /dist
+data/app_settings.json

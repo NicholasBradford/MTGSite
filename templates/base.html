@@ -45,9 +45,12 @@
                         <div class="site-dropdown__content">
                             <a href="/binder/trades">Trade Binder</a>
                             <a href="/sets">Set Collections</a>
-                            <a href="/edh/gallery">Commander</a>
-                            <a href="/collection/planeswalkers">Planeswalkers</a>
-
+                            {% if feature_enabled("edh_decks") %}
+                                <a href="/edh/gallery">Commander</a>
+                            {% endif %}
+                            {% if feature_enabled("planeswalker_collection") %}
+                                <a href="/collection/planeswalkers">Planeswalkers</a>
+                            {% endif %}
                             {% if current_user.is_authenticated and current_user.role == 'admin' %}
                                 <hr>
                                 <a href="/inventory">Master Inventory</a>
@@ -70,8 +73,9 @@
                         </li>
                     {% else %}
                         <li class="site-nav__item site-dropdown">
-                            <a href="/trade" class="site-nav__link site-dropdown__trigger">Create Trade</a>
-
+                            {% if feature_enabled("trade_screen") %}
+                                <a href="/trade" class="site-nav__link site-dropdown__trigger">Create Trade</a>
+                            {% endif %}
                             <div class="site-dropdown__content">
                                 <a href="/wishlist">Wishlist</a>
                             </div>

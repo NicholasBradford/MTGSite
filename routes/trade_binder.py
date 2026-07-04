@@ -1,7 +1,8 @@
 import sqlite3, db.db_manager, uuid, requests,datetime, ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
-from search import search
+from services.feature_flags import require_feature
+from services.search import search
 from db.db_manager import get_db
 sort_options = {
         'name': """
@@ -31,7 +32,6 @@ def get_db_connection():
 trade_bp = Blueprint('trade_binder', __name__)
 
 @trade_bp.route('/binder/trades', methods=['GET', 'POST'])
-@login_required
 def trade():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
@@ -374,11 +374,14 @@ def update_wishlist_item(wish_id):
     finally:
         manager.close()
 
+
 @trade_bp.route('/trade', methods=['GET'])
+@require_feature("trade_screen")
 def trade_page():
     return render_template('trade_page.html')
 
 @trade_bp.route('/api/trade_search', methods=['GET'])
+@require_feature("trade_screen")
 def search_tradeable_cards():
     query = request.args.get('q', '').strip()
     if not query:
@@ -412,6 +415,7 @@ def search_tradeable_cards():
     return jsonify(cards)
 
 @trade_bp.route('/api/fetch_incoming', methods=['POST'])
+@require_feature("trade_screen")
 def fetch_incoming_card():
     data = request.get_json(silent=True) or request.form.to_dict() or {}
     set_code = str(data.get('set_code', '')).strip().lower()

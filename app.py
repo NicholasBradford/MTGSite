@@ -23,13 +23,18 @@ from routes.markets import markets_bp
 from db.db_manager import CardDB, get_db, close_db
 from db.user_manager import User
 from dotenv import load_dotenv
-
 load_dotenv()
+
+from services.app_settings import settings_manager
+
+settings_manager.load_initial()
 
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
 app = Flask(__name__)
+
+app.extensions["settings_manager"] = settings_manager
 
 # if os.path.exists('/var/data'):
 #     IMAGE_FOLDER = '/var/data'
@@ -90,6 +95,7 @@ def load_user(user_id):
 
     return None
 
+
 # 4. Blueprint Registration
 app.register_blueprint(main_bp)
 app.register_blueprint(inventory_bp)
@@ -119,6 +125,25 @@ def internal_server_error(e):
 def serve_card_image(filename):
     return send_from_directory(IMAGE_FOLDER, filename)
 
+@app.before_request
+def reload_settings_if_needed():
+    settings_manager.reload_if_changed()
+
+@app.context_processor
+def inject_site_settings():
+    def feature_enabled(name):
+        return settings_manager.feature_enabled(name)
+
+    def site_setting(section, key, default=None):
+        return settings_manager.get(section, key, default)
+
+    return {
+        "feature_enabled": feature_enabled,
+        "site_setting": site_setting,
+        "site_settings": settings_manager.all(),
+        "site_settings_version": settings_manager.version(),
+    }
+    
 if __name__ == '__main__':
     debug_enabled = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes', 'on')
     app.run(debug=debug_enabled)
