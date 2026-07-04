@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import login_required, current_user
 from db.db_manager import get_db
-from search import search
+from services.search import search
 import sqlite3, ScryfallFetcher, db.db_manager, re
 from services.tcgcsv_prices import (
     TCGCSV_SOURCE_LOCAL_ONLY,

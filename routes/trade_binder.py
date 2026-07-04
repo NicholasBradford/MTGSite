@@ -1,8 +1,8 @@
 import sqlite3, db.db_manager, uuid, requests,datetime, ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
-from search import search
 from services.feature_flags import require_feature
+from services.search import search
 from db.db_manager import get_db
 sort_options = {
         'name': """
