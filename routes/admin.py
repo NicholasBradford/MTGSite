@@ -5,14 +5,17 @@ import ScryfallFetcher
 from flask_login import login_required, current_user
 from db.db_manager import get_db
 try:
-    from services.tcgcsv_prices import get_local_snapshot_metadata, local_snapshot_exists
+    from services.tcgcsv_prices import (
+        resolve_local_price_snapshot_path,
+        get_price_date_for_snapshot,
+    )
 except ImportError:
     # Keep admin dashboard functional on branches where snapshot helpers are not present.
-    def get_local_snapshot_metadata():
-        return {}
+    def resolve_local_price_snapshot_path(*args, **kwargs):
+        return None
 
-    def local_snapshot_exists():
-        return False
+    def get_price_date_for_snapshot(snapshot_path):
+        return None
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -475,29 +478,44 @@ def admin_dashboard():
         _add_attention(attention_items, "warning", "Card printings without images", data_integrity["cards_without_images"], "May show broken or blank card art.")
         _add_attention(attention_items, "info", "Pending trade requests", len(pending_trades), "Trade queue needs review.")
 
-        snapshot_metadata = get_local_snapshot_metadata()
-        snapshot_present = local_snapshot_exists()
-        snapshot_last_updated = snapshot_metadata.get("last_updated") or "Never"
-        snapshot_captured_at = snapshot_metadata.get("captured_at") or "Unknown"
+        snapshot_path = resolve_local_price_snapshot_path(refresh_if_due=False)
+        snapshot_present = bool(
+            snapshot_path
+            and os.path.exists(snapshot_path)
+            and os.path.getsize(snapshot_path) > 0
+        )
+
+        snapshot_price_date = None
+        snapshot_captured_at = "Unknown"
         snapshot_age_days = None
-        if snapshot_metadata.get("captured_at"):
+
+        if snapshot_present:
+            snapshot_price_date = get_price_date_for_snapshot(snapshot_path)
+
             try:
-                captured = datetime.datetime.fromisoformat(snapshot_metadata["captured_at"])
-                snapshot_age_days = (datetime.datetime.utcnow() - captured).days
+                modified = datetime.datetime.fromtimestamp(os.path.getmtime(snapshot_path))
+                snapshot_captured_at = modified.isoformat(timespec="seconds")
             except Exception:
-                pass
+                snapshot_captured_at = "Unknown"
+
+            try:
+                price_date = datetime.datetime.strptime(snapshot_price_date[:10], "%Y-%m-%d").date()
+                snapshot_age_days = (datetime.datetime.utcnow().date() - price_date).days
+            except Exception:
+                snapshot_age_days = None
+
         tcgcsv_snapshot_health = {
             "exists": snapshot_present,
-            "last_updated": snapshot_last_updated,
+            "last_updated": snapshot_price_date or "Never",
             "captured_at": snapshot_captured_at,
             "age_days": snapshot_age_days,
+            "path": snapshot_path,
         }
 
         if not snapshot_present:
             _add_attention(
                 attention_items, "critical",
                 "No local TCGCSV price snapshot", 1,
-                "Run scripts/refresh_tcgcsv_snapshot.py to enable price sync.",
             )
         elif snapshot_age_days is not None and snapshot_age_days > 1:
             _add_attention(
