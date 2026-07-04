@@ -2,6 +2,7 @@ import sqlite3, db.db_manager, uuid, requests,datetime, ScryfallFetcher
 from flask import Blueprint, request, redirect, url_for, render_template, jsonify
 from flask_login import current_user, login_required
 from search import search
+from services.feature_flags import require_feature
 from db.db_manager import get_db
 sort_options = {
         'name': """
@@ -373,7 +374,9 @@ def update_wishlist_item(wish_id):
     finally:
         manager.close()
 
+
 @trade_bp.route('/trade', methods=['GET'])
+@require_feature("trade_screen")
 def trade_page():
     return render_template('trade_page.html')
 

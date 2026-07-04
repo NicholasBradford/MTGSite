@@ -14,7 +14,7 @@ DEFAULT_SETTINGS = {
         "edh_decks": True,
     },
     "homepage": {
-        "color_scheme": "dark_green",
+        "color_scheme": "teal",
         "default_view_mode": "grid",
     },
     "autosorter": {
