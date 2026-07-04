@@ -381,6 +381,7 @@ def trade_page():
     return render_template('trade_page.html')
 
 @trade_bp.route('/api/trade_search', methods=['GET'])
+@require_feature("trade_screen")
 def search_tradeable_cards():
     query = request.args.get('q', '').strip()
     if not query:
@@ -414,6 +415,7 @@ def search_tradeable_cards():
     return jsonify(cards)
 
 @trade_bp.route('/api/fetch_incoming', methods=['POST'])
+@require_feature("trade_screen")
 def fetch_incoming_card():
     data = request.get_json(silent=True) or request.form.to_dict() or {}
     set_code = str(data.get('set_code', '')).strip().lower()
