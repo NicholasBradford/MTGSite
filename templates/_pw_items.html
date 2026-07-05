@@ -1,5 +1,6 @@
 {% for pw in planeswalkers %}
-    <div class="card_class pw-wrapper">
+    <div class="card_class pw-wrapper" data-oracle-id="{{ pw.oracle_id }}" data-pw-name="{{ pw.name }}">
+        
         
         {% if pw.binder_image %}
             <div class="{% if pw.binder_finish == 'foil' %}rainbow_image{% endif %}" title="{{ pw.name }} (Collected)">
