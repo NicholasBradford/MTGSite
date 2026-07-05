@@ -628,6 +628,10 @@ def manage_trade():
 def search_api():
      return render_template('search_api.html')
  
+@admin_bp.route('/settings_api', methods=['GET'])
+def settings_api():
+     return render_template('settings_menu_api.html')
+ 
 @admin_bp.route('/add/wishlist', methods=['GET', 'POST'])
 @login_required
 @admin_required
