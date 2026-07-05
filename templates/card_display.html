@@ -369,8 +369,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const sentinel = document.getElementById("scroll-sentinel");
     const loader = document.getElementById("loading-indicator");
 
+    const isPlaneswalkerPage = Boolean(document.querySelector(".planeswalker-vault-page"));    
+    const hasGenericCardGrid = Boolean(
+        document.getElementById("card-grid") || document.getElementById("card-table-body")
+    );
+
+    const shouldUseGenericInfiniteScroll =
+        !isPlaneswalkerPage &&
+        hasGenericCardGrid &&
+        Boolean(sentinel);
+
     let page = {{ page | default(1) }};
     const totalPages = {{ total_pages | default(1) }};
+    let loadingMore = false;
+    const loadedPages = new Set([page]);
 
     const getValue = (id) => {
         const el = document.getElementById(id);
@@ -483,14 +495,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function loadMore() {
-        if (!loader) return;
+        if (!shouldUseGenericInfiniteScroll || !loader) return;
+        if (loadingMore || page >= totalPages) return;
 
-        page++;
+        const nextPage = page + 1;
+
+        if (loadedPages.has(nextPage)) return;
+
+        loadingMore = true;
+        loadedPages.add(nextPage);
         loader.style.display = "block";
 
         const endpoint = window.location.pathname;
         const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set("page", page);
+        urlParams.set("page", nextPage);
 
         const currentViewMode =
             viewInput?.value ||
@@ -511,18 +529,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? document.getElementById("card-table-body")
                 : document.getElementById("card-grid");
 
-            if (targetContainer) {
+            if (targetContainer && html.trim()) {
                 targetContainer.insertAdjacentHTML("beforeend", html);
+                page = nextPage;
             }
-
-            loader.style.display = "none";
 
             if (page >= totalPages && observer && sentinel) {
                 observer.unobserve(sentinel);
             }
         })
         .catch(err => {
+            loadedPages.delete(nextPage);
             console.error("Failed to load more inventory items:", err);
+        })
+        .finally(() => {
+            loadingMore = false;
             loader.style.display = "none";
         });
     }
@@ -631,7 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let observer = null;
 
-    if (sentinel) {
+    if (shouldUseGenericInfiniteScroll) {
         observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && page < totalPages) {
                 loadMore();
