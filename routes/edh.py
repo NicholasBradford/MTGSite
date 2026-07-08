@@ -1,6 +1,7 @@
 import sqlite3, os, re, time, requests
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash
 from flask_login import login_required, current_user
+from services.feature_flags import require_feature
 from functools import wraps
 # Import your database connection utility here, e.g., get_db
 from db.db_manager import get_db          
@@ -168,6 +169,7 @@ def get_available_card_location(self, scryfall_id):
 @edh_bp.route('/edh/import', methods=['GET', 'POST'])
 @login_required
 @admin_required
+@require_feature("edh_decks")
 def import_deck():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -204,6 +206,7 @@ def import_deck():
     return render_template('edh_import.html')
 
 @edh_bp.route('/edh/gallery')
+@require_feature("edh_decks")
 def edh_gallery():
     """Renders the EDH Gallery View."""
     db = get_db() 
@@ -225,6 +228,7 @@ def edh_gallery():
     return render_template('edh_gallery.html', decks=decks)
 
 @edh_bp.route('/edh/view/<deck_name>')
+@require_feature("edh_decks")
 def edh_view(deck_name):
     """Renders a specific EDH Deck matching the URL path name, categorized with collection status."""
     if not deck_name:

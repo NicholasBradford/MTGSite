@@ -1,4 +1,59 @@
 /* Homepage: The MTG Catalog public landing page */
+
+/* =========================================================
+   Homepage Theme Settings
+   Controlled by app_settings.json:
+   homepage.color_scheme
+   ========================================================= */
+.catalog-home-page.theme-teal {
+    --site-surface: #181818;
+    --site-surface-raised: #1c1c1c;
+    --site-border: rgba(255, 255, 255, 0.12);
+
+    --site-accent: #28c7b7;
+    --site-accent-soft: rgba(40, 199, 183, 0.16);
+
+    --site-text: #f4f7fb;
+    --site-text-soft: #d7e5e6;
+    --site-muted: #a8b3c7;
+}
+
+.catalog-home-page.theme-green,
+.catalog-home-page.theme-dark_green {
+    --site-surface: #181818;
+    --site-surface-raised: #1c1c1c;
+    --site-border: rgba(255, 255, 255, 0.12);
+
+    --site-accent: #4caf50;
+    --site-accent-soft: rgba(76, 175, 80, 0.16);
+
+    --site-text: #f4f7fb;
+    --site-text-soft: #d9eadb;
+    --site-muted: #a9c7ad;
+}
+
+.catalog-home-page.theme-blue {
+    --site-surface: #181818;
+    --site-surface-raised: #1c1c1c;
+    --site-border: rgba(255, 255, 255, 0.12);
+    --site-accent: #42a5f5;
+    --site-accent-soft: rgba(66, 165, 245, 0.16);
+    --site-text: #f4f7fb;
+    --site-text-soft: #d7e8fb;
+    --site-muted: #a8bfd8;
+}
+
+.catalog-home-page.theme-purple {
+    --site-surface: #181818;
+    --site-surface-raised: #1c1c1c;
+    --site-border: rgba(255, 255, 255, 0.12);
+    --site-accent: #ba68c8;
+    --site-accent-soft: rgba(186, 104, 200, 0.16);
+    --site-text: #f8f2fb;
+    --site-text-soft: #ead9f0;
+    --site-muted: #c8a9d1;
+}
+
 .catalog-home {
     display: flex;
     flex-direction: column;
@@ -11,7 +66,7 @@
 .catalog-footer-note,
 .catalog-stat,
 .catalog-path-card {
-    background: var(--site-surface, #151922);
+    background: var(--site-surface-raised, var(--site-surface, #151922));
     border: 1px solid var(--site-border, rgba(255, 255, 255, 0.1));
     border-left: 4px solid var(--site-accent, #28c7b7);
     border-radius: 16px;
@@ -379,4 +434,40 @@
     padding: 0 6px;
 
     font-size: 0.72rem;
+}
+
+/* =========================================================
+   Homepage View Mode Settings
+   Controlled by app_settings.json:
+   homepage.default_view_mode
+   ========================================================= */
+
+.catalog-home-page.home-view-grid .catalog-path-grid {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.catalog-home-page.home-view-table .catalog-path-grid {
+    grid-template-columns: 1fr;
+}
+
+.catalog-home-page.home-view-table .catalog-path-card {
+    display: grid;
+    grid-template-columns: auto 180px minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.catalog-home-page.home-view-table .catalog-path-card h2,
+.catalog-home-page.home-view-table .catalog-path-card p {
+    margin: 0;
+}
+
+@media (max-width: 700px) {
+    .catalog-home-page.home-view-table .catalog-path-card {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .catalog-home-page.home-view-table .catalog-path-card p {
+        grid-column: 2;
+    }
 }

@@ -46,6 +46,17 @@ Thumbs.db
 *.tmp
 *.bak
 DESIGN_RULES.md
+
 tests/logs/log.txt
 tests/logs/log.txt
 /tests/logs
+/scripts
+launch.ps1
+local_launcher.py
+/build
+MTGSiteLocal-v0.1.0-windows.zip
+MTGSiteLocal.spec
+
+# Ignore files for executables
+/dist
+data/app_settings.json

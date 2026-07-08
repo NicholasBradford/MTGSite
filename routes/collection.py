@@ -1,9 +1,12 @@
 from flask import Blueprint, render_template, request
 from db.db_manager import get_db
+from services.feature_flags import require_feature
+
 
 collection_bp = Blueprint('collection', __name__)
 
 @collection_bp.route('/collection/planeswalkers')
+@require_feature("planeswalker_collection")
 def planeswalker_collection():
     name_query = request.args.get('name_query', '').strip().lower()
 

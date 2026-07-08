@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
 {% block title %}Home{% endblock %}
-{% block body_class %}home-page catalog-home-page{% endblock %}
+
+{% block body_class %}
+    home-page
+    catalog-home-page
+    theme-{{ site_setting('homepage', 'color_scheme', 'teal') }}
+    home-view-{{ site_setting('homepage', 'default_view_mode', 'grid') }}
+{% endblock %}
 
 {% block content %}
 <div class="home-container catalog-home">
@@ -43,9 +49,11 @@
             </form>
 
             <div class="catalog-hero-actions" aria-label="Primary collection links">
+                {% if feature_enabled("trade_screen") %}
                 <a href="{{ links.trade_binder }}" class="site-button site-button--accent">
                     View Trade Binder
                 </a>
+                {% endif %}
                 {% if current_user.is_authenticated and current_user.role == 'admin' %}
                     <a href="{{ links.inventory }}" class="site-button site-button--ghost">
                         Browse Full Collection
@@ -154,12 +162,13 @@
             <h2>Set Progress</h2>
             <p>Track binder and set-completion projects.</p>
         </a>
-
-        <a href="{{ links.planeswalkers }}" class="catalog-path-card site-accent-red">
-            <i class="fas fa-user-astronaut"></i>
-            <h2>Planeswalkers</h2>
-            <p>A dedicated view of the planeswalker collection.</p>
-        </a>
+        {% if feature_enabled("planeswalker_collection") %}
+            <a href="{{ links.planeswalkers }}" class="catalog-path-card site-accent-red">
+                <i class="fas fa-user-astronaut"></i>
+                <h2>Planeswalkers</h2>
+                <p>A dedicated view of the planeswalker collection.</p>
+            </a>
+        {% endif %}
     </section>
 
     <section class="catalog-split-section">

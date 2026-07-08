@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}MTGSite Settings Menu Reference{% endblock title %}
+
+{% block body_class %}settings-reference-page{% endblock body_class %}
+
+{% block style %}
+.settings-reference-page {
+    background: #101214;
+}
+
+.settings-reference {
+    --settings-bg: #101214;
+    --settings-panel: #181c20;
+    --settings-panel-2: #20262b;
+    --settings-text: #eef2f5;
+    --settings-muted: #aeb9c4;
+    --settings-accent: #28c7b7;
+    --settings-border: rgba(255, 255, 255, 0.12);
+    --settings-code-bg: #0c0f12;
+
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 32px;
+    background: var(--settings-panel);
+    color: var(--settings-text);
+    border: 1px solid var(--settings-border);
+    border-left: 5px solid var(--settings-accent);
+    border-radius: 18px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+    line-height: 1.55;
+}
+
+.settings-reference *,
+.settings-reference *::before,
+.settings-reference *::after {
+    box-sizing: border-box;
+}
+
+.settings-reference h1,
+.settings-reference h2 {
+    line-height: 1.1;
+}
+
+.settings-reference h1 {
+    margin-top: 0;
+    font-size: clamp(2rem, 5vw, 3.7rem);
+}
+
+.settings-reference h2 {
+    margin-top: 2.2rem;
+    padding-top: 1.4rem;
+    color: #dffdfa;
+    border-top: 1px solid var(--settings-border);
+}
+
+.settings-reference h2:first-of-type {
+    margin-top: 1.5rem;
+}
+
+.settings-reference p {
+    color: var(--settings-text);
+}
+
+.settings-reference .lead {
+    color: var(--settings-muted);
+    font-size: 1.05rem;
+}
+
+.settings-reference .bullet {
+    margin-left: 1rem;
+    color: var(--settings-muted);
+}
+
+.settings-reference a {
+    color: var(--settings-accent);
+}
+
+.settings-reference code {
+    padding: 0.12rem 0.35rem;
+    color: #dffdfa;
+    background: var(--settings-code-bg);
+    border: 1px solid var(--settings-border);
+    border-radius: 5px;
+}
+
+.settings-reference pre {
+    padding: 1rem;
+    overflow-x: auto;
+    background: var(--settings-code-bg);
+    border: 1px solid var(--settings-border);
+    border-radius: 12px;
+}
+
+.settings-reference pre code {
+    padding: 0;
+    color: #f1f5f9;
+    background: transparent;
+    border: 0;
+}
+
+.settings-reference table {
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+    border-collapse: collapse;
+}
+
+.settings-reference th,
+.settings-reference td {
+    padding: 0.65rem;
+    vertical-align: top;
+    border: 1px solid var(--settings-border);
+}
+
+.settings-reference th {
+    color: #dffdfa;
+    text-align: left;
+    background: var(--settings-panel-2);
+}
+
+.settings-reference td {
+    color: var(--settings-muted);
+}
+
+.settings-reference hr {
+    margin: 2rem 0;
+    border: 0;
+    border-top: 1px solid var(--settings-border);
+}
+
+@media (max-width: 720px) {
+    .settings-reference {
+        margin: 0.75rem;
+        padding: 18px;
+    }
+}
+
+@media print {
+    .settings-reference-page {
+        background: #fff;
+    }
+
+    .settings-reference {
+        color: #111;
+        box-shadow: none;
+        border: 0;
+    }
+}
+{% endblock style %}
+
+{% block content %}
+<section class="settings-reference" aria-labelledby="settings-reference-title">
+<h1 id="settings-reference-title">MTGSite Settings Menu Reference</h1>
+
+<p>This document describes the current <code>app_settings.json</code> system and the settings that should be exposed in the MTGSite settings menu.</p>
+
+<h2>1. Where the settings file lives</h2>
+
+<p>The settings manager looks for the settings file in this order:</p>
+
+<pre><code class="language-text">
+1. MTGSITE_SETTINGS_PATH from .env
+2. data/app_settings.json
+</code></pre>
+<hr>
+
+<h2>2. Current full settings JSON</h2>
+
+<p>This is the current working settings structure based on the settings work done so far.</p>
+
+<pre><code class="language-json">
+&#123;
+  "schema_version": 1,
+  "features": &#123;
+    "planeswalker_collection": true,
+    "trade_screen": true,
+    "edh_decks": true
+  &#125;,
+  "homepage": &#123;
+    "color_scheme": "teal",
+    "default_view_mode": "grid"
+  &#125;,
+  "autosorter": &#123;
+    "enabled": true,
+    "strategy": "default"
+  &#125;
+&#125;
+</code></pre>
+
+<p>If a setting is missing, the app falls back to the default in <code>services/app_settings.py</code>.</p>
+
+<hr>
+
+<h2>3. Settings menu sections</h2>
+
+<p>The settings menu should be divided into these sections:</p>
+
+<pre><code class="language-text">
+Feature Toggles
+Homepage Appearance
+Inventory Autosorter
+
+</code></pre>
+
+<hr>
+
+<h2>Feature Toggles</h2>
+
+<p>These settings live under:</p>
+
+<pre><code class="language-json">
+"features": &#123; &#125;
+</code></pre>
+
+<h2><code>features.planeswalker_collection</code></h2>
+
+<p>Type: <code>boolean</code></p>
+
+<p>Default: <code>true</code></p>
+
+<p>Menu label: <code>Enable Planeswalker Collection</code></p>
+
+<p>What it controls:</p>
+
+<p class="bullet">• Shows or hides homepage/sidebar links to the Planeswalker collection.</p>
+<p class="bullet">• Should block Planeswalker routes when disabled.</p>
+<p class="bullet">• Does not delete planeswalker data.</p>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"planeswalker_collection": true
+</code></pre>
+
+<hr>
+
+<h2><code>features.trade_screen</code></h2>
+
+<p>Type: <code>boolean</code></p>
+
+<p>Default: <code>true</code></p>
+
+<p>Menu label: <code>Enable Trade Screen</code></p>
+
+<p>What it controls:</p>
+
+<p class="bullet">• Shows or hides Trade Binder links and buttons.</p>
+<p class="bullet">• Should block trade routes when disabled.</p>
+<p class="bullet">• Does not delete existing trade records or tradeable flags.</p>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"trade_screen": true
+</code></pre>
+
+<hr>
+
+<h2><code>features.edh_decks</code></h2>
+
+<p>Type: <code>boolean</code></p>
+
+<p>Default: <code>true</code></p>
+
+<p>Menu label: <code>Enable EDH / Commander Decks</code></p>
+
+<p>What it controls:</p>
+
+<p class="bullet">• Shows or hides EDH/deck management links.</p>
+<p class="bullet">• Should block EDH routes when disabled.</p>
+<p class="bullet">• Does not delete deck records or deck assignments.</p>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"edh_decks": true
+</code></pre>
+
+<hr>
+
+<h2>Homepage Appearance</h2>
+
+<p>These settings live under:</p>
+
+<pre><code class="language-json">
+"homepage": &#123; &#125;
+</code></pre>
+
+<p>Use <code>site_setting("homepage", "setting_name", default)</code> in templates.</p>
+
+<hr>
+
+<h2><code>homepage.color_scheme</code></h2>
+
+<p>Type: <code>string</code></p>
+
+<p>Default: <code>teal</code></p>
+
+<p>Menu label: <code>Homepage Color Scheme</code></p>
+
+<p>Current options:</p>
+
+<pre><code class="language-text">
+teal
+dark_green / green
+blue
+purple
+</code></pre>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"color_scheme": "teal"
+</code></pre>
+
+<hr>
+
+<h2><code>homepage.default_view_mode</code></h2>
+
+<p>Type: <code>string</code></p>
+
+<p>Default: <code>grid</code></p>
+
+<p>Menu label: <code>Default Homepage View</code></p>
+
+<p>Current options:</p>
+
+<pre><code class="language-text">
+grid
+table
+</code></pre>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"default_view_mode": "grid"
+</code></pre>
+
+<p>Current behavior:</p>
+
+<p class="bullet">• <code>grid</code> keeps the homepage path cards in a card grid.</p>
+<p class="bullet">• <code>table</code> can collapse the path cards into a single-column list if CSS is added.</p>
+<p class="bullet">• This does not currently change inventory search results unless you wire that route separately.</p>
+
+<hr>
+
+<h2>Inventory Autosorter</h2>
+
+<p>These settings live under:</p>
+
+<pre><code class="language-json">
+"autosorter": &#123; &#125;
+</code></pre>
+
+<p>Use <code>site_setting("autosorter", "setting_name", default)</code> in templates.</p>
+
+<h2><code>autosorter.enabled</code></h2>
+
+<p>Type: <code>boolean</code></p>
+
+<p>Default: <code>true</code></p>
+
+<p>Menu label: <code>Enable Inventory Autosorter</code></p>
+
+<p>What it controls:</p>
+
+<p class="bullet">• Shows or hides the autosorter card on the admin dashboard.</p>
+<p class="bullet">• Should also block the sorter route so users cannot run it manually by URL.</p>
+<p class="bullet">• Does not move cards back if turned off after sorting.</p>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"enabled": true
+</code></pre>
+
+<hr>
+
+<h2><code>autosorter.strategy</code></h2>
+
+<p>Type: <code>string</code></p>
+
+<p>Default: <code>default</code></p>
+
+<p>Menu label: <code>Autosorter Strategy</code></p>
+
+<p>Current working option:</p>
+
+<pre><code class="language-text">
+default
+alphabetical
+color_only
+set
+</code></pre>
+
+<p>Current default behavior:</p>
+
+<pre><code class="language-text">
+Basic lands -&gt; Land (Basic)
+Other lands -&gt; Land (Util)
+Nonlands -&gt; color prefix + alphabetical range
+</code></pre>
+
+<p>Examples of default destination boxes:</p>
+
+<pre><code class="language-text">
+W-A:G
+W-H:R
+W-S:Z
+U-A:G
+B-H:R
+R-S:Z
+G-A:G
+M-H:R
+C-A:M
+C-N:Z
+Land (Basic)
+Land (Util)
+</code></pre>
+
+<p>JSON:</p>
+
+<pre><code class="language-json">
+"strategy": "default"</code></pre>
+
+<hr>
+
+<h2>Live reload behavior</h2>
+
+<p>The settings manager checks <code>app_settings.json</code> for changes before each request.</p>
+
+<p>That means:</p>
+
+<pre><code class="language-text">
+Edit app_settings.json
+Save file
+Refresh the website or make a new request
+The new setting is used
+</code></pre>
+
+<p>If the JSON file is invalid, the app should keep the last valid settings and print an error to the server log.</p>
+
+<hr>
+
+<p class="bullet">• Use lowercase <code>true</code> and <code>false</code> for booleans.</p>
+<p class="bullet">• Put strings in double quotes.</p>
+<p class="bullet">• Do not add trailing commas.</p>
+<p class="bullet">• Save the file, then refresh the site.</p>
+<p class="bullet">• If a setting does not appear to change, check whether the relevant template or route has actually been wired to read it.</p>
+
+<p>Valid:</p>
+
+<pre><code class="language-json">
+"trade_screen": false
+</code></pre>
+
+<p>Invalid:</p>
+
+<pre><code class="language-json">
+"trade_screen": False,
+</code></pre>
+
+</section>
+{% endblock content %}

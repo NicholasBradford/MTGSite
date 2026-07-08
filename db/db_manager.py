@@ -7,14 +7,14 @@ load_dotenv()
 class CardDB:
     def __init__(self, db_path=None):
         self.trace_id = random.randint(1000, 9999)
-        
-        # print(f"\n[+] OPENING connection {self.trace_id} from:")
-        # traceback.print_stack(limit=3)
+
         if db_path is None:
             db_path = os.environ.get('DB_PATH')
+
         self.db_path = db_path
+
         self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row  # Allows accessing columns by name
+        self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         
     def log_update(self, task_name, cards_updated=0, status="Success", message=""):
@@ -278,9 +278,7 @@ class CardDB:
                 ON price_history(source, scraped_at);
         """)  
         
-        if self.cursor.execute("SELECT * FROM locations").fetchone()[0] == 0:  
-            self.initialize_locations()       
-                   
+        self.initialize_locations()
         self.commit()
         
     def initialize_locations(self):
