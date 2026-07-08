@@ -11,6 +11,9 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import traceback
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
 from pathlib import Path
 from typing import Iterator, List, Sequence, Tuple
 
@@ -472,6 +475,131 @@ def run_pipeline(args: argparse.Namespace) -> int:
         print("[warn] No rows were exported. Check date range, archive layout, or category IDs.")
     return 0
 
+def parse_iso_date_from_output_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+
+    stem = path.stem
+    # Expected: prices_category_1_2026-07-05
+    date_part = stem.split("_")[-1]
+
+    try:
+        return dt.date.fromisoformat(date_part).isoformat()
+    except ValueError:
+        return None
+
+def parse_iso_date_from_output_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+
+    stem = path.stem
+    # Expected: prices_category_1_2026-07-05
+    date_part = stem.split("_")[-1]
+
+    try:
+        return dt.date.fromisoformat(date_part).isoformat()
+    except ValueError:
+        return None
+def export_prices_for_date(
+    target_date: dt.date | str,
+    outdir: str | Path,
+    category_ids: Sequence[str | int] = DEFAULT_CATEGORY_IDS,
+    cache_dir: str | Path | None = None,
+    fallback_previous_day: bool = True,
+    force: bool = False,
+) -> dict:
+    """
+    App-callable wrapper around the existing TCGCSV archive export pipeline.
+
+    This lets the Flask app / PyInstaller executable create a dated CSV without
+    spawning a second Python process.
+
+    It preserves the CLI behavior because main() can still call run_pipeline().
+    """
+    if isinstance(target_date, str):
+        target_date = dt.date.fromisoformat(target_date)
+    elif isinstance(target_date, dt.datetime):
+        target_date = target_date.date()
+
+    outdir = Path(outdir).expanduser()
+    cache_dir = Path(cache_dir).expanduser() if cache_dir else DEFAULT_CACHE
+
+    normalized_category_ids = tuple(str(category_id) for category_id in category_ids)
+
+    args = argparse.Namespace(
+        date=target_date.isoformat(),
+        start=None,
+        end=None,
+        format="csv",
+        outdir=str(outdir),
+        cache_dir=str(cache_dir),
+        category_id=list(normalized_category_ids),
+        no_fallback_previous_day=not fallback_previous_day,
+        force=force,
+    )
+
+    stdout_buffer = StringIO()
+    stderr_buffer = StringIO()
+
+    requested_output_path = build_output_path(
+        outdir=outdir,
+        category_ids=normalized_category_ids,
+        start_date=target_date,
+        end_date=target_date,
+    )
+
+    fallback_output_path = build_output_path(
+        outdir=outdir,
+        category_ids=normalized_category_ids,
+        start_date=target_date - dt.timedelta(days=1),
+        end_date=target_date - dt.timedelta(days=1),
+    )
+
+    returncode = 0
+
+    try:
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+            returncode = run_pipeline(args)
+
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            returncode = exc.code
+        else:
+            returncode = 1
+            stderr_buffer.write(str(exc.code))
+
+    except Exception:
+        returncode = 1
+        stderr_buffer.write(traceback.format_exc())
+
+    candidate_paths = [requested_output_path]
+
+    if fallback_previous_day:
+        candidate_paths.append(fallback_output_path)
+
+    written_path = next(
+        (
+            path
+            for path in candidate_paths
+            if path.exists() and path.stat().st_size > 0
+        ),
+        None,
+    )
+
+    return {
+        "attempted": True,
+        "updated": written_path is not None,
+        "requested_date": target_date.isoformat(),
+        "date": (
+            parse_iso_date_from_output_path(written_path)
+            if written_path
+            else target_date.isoformat()
+        ),
+        "path": str(written_path) if written_path else None,
+        "stdout": stdout_buffer.getvalue(),
+        "stderr": stderr_buffer.getvalue(),
+        "returncode": returncode,
+    }
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)

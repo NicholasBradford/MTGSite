@@ -2,8 +2,6 @@ import csv
 import json
 import os
 import time, requests
-import subprocess
-import sys
 import re
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
@@ -261,49 +259,57 @@ def find_prior_tcgcsv_history_files(
 
 def fetch_tcgcsv_history_csv_for_date(target_date):
     """
-    Run _get_tcgcsv.py for exactly one target date.
+    Create/download exactly one target-date TCGCSV history CSV.
 
-    This helper deliberately passes --no-fallback-previous-day so this parent
-    module controls fallback behavior and status reporting stays accurate.
+    This calls services._get_tcgcsv directly instead of spawning a subprocess.
+    That matters for the portable executable, where sys.executable points to
+    MTGSiteLocal.exe, not python.exe.
+
+    This helper deliberately disables previous-day fallback because this parent
+    module controls fallback behavior and status reporting.
     """
-    script_path = TCGCSV_FETCH_SCRIPT_PATH
+    os.makedirs(TCGCSV_HISTORY_DIR, exist_ok=True)
 
-    if not os.path.exists(script_path):
+    try:
+        from services._get_tcgcsv import export_prices_for_date
+    except Exception as error:
         return {
             "attempted": False,
             "updated": False,
-            "status": "fetch_script_missing",
-            "message": f"Could not find TCGCSV fetch script: {script_path}",
+            "status": "fetch_module_missing",
+            "message": (
+                "Could not import services._get_tcgcsv.export_prices_for_date: "
+                f"{error}"
+            ),
             "date": target_date.isoformat(),
             "path": find_latest_tcgcsv_history_file(),
+            "stdout": "",
+            "stderr": str(error),
+            "returncode": 1,
         }
 
-    command = [
-        sys.executable,
-        script_path,
-        "--date",
-        target_date.isoformat(),
-        "--outdir",
-        TCGCSV_HISTORY_DIR,
-        "--no-fallback-previous-day",
-    ]
-
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=TCGCSV_FETCH_TIMEOUT_SECONDS,
-            check=False,
+        result = export_prices_for_date(
+            target_date=target_date,
+            outdir=TCGCSV_HISTORY_DIR,
+            category_ids=(TCGCSV_MAGIC_CATEGORY_ID,),
+            fallback_previous_day=False,
+            force=False,
         )
     except Exception as error:
         return {
             "attempted": True,
             "updated": False,
             "status": "fetch_failed",
-            "message": f"Failed to run _get_tcgcsv.py for {target_date.isoformat()}: {error}",
+            "message": (
+                f"Failed to fetch local CSV for {target_date.isoformat()}: "
+                f"{error}"
+            ),
             "date": target_date.isoformat(),
             "path": find_latest_tcgcsv_history_file(),
+            "stdout": "",
+            "stderr": str(error),
+            "returncode": 1,
         }
 
     path_after_fetch = find_tcgcsv_history_file_for_date(target_date)
@@ -313,12 +319,15 @@ def fetch_tcgcsv_history_csv_for_date(target_date):
             "attempted": True,
             "updated": True,
             "status": "csv_downloaded",
-            "message": f"Downloaded local CSV for {target_date.isoformat()}: {path_after_fetch}",
+            "message": (
+                f"Downloaded local CSV for {target_date.isoformat()}: "
+                f"{path_after_fetch}"
+            ),
             "date": target_date.isoformat(),
             "path": path_after_fetch,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode,
+            "stdout": result.get("stdout", ""),
+            "stderr": result.get("stderr", ""),
+            "returncode": result.get("returncode", 0),
         }
 
     return {
@@ -327,13 +336,14 @@ def fetch_tcgcsv_history_csv_for_date(target_date):
         "status": "csv_unavailable",
         "message": (
             f"No CSV was created for {target_date.isoformat()}; "
-            f"continuing with newest available local CSV: {find_latest_tcgcsv_history_file()}"
+            f"continuing with newest available local CSV: "
+            f"{find_latest_tcgcsv_history_file()}"
         ),
         "date": target_date.isoformat(),
         "path": find_latest_tcgcsv_history_file(),
-        "stdout": result.stdout,
-        "stderr": result.stderr,
-        "returncode": result.returncode,
+        "stdout": result.get("stdout", ""),
+        "stderr": result.get("stderr", ""),
+        "returncode": result.get("returncode", 1),
     }
 
 def refresh_current_day_history_csv_if_due(now=None):

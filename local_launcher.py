@@ -28,13 +28,18 @@ def find_free_port(start=5000, stop=5100) -> int:
 
 def configure_local_environment() -> Path:
     root = executable_dir()
+    os.chdir(root)
     data_dir = root / "user_data"
     image_dir = data_dir / "img"
     logs_dir = data_dir / "logs"
+    tcg_history_dir = data_dir / "tcg_history"
+    tcgcsv_data_dir = data_dir / "tcgcsv"
 
     data_dir.mkdir(exist_ok=True)
     image_dir.mkdir(exist_ok=True)
     logs_dir.mkdir(exist_ok=True)
+    tcg_history_dir.mkdir(exist_ok=True)
+    tcgcsv_data_dir.mkdir(exist_ok=True)
 
     secret_file = data_dir / ".secret_key"
     if not secret_file.exists():
@@ -46,6 +51,8 @@ def configure_local_environment() -> Path:
     os.environ.setdefault("FLASK_DEBUG", "False")
     os.environ.setdefault("LOCAL_APP_MODE", "1")
     os.environ.setdefault("LOG_DIR", str(logs_dir))
+    os.environ.setdefault("TCGCSV_HISTORY_DIR", str(tcg_history_dir))
+    os.environ.setdefault("TCGCSV_LOCAL_TIMEZONE", "America/Chicago")
 
     return data_dir
 
