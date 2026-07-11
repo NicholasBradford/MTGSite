@@ -18,6 +18,7 @@ sort_card.py
 ROBOT_IDEA.md
 IDEAS.md
 /static/images
+/tcg_history
 
 # Python/cache/test artifacts
 __pycache__/
