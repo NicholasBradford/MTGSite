@@ -181,6 +181,7 @@ def get_market_filter_sql(market_filter):
 
 def get_wishlist_drops(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager, trailing_comma=True)
 
     wishlist_is_foil_sql = """
         LOWER(REPLACE(COALESCE(w.finish, ''), '_', ' ')) IN (
@@ -191,7 +192,7 @@ def get_wishlist_drops(manager, limit=24, market_sort="owned_impact"):
         """
 
     query = f"""
-        {PRICE_PAIR_CTE},
+        {cte_sql}
 
         WishlistRows AS (
             SELECT
@@ -301,9 +302,10 @@ def get_wishlist_drops(manager, limit=24, market_sort="owned_impact"):
 
 def get_deck_market_alerts(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager)
 
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             NULL AS instance_id,
@@ -379,9 +381,10 @@ def get_deck_market_alerts(manager, limit=24, market_sort="owned_impact"):
 
 def get_planeswalker_market_alerts(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager, trailing_comma=True)
 
     query = f"""
-        {PRICE_PAIR_CTE},
+        {cte_sql}
 
         PlaneswalkerRows AS (
             SELECT
@@ -493,9 +496,10 @@ def get_planeswalker_market_alerts(manager, limit=24, market_sort="owned_impact"
 
 def get_surplus_market_alerts(manager, limit=24, market_sort="owned_impact"):
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager)
 
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             instance_id,
@@ -562,8 +566,10 @@ def get_surplus_market_alerts(manager, limit=24, market_sort="owned_impact"):
     return cards
 
 def get_purchase_gain_loss_alerts(manager, limit=24):
+    cte_sql = market_base_cte(manager)
+
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             instance_id,
@@ -811,13 +817,145 @@ MarketRows AS (
 """
 
 
+def market_base_cte(manager, trailing_comma=False):
+    """
+    Return a CTE that resolves PricePairs/MarketRows.
+
+    When request-scoped temp cache tables are available, this avoids rerunning
+    the expensive price_history window query for every dashboard section.
+    """
+    if getattr(manager, "_market_cache_ready", False):
+        cte = """
+WITH PricePairs AS (
+    SELECT * FROM temp_market_price_pairs
+),
+MarketRows AS (
+    SELECT * FROM temp_market_rows
+)
+"""
+    else:
+        cte = PRICE_PAIR_CTE
+
+    if trailing_comma:
+        return f"{cte.rstrip()}\n,"
+
+    return cte
+
+
+def prepare_market_query_cache(manager):
+    """Build request-local temp tables used by market dashboard queries."""
+    manager.cursor.executescript("""
+        DROP TABLE IF EXISTS temp_market_price_pairs;
+        DROP TABLE IF EXISTS temp_market_rows;
+
+        CREATE TEMP TABLE temp_market_price_pairs AS
+        WITH RankedPrices AS (
+            SELECT
+                scryfall_id,
+                source,
+                CAST(NULLIF(price_usd, '') AS REAL) AS price_usd,
+                CAST(NULLIF(price_foil, '') AS REAL) AS price_foil,
+                scraped_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY scryfall_id, source
+                    ORDER BY scraped_at DESC
+                ) AS rn
+            FROM price_history
+            WHERE source = 'tcgcsv'
+        )
+        SELECT
+            curr.scryfall_id,
+            prev.price_usd AS old_price_usd,
+            curr.price_usd AS new_price_usd,
+            prev.price_foil AS old_price_foil,
+            curr.price_foil AS new_price_foil,
+            curr.scraped_at AS latest_scraped_at,
+            prev.scraped_at AS previous_scraped_at
+        FROM RankedPrices curr
+        LEFT JOIN RankedPrices prev
+            ON curr.scryfall_id = prev.scryfall_id
+            AND curr.source = prev.source
+            AND prev.rn = 2
+        WHERE curr.rn = 1;
+
+        CREATE INDEX IF NOT EXISTS idx_tmp_market_price_pairs_scryfall
+            ON temp_market_price_pairs(scryfall_id);
+
+        CREATE TEMP TABLE temp_market_rows AS
+        WITH InventoryGrouped AS (
+            SELECT
+                i.scryfall_id,
+                i.finish,
+                MIN(i.instance_id) AS instance_id,
+                MAX(i.location_id) AS location_id,
+                COUNT(*) AS qty,
+                MAX(COALESCE(i.is_tradeable, 0)) AS is_tradeable,
+                MAX(COALESCE(i.is_surplus, 0)) AS is_surplus,
+                SUM(COALESCE(i.purchase_price, 0)) AS total_purchase_price
+            FROM inventory i
+            GROUP BY i.scryfall_id, i.finish
+        )
+        SELECT
+            ig.instance_id,
+            ig.scryfall_id,
+            ig.finish,
+            ig.location_id,
+            ig.qty,
+            ig.is_tradeable,
+            ig.is_surplus,
+            ig.total_purchase_price,
+            cp.image_url,
+            cp.set_code,
+            cp.collector_number,
+            cd.name,
+            CASE
+                WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) IN (
+                    'foil',
+                    'etched',
+                    'rainbow foil'
+                )
+                THEN pp.old_price_foil
+                ELSE pp.old_price_usd
+            END AS old_price,
+            CASE
+                WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) IN (
+                    'foil',
+                    'etched',
+                    'rainbow foil'
+                )
+                THEN pp.new_price_foil
+                ELSE pp.new_price_usd
+            END AS new_price,
+            pp.latest_scraped_at,
+            pp.previous_scraped_at
+        FROM InventoryGrouped ig
+        JOIN temp_market_price_pairs pp
+            ON ig.scryfall_id = pp.scryfall_id
+        LEFT JOIN card_printings cp
+            ON ig.scryfall_id = cp.scryfall_id
+        LEFT JOIN card_definitions cd
+            ON cp.oracle_id = cd.oracle_id;
+
+        CREATE INDEX IF NOT EXISTS idx_tmp_market_rows_tradeable
+            ON temp_market_rows(is_tradeable);
+        CREATE INDEX IF NOT EXISTS idx_tmp_market_rows_surplus
+            ON temp_market_rows(is_surplus);
+        CREATE INDEX IF NOT EXISTS idx_tmp_market_rows_scryfall_finish
+            ON temp_market_rows(scryfall_id, finish);
+    """)
+
+    manager._market_cache_ready = True
+
+
 # =========================================================
 # Market Data Helpers
 # =========================================================
 
 def get_market_summary(manager):
+    cte_sql = market_base_cte(manager)
+
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             COALESCE(SUM(new_price * qty), 0) AS collection_value,
@@ -898,9 +1036,10 @@ def get_market_movers(
 ):
     filter_sql = get_market_filter_sql(market_filter)
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager)
 
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             instance_id,
@@ -974,9 +1113,10 @@ def get_trade_alerts(
     market_sort="owned_impact"
 ):
     sort_sql = get_market_sort_sql(market_sort)
+    cte_sql = market_base_cte(manager)
 
     query = f"""
-        {PRICE_PAIR_CTE}
+        {cte_sql}
 
         SELECT
             instance_id,
@@ -1101,7 +1241,11 @@ def get_market_opportunities(
     manager,
     limit=MARKET_OPPORTUNITY_LIMIT,
     market_filter="all",
-    market_sort="owned_impact"
+    market_sort="owned_impact",
+    spikes=None,
+    drops=None,
+    trade_alerts=None,
+    missing_count=None,
 ):
     """
     Builds lightweight opportunity cards from already-trackable market movement.
@@ -1109,20 +1253,23 @@ def get_market_opportunities(
     Wishlist/deck/set-completion intelligence should be layered in later
     after those data sources are wired into the market system.
     """
-    spikes, drops = get_market_movers(
-        manager,
-        limit=24,
-        market_filter=market_filter,
-        market_sort=market_sort,
-    )
+    if spikes is None or drops is None:
+        spikes, drops = get_market_movers(
+            manager,
+            limit=24,
+            market_filter=market_filter,
+            market_sort=market_sort,
+        )
 
-    trade_alerts = get_trade_alerts(
-        manager,
-        limit=12,
-        market_sort=market_sort,
-    )
+    if trade_alerts is None:
+        trade_alerts = get_trade_alerts(
+            manager,
+            limit=12,
+            market_sort=market_sort,
+        )
 
-    missing_count = get_missing_price_count(manager)
+    if missing_count is None:
+        missing_count = get_missing_price_count(manager)
 
     opportunities = []
 
@@ -1266,6 +1413,11 @@ def market_dashboard():
     }
 
     try:
+        try:
+            prepare_market_query_cache(manager)
+        except Exception:
+            manager._market_cache_ready = False
+
         market_summary = get_market_summary(manager)
 
         spikes, drops = get_market_movers(
@@ -1274,15 +1426,19 @@ def market_dashboard():
             market_sort=market_sort,
         )
 
+        trade_alerts = get_trade_alerts(
+            manager,
+            market_sort=market_sort,
+        )
+
         opportunities = get_market_opportunities(
             manager,
             market_filter=market_filter,
             market_sort=market_sort,
-        )
-
-        trade_alerts = get_trade_alerts(
-            manager,
-            market_sort=market_sort,
+            spikes=spikes,
+            drops=drops,
+            trade_alerts=trade_alerts,
+            missing_count=market_summary.get("missing_price_count", 0),
         )
 
         wishlist_drops = []

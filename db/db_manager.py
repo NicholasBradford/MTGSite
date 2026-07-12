@@ -526,6 +526,9 @@ class CardDB:
 
             CREATE INDEX IF NOT EXISTS idx_price_history_source_date
                 ON price_history(source, scraped_at);
+
+            CREATE INDEX IF NOT EXISTS idx_price_history_source_scryfall_scraped
+                ON price_history(source, scryfall_id, scraped_at DESC);
         """)  
         
         self.initialize_locations()
