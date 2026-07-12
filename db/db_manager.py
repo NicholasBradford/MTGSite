@@ -1,8 +1,16 @@
 import sqlite3, os, random, traceback
+import csv
+from datetime import datetime
 from flask import g
 from dotenv import load_dotenv
 
 load_dotenv()
+
+TCGCSV_HISTORY_DIR = os.environ.get("TCGCSV_HISTORY_DIR", "tcg_history")
+TCGCSV_HISTORY_FILE_PREFIX = "prices_category_1_"
+TCGCSV_HISTORY_FILE_SUFFIX = ".csv"
+TCGCSV_SNAPSHOT_DIR = os.path.join("var", "data", "tcgcsv")
+TCGCSV_LOCAL_PRICE_SNAPSHOT = os.path.join(TCGCSV_SNAPSHOT_DIR, "daily_prices_latest.csv")
 
 class CardDB:
     def __init__(self, db_path=None):
@@ -23,6 +31,248 @@ class CardDB:
             VALUES (?, ?, ?, ?)
         """, (task_name, cards_updated, status, message))
         self.commit()
+
+    @staticmethod
+    def local_price_index_path(snapshot_path):
+        return f"{snapshot_path}.idx.sqlite"
+
+    @staticmethod
+    def _parse_tcgcsv_history_file_date(path):
+        filename = os.path.basename(path)
+
+        if not filename.startswith(TCGCSV_HISTORY_FILE_PREFIX):
+            return None
+
+        if not filename.endswith(TCGCSV_HISTORY_FILE_SUFFIX):
+            return None
+
+        date_part = filename[
+            len(TCGCSV_HISTORY_FILE_PREFIX):-len(TCGCSV_HISTORY_FILE_SUFFIX)
+        ]
+
+        if "_" in date_part:
+            return None
+
+        try:
+            return datetime.strptime(date_part, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    @classmethod
+    def resolve_tcgcsv_snapshot_path(cls):
+        if os.path.isdir(TCGCSV_HISTORY_DIR):
+            candidates = []
+
+            for filename in os.listdir(TCGCSV_HISTORY_DIR):
+                path = os.path.join(TCGCSV_HISTORY_DIR, filename)
+                if not os.path.isfile(path):
+                    continue
+
+                if os.path.getsize(path) <= 0:
+                    continue
+
+                file_date = cls._parse_tcgcsv_history_file_date(path)
+                if file_date is None:
+                    continue
+
+                candidates.append((file_date, os.path.getmtime(path), path))
+
+            if candidates:
+                candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+                return candidates[0][2]
+
+        if os.path.exists(TCGCSV_LOCAL_PRICE_SNAPSHOT):
+            return TCGCSV_LOCAL_PRICE_SNAPSHOT
+
+        return None
+
+    @staticmethod
+    def _first_present(row, *names):
+        for name in names:
+            value = row.get(name)
+            if value not in (None, ""):
+                return value
+        return None
+
+    @staticmethod
+    def _coerce_price(value):
+        if value is None:
+            return None
+
+        if isinstance(value, str):
+            value = value.strip().replace("$", "").replace(",", "")
+            if value == "" or value.lower() in {"none", "null", "nan"}:
+                return None
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _normalize_price_snapshot_row(cls, row):
+        product_id = cls._first_present(row, "product_id", "productId")
+        group_id = cls._first_present(row, "group_id", "groupId")
+        subtype_name = cls._first_present(row, "sub_type_name", "subTypeName") or ""
+
+        if not product_id or not group_id:
+            return None
+
+        try:
+            product_id = int(product_id)
+        except (TypeError, ValueError):
+            return None
+
+        return {
+            "product_id": product_id,
+            "group_id": str(group_id),
+            "subtype_name": str(subtype_name),
+            "market_price": cls._coerce_price(cls._first_present(row, "market_price", "marketPrice")),
+            "mid_price": cls._coerce_price(cls._first_present(row, "mid_price", "midPrice")),
+            "low_price": cls._coerce_price(cls._first_present(row, "low_price", "lowPrice")),
+            "high_price": cls._coerce_price(cls._first_present(row, "high_price", "highPrice")),
+            "direct_low_price": cls._coerce_price(cls._first_present(row, "direct_low_price", "directLowPrice")),
+        }
+
+    @classmethod
+    def ensure_local_price_sidecar_index(cls, snapshot_path=None, force_rebuild=False):
+        snapshot_path = snapshot_path or cls.resolve_tcgcsv_snapshot_path()
+        if not snapshot_path or not os.path.exists(snapshot_path):
+            return None
+
+        snapshot_mtime = float(os.path.getmtime(snapshot_path))
+        snapshot_size = int(os.path.getsize(snapshot_path))
+        index_path = cls.local_price_index_path(snapshot_path)
+
+        if not force_rebuild and os.path.exists(index_path):
+            existing_index = cls(db_path=index_path)
+            try:
+                existing_index.cursor.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS index_meta (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        snapshot_mtime REAL NOT NULL,
+                        snapshot_size INTEGER NOT NULL,
+                        built_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    );
+                    """
+                )
+                existing_index.commit()
+
+                meta = existing_index.cursor.execute(
+                    "SELECT snapshot_mtime, snapshot_size FROM index_meta WHERE id = 1"
+                ).fetchone()
+
+                if (
+                    meta
+                    and float(meta["snapshot_mtime"]) == snapshot_mtime
+                    and int(meta["snapshot_size"]) == snapshot_size
+                ):
+                    return index_path
+            finally:
+                existing_index.close()
+
+        temp_index_path = f"{index_path}.tmp"
+        if os.path.exists(temp_index_path):
+            os.remove(temp_index_path)
+
+        index_db = cls(db_path=temp_index_path)
+        try:
+            index_db.cursor.executescript(
+                """
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                CREATE TABLE IF NOT EXISTS index_meta (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    snapshot_mtime REAL NOT NULL,
+                    snapshot_size INTEGER NOT NULL,
+                    built_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS price_rows (
+                    product_id INTEGER,
+                    group_id TEXT,
+                    subtype_name TEXT,
+                    market_price REAL,
+                    mid_price REAL,
+                    low_price REAL,
+                    high_price REAL,
+                    direct_low_price REAL
+                );
+                CREATE INDEX IF NOT EXISTS idx_product_id ON price_rows(product_id);
+                CREATE INDEX IF NOT EXISTS idx_group_id ON price_rows(group_id);
+                CREATE INDEX IF NOT EXISTS idx_group_subtype ON price_rows(group_id, subtype_name);
+                """
+            )
+
+            rows_to_insert = []
+
+            with open(snapshot_path, "r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                for raw_row in reader:
+                    normalized = cls._normalize_price_snapshot_row(raw_row)
+                    if normalized is None:
+                        continue
+
+                    rows_to_insert.append((
+                        normalized["product_id"],
+                        normalized["group_id"],
+                        normalized["subtype_name"],
+                        normalized["market_price"],
+                        normalized["mid_price"],
+                        normalized["low_price"],
+                        normalized["high_price"],
+                        normalized["direct_low_price"],
+                    ))
+
+                    if len(rows_to_insert) >= 5000:
+                        index_db.cursor.executemany(
+                            """
+                            INSERT INTO price_rows (
+                                product_id,
+                                group_id,
+                                subtype_name,
+                                market_price,
+                                mid_price,
+                                low_price,
+                                high_price,
+                                direct_low_price
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            rows_to_insert,
+                        )
+                        rows_to_insert.clear()
+
+            if rows_to_insert:
+                index_db.cursor.executemany(
+                    """
+                    INSERT INTO price_rows (
+                        product_id,
+                        group_id,
+                        subtype_name,
+                        market_price,
+                        mid_price,
+                        low_price,
+                        high_price,
+                        direct_low_price
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows_to_insert,
+                )
+
+            index_db.cursor.execute("DELETE FROM index_meta WHERE id = 1")
+            index_db.cursor.execute(
+                """
+                INSERT INTO index_meta (id, snapshot_mtime, snapshot_size)
+                VALUES (1, ?, ?)
+                """,
+                (snapshot_mtime, snapshot_size),
+            )
+            index_db.commit()
+        finally:
+            index_db.close()
+
+        os.replace(temp_index_path, index_path)
+        return index_path
     
     def wipe_db(self):
         """Safely closes connection, deletes the file, and restarts."""
@@ -279,6 +529,13 @@ class CardDB:
         """)  
         
         self.initialize_locations()
+
+        try:
+            self.ensure_local_price_sidecar_index()
+        except Exception:
+            # Sidecar index bootstrap is best-effort and should not block app startup.
+            pass
+
         self.commit()
         
     def initialize_locations(self):
