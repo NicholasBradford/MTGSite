@@ -2,6 +2,7 @@
 import json
 import time
 import requests
+import traceback
 
 
 from functools import wraps
@@ -117,6 +118,119 @@ def fetch_one_dict(manager, query, params=()):
 def fetch_all_dicts(manager, query, params=()):
     rows = manager.cursor.execute(query, params).fetchall()
     return [dict(row) for row in rows]
+
+
+def ensure_market_price_pair_table(manager):
+    """Ensure the dashboard has a persistent current/previous price cache.
+
+    This table keeps the expensive price_history ranking work out of normal
+    dashboard page loads. It is refreshed after a price sync and lazily rebuilt
+    once if an existing database already has price_history but no cache yet.
+    """
+    manager.cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS market_price_pairs (
+            scryfall_id TEXT PRIMARY KEY,
+            old_price_usd REAL,
+            new_price_usd REAL,
+            old_price_foil REAL,
+            new_price_foil REAL,
+            latest_scraped_at TEXT,
+            previous_scraped_at TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_market_price_pairs_latest
+            ON market_price_pairs(latest_scraped_at);
+    """)
+
+
+def refresh_market_price_pairs(manager):
+    """Rebuild the persistent latest/previous TCGCSV price cache.
+
+    This is the one place where the dashboard pays the ROW_NUMBER cost. Normal
+    dashboard reads should query market_price_pairs instead of price_history.
+    """
+    ensure_market_price_pair_table(manager)
+
+    manager.cursor.execute("DELETE FROM market_price_pairs")
+    manager.cursor.executescript("""
+        INSERT INTO market_price_pairs (
+            scryfall_id,
+            old_price_usd,
+            new_price_usd,
+            old_price_foil,
+            new_price_foil,
+            latest_scraped_at,
+            previous_scraped_at,
+            updated_at
+        )
+        WITH RankedPrices AS (
+            SELECT
+                scryfall_id,
+                CAST(NULLIF(price_usd, '') AS REAL) AS price_usd,
+                CAST(NULLIF(price_foil, '') AS REAL) AS price_foil,
+                scraped_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY scryfall_id
+                    ORDER BY scraped_at DESC, price_id DESC
+                ) AS rn
+            FROM price_history
+            WHERE source = 'tcgcsv'
+        )
+        SELECT
+            curr.scryfall_id,
+            prev.price_usd AS old_price_usd,
+            curr.price_usd AS new_price_usd,
+            prev.price_foil AS old_price_foil,
+            curr.price_foil AS new_price_foil,
+            curr.scraped_at AS latest_scraped_at,
+            prev.scraped_at AS previous_scraped_at,
+            CURRENT_TIMESTAMP AS updated_at
+        FROM RankedPrices curr
+        LEFT JOIN RankedPrices prev
+            ON curr.scryfall_id = prev.scryfall_id
+            AND prev.rn = 2
+        WHERE curr.rn = 1;
+    """)
+
+    manager.commit()
+
+    row = manager.cursor.execute(
+        "SELECT COUNT(*) AS cached_count FROM market_price_pairs"
+    ).fetchone()
+    return row["cached_count"] if row else 0
+
+
+def ensure_market_price_pairs_ready(manager):
+    """Create and refresh the persistent cache only when needed."""
+    ensure_market_price_pair_table(manager)
+
+    cache_state = fetch_one_dict(
+        manager,
+        """
+        SELECT
+            COUNT(*) AS cached_count,
+            MAX(latest_scraped_at) AS cache_latest
+        FROM market_price_pairs
+        """,
+    )
+    history_state = fetch_one_dict(
+        manager,
+        """
+        SELECT MAX(scraped_at) AS history_latest
+        FROM price_history
+        WHERE source = 'tcgcsv'
+        """,
+    )
+
+    cached_count = cache_state.get("cached_count", 0) or 0
+    cache_latest = cache_state.get("cache_latest")
+    history_latest = history_state.get("history_latest")
+
+    if history_latest and (cached_count == 0 or not cache_latest or history_latest > cache_latest):
+        return refresh_market_price_pairs(manager)
+
+    return cached_count
 
 
 def money(value):
@@ -633,14 +747,6 @@ def get_price_quality_flags(manager, limit=24):
     foil_like_sql = FOIL_LIKE_FINISH_SQL.format(finish_column="i.finish")
 
     query = f"""
-        WITH PriceHistoryCounts AS (
-            SELECT
-                scryfall_id,
-                COUNT(*) AS price_history_count
-            FROM price_history
-            GROUP BY scryfall_id
-        )
-
         SELECT
             MIN(i.instance_id) AS instance_id,
             i.scryfall_id,
@@ -656,7 +762,11 @@ def get_price_quality_flags(manager, limit=24):
             cp.current_price,
             cp.current_price_foil,
 
-            COALESCE(phc.price_history_count, 0) AS price_history_count,
+            CASE
+                WHEN mpp.latest_scraped_at IS NULL THEN 0
+                WHEN mpp.previous_scraped_at IS NULL THEN 1
+                ELSE 2
+            END AS price_history_count,
 
             CASE
                 WHEN {foil_like_sql}
@@ -671,7 +781,7 @@ def get_price_quality_flags(manager, limit=24):
                     AND (cp.current_price IS NULL OR cp.current_price = '')
                 THEN 'Nonfoil copy missing price'
 
-                WHEN COALESCE(phc.price_history_count, 0) < 2
+                WHEN mpp.previous_scraped_at IS NULL
                 THEN 'Needs at least two price snapshots'
 
                 ELSE 'Review price data'
@@ -681,8 +791,8 @@ def get_price_quality_flags(manager, limit=24):
             ON i.scryfall_id = cp.scryfall_id
         LEFT JOIN card_definitions cd
             ON cp.oracle_id = cd.oracle_id
-        LEFT JOIN PriceHistoryCounts phc
-            ON i.scryfall_id = phc.scryfall_id
+        LEFT JOIN market_price_pairs mpp
+            ON i.scryfall_id = mpp.scryfall_id
         LEFT JOIN tcgplayer_price_overrides o
             ON i.scryfall_id = o.scryfall_id
             AND LOWER(REPLACE(i.finish, '_', ' ')) = LOWER(REPLACE(o.finish, '_', ' '))
@@ -695,7 +805,8 @@ def get_price_quality_flags(manager, limit=24):
             cd.name,
             cp.current_price,
             cp.current_price_foil,
-            phc.price_history_count
+            mpp.latest_scraped_at,
+            mpp.previous_scraped_at
         HAVING
             (
                 {foil_like_sql}
@@ -706,52 +817,28 @@ def get_price_quality_flags(manager, limit=24):
                 NOT ({foil_like_sql})
                 AND (cp.current_price IS NULL OR cp.current_price = '')
             )
-            OR COALESCE(phc.price_history_count, 0) < 2
+            OR mpp.previous_scraped_at IS NULL
         ORDER BY cd.name ASC
         LIMIT ?
     """
 
     return fetch_all_dicts(manager, query, (limit,))
 
-
 # =========================================================
 # Shared SQL Fragments
 # =========================================================
 
 PRICE_PAIR_CTE = """
-WITH RankedPrices AS (
+WITH PricePairs AS (
     SELECT
         scryfall_id,
-        source,
-        CAST(NULLIF(price_usd, '') AS REAL) AS price_usd,
-        CAST(NULLIF(price_foil, '') AS REAL) AS price_foil,
-        scraped_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY scryfall_id, source
-            ORDER BY scraped_at DESC
-        ) AS rn
-    FROM price_history
-    WHERE source = 'tcgcsv'
-),
-
-PricePairs AS (
-    SELECT
-        curr.scryfall_id,
-
-        prev.price_usd AS old_price_usd,
-        curr.price_usd AS new_price_usd,
-
-        prev.price_foil AS old_price_foil,
-        curr.price_foil AS new_price_foil,
-
-        curr.scraped_at AS latest_scraped_at,
-        prev.scraped_at AS previous_scraped_at
-    FROM RankedPrices curr
-    LEFT JOIN RankedPrices prev
-        ON curr.scryfall_id = prev.scryfall_id
-        AND curr.source = prev.source
-        AND prev.rn = 2
-    WHERE curr.rn = 1
+        old_price_usd,
+        new_price_usd,
+        old_price_foil,
+        new_price_foil,
+        latest_scraped_at,
+        previous_scraped_at
+    FROM market_price_pairs
 ),
 
 InventoryGrouped AS (
@@ -796,11 +883,11 @@ MarketRows AS (
 
         CASE
             WHEN LOWER(REPLACE(COALESCE(ig.finish, ''), '_', ' ')) IN (
-            'foil',
-            'etched',
-            'rainbow foil'
-        )
-        THEN pp.new_price_foil
+                'foil',
+                'etched',
+                'rainbow foil'
+            )
+            THEN pp.new_price_foil
             ELSE pp.new_price_usd
         END AS new_price,
 
@@ -821,8 +908,10 @@ def market_base_cte(manager, trailing_comma=False):
     """
     Return a CTE that resolves PricePairs/MarketRows.
 
-    When request-scoped temp cache tables are available, this avoids rerunning
-    the expensive price_history window query for every dashboard section.
+    Normal dashboard requests now read from the persistent market_price_pairs
+    cache instead of ranking the full price_history table on every page load.
+    Request-scoped temp tables are still used when available to avoid repeating
+    inventory grouping and joins across dashboard sections.
     """
     if getattr(manager, "_market_cache_ready", False):
         cte = """
@@ -844,39 +933,22 @@ MarketRows AS (
 
 def prepare_market_query_cache(manager):
     """Build request-local temp tables used by market dashboard queries."""
+    ensure_market_price_pairs_ready(manager)
+
     manager.cursor.executescript("""
         DROP TABLE IF EXISTS temp_market_price_pairs;
         DROP TABLE IF EXISTS temp_market_rows;
 
         CREATE TEMP TABLE temp_market_price_pairs AS
-        WITH RankedPrices AS (
-            SELECT
-                scryfall_id,
-                source,
-                CAST(NULLIF(price_usd, '') AS REAL) AS price_usd,
-                CAST(NULLIF(price_foil, '') AS REAL) AS price_foil,
-                scraped_at,
-                ROW_NUMBER() OVER (
-                    PARTITION BY scryfall_id, source
-                    ORDER BY scraped_at DESC
-                ) AS rn
-            FROM price_history
-            WHERE source = 'tcgcsv'
-        )
         SELECT
-            curr.scryfall_id,
-            prev.price_usd AS old_price_usd,
-            curr.price_usd AS new_price_usd,
-            prev.price_foil AS old_price_foil,
-            curr.price_foil AS new_price_foil,
-            curr.scraped_at AS latest_scraped_at,
-            prev.scraped_at AS previous_scraped_at
-        FROM RankedPrices curr
-        LEFT JOIN RankedPrices prev
-            ON curr.scryfall_id = prev.scryfall_id
-            AND curr.source = prev.source
-            AND prev.rn = 2
-        WHERE curr.rn = 1;
+            scryfall_id,
+            old_price_usd,
+            new_price_usd,
+            old_price_foil,
+            new_price_foil,
+            latest_scraped_at,
+            previous_scraped_at
+        FROM market_price_pairs;
 
         CREATE INDEX IF NOT EXISTS idx_tmp_market_price_pairs_scryfall
             ON temp_market_price_pairs(scryfall_id);
@@ -945,7 +1017,6 @@ def prepare_market_query_cache(manager):
     """)
 
     manager._market_cache_ready = True
-
 
 # =========================================================
 # Market Data Helpers
@@ -1477,8 +1548,10 @@ def market_dashboard():
     try:
         try:
             prepare_market_query_cache(manager)
-        except Exception:
+        except Exception as error:
             manager._market_cache_ready = False
+            print(f"[market] failed to prepare request cache: {error}", flush=True)
+            traceback.print_exc()
 
         market_summary = get_market_summary(manager)
 
@@ -1488,10 +1561,13 @@ def market_dashboard():
             market_sort=market_sort,
         )
 
-        trade_alerts = get_trade_alerts(
-            manager,
-            market_sort=market_sort,
-        )
+        trade_alerts = []
+
+        if not defer_sections:
+            trade_alerts = get_trade_alerts(
+                manager,
+                market_sort=market_sort,
+            )
 
         opportunities = get_market_opportunities(
             manager,
@@ -1565,8 +1641,10 @@ def market_dashboard_deferred_sections():
     try:
         try:
             prepare_market_query_cache(manager)
-        except Exception:
+        except Exception as error:
             manager._market_cache_ready = False
+            print(f"[market] failed to prepare request cache: {error}", flush=True)
+            traceback.print_exc()
 
         deferred_sections = get_deferred_market_sections(
             manager,
@@ -1761,6 +1839,9 @@ def update_prices():
             )
             manager.commit()
 
+        yield sse_message(98, "Rebuilding market dashboard price cache...")
+        market_pair_count = refresh_market_price_pairs(manager)
+
         manager.log_update(
             task_name="TCGCSV Price Sync",
             cards_updated=updated_count,
@@ -1768,6 +1849,7 @@ def update_prices():
             message=(
                 f"Updated {updated_count} cards from local CSV date {tcgcsv_price_date}. "
                 f"Backfilled {backfilled_count} prior history rows. "
+                f"Cached {market_pair_count} market price pairs. "
                 f"Missing prices for {missing_count} cards."
             )
         )
@@ -1777,6 +1859,7 @@ def update_prices():
             (
                 f"TCGCSV sync complete. Updated {updated_count} cards from local CSV date "
                 f"{tcgcsv_price_date}. Backfilled {backfilled_count} prior rows. "
+                f"Cached {market_pair_count} market price pairs. "
                 f"Missing prices for {missing_count} cards."
             )
         )

@@ -374,6 +374,19 @@ class CardDB:
             )
         ''')
         self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS market_price_pairs (
+                scryfall_id TEXT PRIMARY KEY,
+                old_price_usd REAL,
+                new_price_usd REAL,
+                old_price_foil REAL,
+                new_price_foil REAL,
+                latest_scraped_at TEXT,
+                previous_scraped_at TEXT,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (scryfall_id) REFERENCES card_printings (scryfall_id)
+            )
+        ''')
+        self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS wishlist (
                 wish_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 scryfall_id TEXT,
@@ -529,6 +542,9 @@ class CardDB:
 
             CREATE INDEX IF NOT EXISTS idx_price_history_source_scryfall_scraped
                 ON price_history(source, scryfall_id, scraped_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_market_price_pairs_latest
+                ON market_price_pairs(latest_scraped_at);
         """)  
         
         self.initialize_locations()
