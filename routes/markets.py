@@ -1608,6 +1608,13 @@ def update_prices():
     try:
         yield sse_message(5, "Checking for newest local TCGCSV price CSV...")
 
+        try:
+            manager.ensure_local_price_sidecar_index()
+            yield sse_message(6, "Local TCGCSV sidecar index is ready.")
+        except Exception:
+            # Fall back to CSV streaming lookups if sidecar index warmup fails.
+            yield sse_message(6, "Proceeding without local sidecar index warmup.")
+
         refresh_result = refresh_current_day_history_csv_if_due()
 
         if refresh_result.get("attempted"):

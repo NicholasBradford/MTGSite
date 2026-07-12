@@ -293,7 +293,7 @@ class CardDB:
                 os.remove(self.db_path)
             
     
-    def create_tables(self):
+    def create_tables(self, bootstrap_local_price_index=None):
         # Enable foreign keys in SQLite
         self.cursor.execute("PRAGMA foreign_keys = ON;")
         self.cursor.execute('PRAGMA journal_mode=WAL;')
@@ -533,11 +533,18 @@ class CardDB:
         
         self.initialize_locations()
 
-        try:
-            self.ensure_local_price_sidecar_index()
-        except Exception:
-            # Sidecar index bootstrap is best-effort and should not block app startup.
-            pass
+        if bootstrap_local_price_index is None:
+            bootstrap_local_price_index = (
+                os.environ.get("BOOTSTRAP_LOCAL_PRICE_INDEX", "0").strip().lower()
+                in ("1", "true", "yes", "on")
+            )
+
+        if bootstrap_local_price_index:
+            try:
+                self.ensure_local_price_sidecar_index()
+            except Exception:
+                # Sidecar index bootstrap is best-effort and should not block app startup.
+                pass
 
         self.commit()
         

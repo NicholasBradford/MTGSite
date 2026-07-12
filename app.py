@@ -45,7 +45,8 @@ app.config['IMAGE_PATH'] = os.getenv('IMAGE_PATH', '/static/images/')
 
 startup_db = CardDB()
 try:
-    startup_db.create_tables()
+    # Keep web process startup lean; build local TCGCSV sidecar index lazily.
+    startup_db.create_tables(bootstrap_local_price_index=False)
     startup_db.commit()
 finally:
     startup_db.close()
