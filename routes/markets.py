@@ -1391,6 +1391,66 @@ def format_signed_percent(value):
     return f"{sign}{numeric:,.1f}%"
 
 
+def get_deferred_market_sections(
+    manager,
+    section_visibility,
+    market_sort,
+    trade_alerts=None,
+):
+    wishlist_drops = []
+    deck_alerts = []
+    planeswalker_alerts = []
+    surplus_alerts = []
+    purchase_alerts = []
+    price_quality_flags = []
+
+    if section_visibility["show_wishlist_sections"]:
+        wishlist_drops = get_wishlist_drops(
+            manager,
+            market_sort=market_sort,
+        )
+
+    if section_visibility["show_deck_sections"]:
+        deck_alerts = get_deck_market_alerts(
+            manager,
+            market_sort=market_sort,
+        )
+
+    if section_visibility["show_planeswalker_sections"]:
+        planeswalker_alerts = get_planeswalker_market_alerts(
+            manager,
+            market_sort=market_sort,
+        )
+
+    if section_visibility["show_trade_sections"]:
+        if trade_alerts is None:
+            trade_alerts = get_trade_alerts(
+                manager,
+                market_sort=market_sort,
+            )
+
+        surplus_alerts = get_surplus_market_alerts(
+            manager,
+            market_sort=market_sort,
+        )
+
+    if section_visibility["show_owned_sections"]:
+        purchase_alerts = get_purchase_gain_loss_alerts(manager)
+
+    if section_visibility["show_data_quality_sections"]:
+        price_quality_flags = get_price_quality_flags(manager)
+
+    return {
+        "trade_alerts": trade_alerts or [],
+        "wishlist_drops": wishlist_drops,
+        "deck_alerts": deck_alerts,
+        "planeswalker_alerts": planeswalker_alerts,
+        "surplus_alerts": surplus_alerts,
+        "purchase_alerts": purchase_alerts,
+        "price_quality_flags": price_quality_flags,
+    }
+
+
 # =========================================================
 # Routes
 # =========================================================
@@ -1411,6 +1471,8 @@ def market_dashboard():
         "show_planeswalker_sections": market_filter in ("all", "planeswalkers"),
         "show_data_quality_sections": market_filter in ("all", "owned"),
     }
+
+    defer_sections = request.args.get("defer_sections", "1") != "0"
 
     try:
         try:
@@ -1441,45 +1503,23 @@ def market_dashboard():
             missing_count=market_summary.get("missing_price_count", 0),
         )
 
-        wishlist_drops = []
-        deck_alerts = []
-        planeswalker_alerts = []
-        surplus_alerts = []
-        purchase_alerts = []
+        deferred_sections = {
+            "trade_alerts": [],
+            "wishlist_drops": [],
+            "deck_alerts": [],
+            "planeswalker_alerts": [],
+            "surplus_alerts": [],
+            "purchase_alerts": [],
+            "price_quality_flags": [],
+        }
 
-        if section_visibility["show_wishlist_sections"]:
-            wishlist_drops = get_wishlist_drops(
+        if not defer_sections:
+            deferred_sections = get_deferred_market_sections(
                 manager,
+                section_visibility=section_visibility,
                 market_sort=market_sort,
+                trade_alerts=trade_alerts,
             )
-
-        if section_visibility["show_deck_sections"]:
-            deck_alerts = get_deck_market_alerts(
-                manager,
-                market_sort=market_sort,
-            )
-
-        if section_visibility["show_planeswalker_sections"]:
-            planeswalker_alerts = get_planeswalker_market_alerts(
-                manager,
-                market_sort=market_sort,
-            )
-
-        if section_visibility["show_trade_sections"]:
-            surplus_alerts = get_surplus_market_alerts(
-                manager,
-                market_sort=market_sort,
-            )
-
-        if section_visibility["show_owned_sections"]:
-            purchase_alerts = get_purchase_gain_loss_alerts(manager)
-
-        missing_prices = []
-        price_quality_flags = []
-
-        if section_visibility["show_data_quality_sections"]:
-            missing_prices = get_missing_price_cards(manager)
-            price_quality_flags = get_price_quality_flags(manager)
 
         return render_template(
             "market.html",
@@ -1487,20 +1527,64 @@ def market_dashboard():
             opportunities=opportunities,
             spikes=spikes,
             drops=drops,
-            trade_alerts=trade_alerts,
-            wishlist_drops=wishlist_drops,
-            deck_alerts=deck_alerts,
-            planeswalker_alerts=planeswalker_alerts,
-            surplus_alerts=surplus_alerts,
-            purchase_alerts=purchase_alerts,
-            missing_prices=missing_prices,
-            price_quality_flags=price_quality_flags,
+            trade_alerts=deferred_sections["trade_alerts"],
+            wishlist_drops=deferred_sections["wishlist_drops"],
+            deck_alerts=deferred_sections["deck_alerts"],
+            planeswalker_alerts=deferred_sections["planeswalker_alerts"],
+            surplus_alerts=deferred_sections["surplus_alerts"],
+            purchase_alerts=deferred_sections["purchase_alerts"],
+            price_quality_flags=deferred_sections["price_quality_flags"],
             section_visibility=section_visibility,
             market_filter=market_filter,
             market_sort=market_sort,
+            defer_sections=defer_sections,
             view_mode="tracking",
         )
 
+    finally:
+        manager.close()
+
+
+@markets_bp.route("/market/dashboard/deferred-sections", methods=["GET"])
+@login_required
+def market_dashboard_deferred_sections():
+    manager = get_db()
+
+    market_filter = get_market_filter()
+    market_sort = get_market_sort()
+
+    section_visibility = {
+        "show_owned_sections": market_filter in ("all", "owned"),
+        "show_trade_sections": market_filter in ("all", "tradeable"),
+        "show_wishlist_sections": market_filter in ("all", "wishlist"),
+        "show_deck_sections": market_filter in ("all", "decks"),
+        "show_planeswalker_sections": market_filter in ("all", "planeswalkers"),
+        "show_data_quality_sections": market_filter in ("all", "owned"),
+    }
+
+    try:
+        try:
+            prepare_market_query_cache(manager)
+        except Exception:
+            manager._market_cache_ready = False
+
+        deferred_sections = get_deferred_market_sections(
+            manager,
+            section_visibility=section_visibility,
+            market_sort=market_sort,
+        )
+
+        return render_template(
+            "_market_deferred_sections.html",
+            section_visibility=section_visibility,
+            trade_alerts=deferred_sections["trade_alerts"],
+            wishlist_drops=deferred_sections["wishlist_drops"],
+            deck_alerts=deferred_sections["deck_alerts"],
+            planeswalker_alerts=deferred_sections["planeswalker_alerts"],
+            surplus_alerts=deferred_sections["surplus_alerts"],
+            purchase_alerts=deferred_sections["purchase_alerts"],
+            price_quality_flags=deferred_sections["price_quality_flags"],
+        )
     finally:
         manager.close()
 
