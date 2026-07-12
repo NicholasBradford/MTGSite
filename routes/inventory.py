@@ -7,8 +7,9 @@ from services.tcgcsv_prices import (
     TCGCSV_SOURCE_LOCAL_ONLY,
     normalize_finish,
     update_single_card_price_from_tcgcsv,
-    search_local_tcgcsv_products_for_finish
 )
+
+from services.finish_mapping import search_local_tcgcsv_products_for_finish
 
 sort_options = {
         'name': """

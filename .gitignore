@@ -61,3 +61,4 @@ MTGSiteLocal.spec
 # Ignore files for executables
 /dist
 data/app_settings.json
+AGENTS.md
