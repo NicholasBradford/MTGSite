@@ -1,7 +1,7 @@
 {% if cards and cards[0] %}
     {% for card in cards %}
-        {% set is_admin_inventory = current_user.is_authenticated and (view_mode == 'inventory' or view_mode == 'trades') %}
-        {% set is_wishlist_editable = current_user.is_authenticated and view_mode == 'wishlist' %}
+        {% set is_admin_inventory = current_user.is_authenticated and current_user.role == 'admin' and (view_mode == 'inventory' or view_mode == 'trades') %}
+        {% set is_wishlist_editable = current_user.is_authenticated and current_user.role == 'admin' and view_mode == 'wishlist' %}
         {% set finish = card['finish']|lower %}
         {% set is_foil = finish == 'foil' %}
         {% set is_rainbow_foil = finish == 'rainbow foil' %}
@@ -52,7 +52,7 @@
                         {% elif is_wishlist_editable %}
                             onclick="openWishlistEditModalFromCard(this.closest('.site-card-tile'))"
                         {% else %}
-                            onclick="showPopup('{{ card['name'] }}')"
+                            onclick="window.open(this.src, '_blank', 'noopener')"
                         {% endif %}
                         loading="lazy"
                     >

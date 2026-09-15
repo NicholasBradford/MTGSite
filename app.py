@@ -40,8 +40,8 @@ app.extensions["settings_manager"] = settings_manager
 #     IMAGE_FOLDER = '/var/data'
 # else:
 # This 'or' chain ensures IMAGE_FOLDER is NEVER None
-IMAGE_FOLDER = os.environ.get('IMAGE_PATH')
-app.config['IMAGE_PATH'] = os.getenv('IMAGE_PATH', '/static/images/')
+IMAGE_FOLDER = os.environ.get('IMAGE_PATH') or os.path.join(app.root_path, 'static', 'images')
+app.config['IMAGE_PATH'] = IMAGE_FOLDER
 
 startup_db = CardDB()
 try:
@@ -114,12 +114,12 @@ app.register_blueprint(markets_bp)
 @app.errorhandler(404)
 def page_not_found(e):
     logger.error(f"404 Error: {e}")
-    return render_template('404.html')
+    return render_template('404.html'), 404
 
 @app.errorhandler(500)
 def internal_server_error(e):
     logger.error(f"500 Error: {e}")
-    return render_template('404.html')
+    return render_template('500.html'), 500
 
 @app.route('/var/data/<path:filename>')
 def serve_card_image(filename):

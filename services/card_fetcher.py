@@ -565,13 +565,18 @@ class CardImporter:
         request: InventoryImportRequest,
         commit: bool = True,
     ) -> None:
-        self.download_card_image(card)
-        self.upsert_card_definition(card)
-        self.upsert_card_printing(card)
-        self.add_inventory_copies(card, request)
-
-        if commit:
-            self.db.commit()
+        if type(request.quantity) is not int or request.quantity < 1:
+            raise ValueError('Quantity must be a positive integer.')
+        try:
+            self.download_card_image(card)
+            self.upsert_card_definition(card)
+            self.upsert_card_printing(card)
+            self.add_inventory_copies(card, request)
+            if commit:
+                self.db.commit()
+        except Exception:
+            self.db.conn.rollback()
+            raise
         
         
 # MASS IMPORT
@@ -905,13 +910,25 @@ class CardImporterService:
             "Price",
         )
 
+        location_raw = self._get_row_value(row, 'location_id', 'location', 'Location')
+        location_id = int(default_location_id or DEFAULT_LOCATION_ID)
+        if location_raw:
+            if location_raw.isdigit():
+                location_id = int(location_raw)
+            else:
+                location = self.db.cursor.execute('SELECT location_id FROM locations WHERE LOWER(name) = LOWER(?)', (location_raw,)).fetchone()
+                if location:
+                    location_id = location['location_id']
+        tradeable = self._get_row_value(row, 'is_tradeable', 'tradeable', 'Tradeable').lower() in {'1', 'yes', 'true', 'y'}
+
         return InventoryImportRequest(
             set_code=set_code,
             collector_number=collector_number,
             finish=self._normalize_bulk_finish(finish_raw),
             condition=self._normalize_bulk_condition(condition_raw),
             quantity=quantity,
-            location_id=int(default_location_id or DEFAULT_LOCATION_ID),
+            location_id=location_id,
+            is_tradeable=tradeable,
             purchase_price=self._decimal_from_bulk_value(purchase_price_raw),
         )
         
@@ -922,14 +939,20 @@ class CardImporterService:
     ) -> MassImportResult:
         inventory_requests: list[InventoryImportRequest] = []
 
+        invalid_rows = []
         for row in rows:
-            request = self._inventory_request_from_bulk_row(
-                row,
-                default_location_id=default_location_id,
-            )
-
-            if request is not None:
+            try:
+                request = self._inventory_request_from_bulk_row(row, default_location_id=default_location_id)
+                if request is None:
+                    raise ValueError('Missing set code or collector number.')
+                if request.quantity < 1:
+                    raise ValueError('Quantity must be a positive integer.')
                 inventory_requests.append(request)
+            except (ValueError, TypeError) as error:
+                invalid_rows.append(FailedImport(
+                    request=CardImportRequest(self._get_row_value(row, 'set_code', 'Set code'), self._get_row_value(row, 'collector_number', 'Collector number')),
+                    reason=str(error),
+                ))
 
         seen_set_codes = set()
 
@@ -938,7 +961,11 @@ class CardImporterService:
                 self.ensure_set_is_fully_populated(request.set_code)
                 seen_set_codes.add(request.set_code)
 
-        return self.mass_importer.import_owned_many(inventory_requests)
+        result = self.mass_importer.import_owned_many(inventory_requests)
+        result.requested += len(invalid_rows)
+        result.failed += len(invalid_rows)
+        result.failed_cards.extend(invalid_rows)
+        return result
 
 if __name__ == "__main__":
     from db.db_manager import CardDB

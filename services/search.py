@@ -1,11 +1,15 @@
 from flask import request
 import re
 
-def search(search_query, conditions=None):
+def search(search_query, conditions=None, source='inventory'):
     if conditions is None:
         conditions = []
     
-    s_sort = 'name' # Default sort key
+    if source not in ('inventory', 'wishlist'):
+        raise ValueError('Unsupported search source')
+    s_sort = request.args.get('sort', 'name') if request else 'name'
+    if s_sort == 'price':
+        s_sort = 'usd'
     search_params = {
         'names': [], 'sets': [], 'types': [], 'colors': [], 
         'identities': [], 'text': [], 'locs': [], 'cns': [], 'oracle':[],
@@ -70,10 +74,10 @@ def search(search_query, conditions=None):
         'name': """LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
         'rarity': """CASE cp.rarity WHEN 'mythic' THEN 1 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 3 WHEN 'common' THEN 4 ELSE 5 END ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC """,
         'color': COLOR_SORT_SQL,
-        'identity': COLOR_SORT_SQL.replace('color =', 'color_identity =').replace('LENGTH(color)', 'LENGTH(color_identity)'),
+        'identity': re.sub(r'\bcolor\b', 'color_identity', COLOR_SORT_SQL),
         'usd': """(CASE WHEN i.finish = 'foil' THEN COALESCE(cp.current_price_foil, 0) ELSE COALESCE(cp.current_price, 0) END) DESC""",
         'set': """cp.set_code ASC""",
-        'location': """l.name ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
+        'location': """(SELECT name FROM locations WHERE location_id = i.location_id) ASC, LOWER(REPLACE(REPLACE(REPLACE(REPLACE(cd.name, 'The ', ''), 'An ', ''), 'A ', ''), ' ', '')) ASC""",
         'added': """i.added DESC"""
     }
             
@@ -117,7 +121,7 @@ def search(search_query, conditions=None):
                 elif key == "sort":
                     s_sort = val.lower()
             else:
-                search_params['names'].append(token)
+                search_params['names'].append(('-' if is_negated else '') + clean_token.strip(chr(34)))
 
     params = []
 
@@ -231,38 +235,44 @@ def search(search_query, conditions=None):
             conditions.append(f"i.location_id {'NOT IN' if is_negated else 'IN'} (SELECT location_id FROM locations WHERE name LIKE ?)")
             params.append(f'%{val}%')
 
-    # USD Logic
-    for usd_term in search_params['usd']:
-        is_negated = usd_term.startswith('-')
-        normalized_usd_term = usd_term[1:] if is_negated else usd_term
-
-        if normalized_usd_term.upper() == "NULL" or normalized_usd_term.lower() == "unassigned":
-            conditions.append(f"""
-                (CASE WHEN i.finish = 'foil' THEN cp.current_price_foil
-                ELSE cp.current_price END) {'IS NOT' if is_negated else 'IS'} NULL""")
-            continue # Skip the rest of the loop and move to the next term
-        
-        match = re.match(r'([<>=!]+)?([\d\.]+)', normalized_usd_term)
+    # Only accepted numeric operators become SQL; malformed filters are ignored.
+    inverse = {'>': '<=', '<': '>=', '>=': '<', '<=': '>', '=': '!=', '!=': '='}
+    for term in search_params['usd']:
+        negated = term.startswith('-')
+        value = term[1:] if negated else term
+        if value.lower() in ('null', 'unassigned'):
+            conditions.append(f"(CASE WHEN i.finish = 'foil' THEN cp.current_price_foil ELSE cp.current_price END) {'IS NOT' if negated else 'IS'} NULL")
+            continue
+        match = re.fullmatch(r'(>=|<=|!=|>|<|=)?(\d+(?:\.\d*)?|\.\d+)', value)
         if match:
-            op, val = match.group(1) or '=', float(match.group(2))
-            if op in ['>', '<', '>=', '<=', '=', '!=']:
-                conditions.append(f"""
-                    (CASE WHEN i.finish = 'foil' THEN COALESCE(cp.current_price_foil, 0)
-                    ELSE COALESCE(cp.current_price, 0) END) {op} ?""")
-                params.append(val)
+            op = match.group(1) or '='
+            if negated:
+                op = inverse[op]
+            conditions.append(f"(CASE WHEN i.finish = 'foil' THEN COALESCE(cp.current_price_foil, 0) ELSE COALESCE(cp.current_price, 0) END) {op} ?")
+            params.append(float(match.group(2)))
 
-    # Final SQL construction
     filter_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
-
-    # Quantity (HAVING)
-    having_sql, having_params = "", []
-    if search_params['qty']:
-        match = re.match(r'([<>=]*)\s*(\d+)', search_params['qty'][0])
+    having_parts, having_params = [], []
+    for term in search_params['qty']:
+        negated = term.startswith('-')
+        match = re.fullmatch(r'(>=|<=|!=|>|<|=)?(\d+)', term[1:] if negated else term)
         if match:
-            op, val = match.groups()
-            having_sql = f"HAVING COUNT(*) {op if op else '='} ?"
-            having_params.append(int(val))
+            op = match.group(1) or '='
+            if negated:
+                op = inverse[op]
+            having_parts.append(f"COUNT(*) {op} ?")
+            having_params.append(int(match.group(2)))
+    having_sql = 'HAVING ' + ' AND '.join(having_parts) if having_parts else ''
 
     sort_sql = sort_options.get(s_sort, sort_options['name'])
             
+    foil_condition = "LOWER(REPLACE(COALESCE(i.finish, ''), '_', ' ')) IN ('foil', 'etched', 'rainbow foil')"
+    filter_sql = filter_sql.replace("i.finish = 'foil'", foil_condition)
+    sort_sql = sort_sql.replace("i.finish = 'foil'", foil_condition)
+    if source == 'wishlist':
+        # Wishlist rows have their own finish/added fields. Storage filters refer
+        # to an owned copy of that printing and finish, if one exists.
+        location = "(SELECT MIN(location_id) FROM inventory WHERE scryfall_id = w.scryfall_id AND finish = w.finish)"
+        filter_sql = filter_sql.replace('i.location_id', location).replace('i.finish', 'w.finish').replace('i.added', 'w.added')
+        sort_sql = sort_sql.replace('i.location_id', location).replace('i.finish', 'w.finish').replace('i.added', 'w.added')
     return params, filter_sql, having_sql, having_params, sort_sql

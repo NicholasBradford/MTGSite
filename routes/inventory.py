@@ -7,8 +7,9 @@ from services.tcgcsv_prices import (
     TCGCSV_SOURCE_LOCAL_ONLY,
     normalize_finish,
     update_single_card_price_from_tcgcsv,
-    search_local_tcgcsv_products_for_finish
 )
+
+from services.finish_mapping import search_local_tcgcsv_products_for_finish
 
 sort_options = {
         'name': """
@@ -171,6 +172,15 @@ def edit_instance(instance_id):
     new_finish = request.form.get("finish")
 
     if new_loc is not None:
+        if new_loc == '':
+            new_loc = None
+        else:
+            try:
+                new_loc = int(new_loc)
+            except (TypeError, ValueError):
+                return {"status": "error", "error": "Invalid location"}, 400
+            if manager.cursor.execute('SELECT 1 FROM locations WHERE location_id = ?', (new_loc,)).fetchone() is None:
+                return {"status": "error", "error": "Location not found"}, 400
         manager.cursor.execute(
             "UPDATE inventory SET location_id = ? WHERE instance_id = ?",
             (new_loc, instance_id)
@@ -203,7 +213,7 @@ def get_instances(scryfall_id, finish):
         SELECT i.scryfall_id, i.instance_id, i.location_id, i.is_tradeable, i.finish,
         cp.current_price, cp.current_price_foil, l.name as location_name
         FROM inventory i
-        JOIN locations l ON i.location_id = l.location_id
+        LEFT JOIN locations l ON i.location_id = l.location_id
         JOIN card_printings cp on i.scryfall_id = cp.scryfall_id
         WHERE i.scryfall_id = ? AND i.finish = ?
     '''

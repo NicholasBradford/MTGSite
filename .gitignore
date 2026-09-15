@@ -18,6 +18,7 @@ sort_card.py
 ROBOT_IDEA.md
 IDEAS.md
 /static/images
+/tcg_history
 
 # Python/cache/test artifacts
 __pycache__/
@@ -60,3 +61,4 @@ MTGSiteLocal.spec
 # Ignore files for executables
 /dist
 data/app_settings.json
+AGENTS.md

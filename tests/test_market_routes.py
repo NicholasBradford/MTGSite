@@ -139,3 +139,95 @@ def test_run_price_update_streams_for_admin_without_hitting_scryfall(admin_clien
 
     assert "Test complete" in body
     assert '"progress": 100' in body
+
+
+def test_market_dashboard_reuses_prefetched_market_lists(auth_client, monkeypatch):
+    from routes import markets
+
+    call_counts = {
+        "movers": 0,
+        "trade_alerts": 0,
+    }
+
+    def fake_prepare_market_query_cache(manager):
+        manager._market_cache_ready = False
+
+    def fake_market_summary(*args, **kwargs):
+        return {
+            "last_sync": "2026-07-11",
+            "collection_value": 0,
+            "total_gains": 0,
+            "total_losses": 0,
+            "trade_value": 0,
+            "alert_count": 0,
+            "tracked_count": 0,
+            "missing_price_count": 0,
+            "wishlist_drop_count": 0,
+        }
+
+    def fake_market_movers(*args, **kwargs):
+        call_counts["movers"] += 1
+        return [], []
+
+    def fake_trade_alerts(*args, **kwargs):
+        call_counts["trade_alerts"] += 1
+        return []
+
+    monkeypatch.setattr(markets, "prepare_market_query_cache", fake_prepare_market_query_cache)
+    monkeypatch.setattr(markets, "get_market_summary", fake_market_summary)
+    monkeypatch.setattr(markets, "get_market_movers", fake_market_movers)
+    monkeypatch.setattr(markets, "get_trade_alerts", fake_trade_alerts)
+    monkeypatch.setattr(markets, "get_wishlist_drops", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_deck_market_alerts", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_planeswalker_market_alerts", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_surplus_market_alerts", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_purchase_gain_loss_alerts", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_missing_price_cards", lambda *a, **k: [])
+    monkeypatch.setattr(markets, "get_price_quality_flags", lambda *a, **k: [])
+
+    response = auth_client.get("/market/dashboard")
+
+    assert response.status_code == 200
+    assert call_counts["movers"] == 1
+    assert call_counts["trade_alerts"] == 1
+
+
+def test_market_dashboard_defers_heavy_sections_by_default(auth_client, monkeypatch):
+    from routes import markets
+
+    call_counts = {
+        "wishlist": 0,
+        "deck": 0,
+        "planeswalker": 0,
+        "surplus": 0,
+        "purchase": 0,
+        "quality": 0,
+    }
+
+    monkeypatch.setattr(markets, "get_wishlist_drops", lambda *a, **k: call_counts.__setitem__("wishlist", call_counts["wishlist"] + 1) or [])
+    monkeypatch.setattr(markets, "get_deck_market_alerts", lambda *a, **k: call_counts.__setitem__("deck", call_counts["deck"] + 1) or [])
+    monkeypatch.setattr(markets, "get_planeswalker_market_alerts", lambda *a, **k: call_counts.__setitem__("planeswalker", call_counts["planeswalker"] + 1) or [])
+    monkeypatch.setattr(markets, "get_surplus_market_alerts", lambda *a, **k: call_counts.__setitem__("surplus", call_counts["surplus"] + 1) or [])
+    monkeypatch.setattr(markets, "get_purchase_gain_loss_alerts", lambda *a, **k: call_counts.__setitem__("purchase", call_counts["purchase"] + 1) or [])
+    monkeypatch.setattr(markets, "get_price_quality_flags", lambda *a, **k: call_counts.__setitem__("quality", call_counts["quality"] + 1) or [])
+
+    response = auth_client.get("/market/dashboard")
+
+    assert response.status_code == 200
+    assert "Loading additional market sections" in response.get_data(as_text=True)
+    assert call_counts["wishlist"] == 0
+    assert call_counts["deck"] == 0
+    assert call_counts["planeswalker"] == 0
+    assert call_counts["surplus"] == 0
+    assert call_counts["purchase"] == 0
+    assert call_counts["quality"] == 0
+
+
+def test_market_dashboard_deferred_sections_endpoint_loads(auth_client):
+    response = auth_client.get("/market/dashboard/deferred-sections")
+
+    assert response.status_code == 200
+
+    body = response.get_data(as_text=True)
+
+    assert "Trade Binder Watch" in body or "No trade binder alerts yet" in body

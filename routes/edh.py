@@ -1,4 +1,4 @@
-import sqlite3, os, re, time, requests
+import sqlite3, os, re, time, requests, tempfile
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash
 from flask_login import login_required, current_user
 from services.feature_flags import require_feature
@@ -43,8 +43,8 @@ def resolve_card_by_name(card_name, db, fetcher):
     time.sleep(0.1) 
     
     # Use exact match. (Scryfall handles "Face A // Face B" syntax cleanly)
-    api_url = f"https://api.scryfall.com/cards/named?exact={card_name}"
-    response = requests.get(api_url, headers={'User-Agent': 'MTG-Collection-Tracker/1.0'})
+    api_url = 'https://api.scryfall.com/cards/named'
+    response = requests.get(api_url, params={'exact': card_name}, headers={'User-Agent': 'MTG-Collection-Tracker/1.0'}, timeout=20)
     
     if response.status_code == 200:
         data = response.json()
@@ -106,27 +106,27 @@ def process_and_import_deck(file_path, deck_name, color_identity, commander_name
         if not commander_scryfall_id:
             raise ValueError(f"Could not resolve Commander '{commander_name}'. Import aborted.")
         
-        # 2. Create Deck Record
+        resolved_cards = []
+        for qty, card_name, category in parse_decklist_file(file_path):
+            if qty < 1:
+                raise ValueError(f"Invalid quantity for '{card_name}'.")
+            scryfall_id = resolve_card_by_name(card_name, db, fetcher)
+            if not scryfall_id:
+                raise ValueError(f"Could not resolve '{card_name}'. Import aborted.")
+            resolved_cards.append((scryfall_id, qty, category))
+
         db.cursor.execute('''
-            INSERT INTO edh_decks (deck_name, commander_scryfall_id, color_identity) 
+            INSERT INTO edh_decks (deck_name, commander_scryfall_id, color_identity)
             VALUES (?, ?, ?)
         ''', (deck_name, commander_scryfall_id, color_identity))
-        
         deck_id = db.cursor.lastrowid
-        
-        # 3. Parse and Insert Cards
-        parsed_cards = parse_decklist_file(file_path)
-        
-        for qty, card_name, category in parsed_cards:
-            scryfall_id = resolve_card_by_name(card_name, db, fetcher)
-            
-            if scryfall_id:
-                db.cursor.execute('''
-                    INSERT INTO edh_deck_cards (deck_id, scryfall_id, quantity, category)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(deck_id, scryfall_id) DO UPDATE SET quantity = quantity + ?
-                ''', (deck_id, scryfall_id, qty, category, qty))
-                
+        for scryfall_id, qty, category in resolved_cards:
+            db.cursor.execute('''
+                INSERT INTO edh_deck_cards (deck_id, scryfall_id, quantity, category)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(deck_id, scryfall_id) DO UPDATE SET quantity = quantity + excluded.quantity
+            ''', (deck_id, scryfall_id, qty, category))
+
         db.commit()
         print(f"Deck '{deck_name}' imported successfully.")
         
@@ -187,22 +187,16 @@ def import_deck():
         if not all([deck_name, color_identity, commander_name]):
             return "Missing required deck details.", 400
         
-        # Save file to uploads directory
-        upload_folder = os.path.join(os.getcwd(), 'uploads')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, file.filename)
-        file.save(file_path)
-        
-        # Process the Import
+        # A client filename must never control a server filesystem path.
         try:
-            process_and_import_deck(file_path, deck_name, color_identity, commander_name)
-            
-            # Clean up the text file after successful import
-            os.remove(file_path) 
+            with tempfile.TemporaryDirectory(prefix='mtg-deck-') as upload_folder:
+                file_path = os.path.join(upload_folder, 'deck.txt')
+                file.save(file_path)
+                process_and_import_deck(file_path, deck_name, color_identity, commander_name)
             return "Deck Imported Successfully!"
         except Exception as e:
             return f"Failed to import deck: {str(e)}", 500
-        
+
     return render_template('edh_import.html')
 
 @edh_bp.route('/edh/gallery')
@@ -283,7 +277,7 @@ def edh_view(deck_name):
     categorized_cards = {
         'Creatures': [], 'Artifacts': [], 'Enchantments': [], 
         'Planeswalkers': [], 'Battles': [], 'Instants': [], 
-        'Sorceries': [], 'Lands': []
+        'Sorceries': [], 'Lands': [], 'Other': []
     }
     mana_curve = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, '6+': 0}
     
@@ -506,6 +500,7 @@ def add_card_to_deck_by_name(deck_id):
 
 @edh_bp.route('/edh/assign_card/<int:deck_id>/<oracle_id>', methods=['POST'])
 @login_required
+@admin_required
 def assign_card_to_deck(deck_id, oracle_id):
     db = get_db()
 
@@ -537,7 +532,8 @@ def assign_card_to_deck(deck_id, oracle_id):
     
     db.cursor.execute('''
         UPDATE inventory 
-        SET in_deck = 1, 
+        SET in_deck = 1,
+            is_tradeable = 0,
             deck_id = ?, 
             location_id = NULL -- Optional: Remove it from its storage box
         WHERE instance_id = ?

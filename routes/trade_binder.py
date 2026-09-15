@@ -140,73 +140,67 @@ def trade():
 @trade_bp.route('/api/submit_trade', methods=['POST'])
 @login_required
 def submit_trade():
-    # Grab the JSON payload sent by the JavaScript cart
-    data = request.get_json()
-    outbound_items = data.get('outbound', []) 
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Expected a JSON object.'}), 400
+    outbound_items = data.get('outbound', [])
     inbound_items = data.get('inbound', [])
-    
+    if not isinstance(outbound_items, list) or not isinstance(inbound_items, list):
+        return jsonify({'success': False, 'error': 'Trade items must be lists.'}), 400
     if not outbound_items and not inbound_items:
         return jsonify({'success': False, 'error': 'No cards selected for trade.'}), 400
-    
-    required_outbound_fields = {"scryfall_id", "finish", "qty"}
-    required_inbound_fields = {"scryfall_id", "finish", "qty", "set_code", "cn"}
 
-    for index, item in enumerate(outbound_items):
-        missing_fields = required_outbound_fields - item.keys()
-        if missing_fields:
-            return jsonify({
-                "success": False,
-                "error": f"Outbound item {index + 1} is missing required field(s): {', '.join(sorted(missing_fields))}."
-            }), 400
+    for label, items, required in (
+        ('Outbound', outbound_items, {'scryfall_id', 'finish', 'qty'}),
+        ('Inbound', inbound_items, {'scryfall_id', 'finish', 'qty', 'set_code', 'cn'}),
+    ):
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                return jsonify({'success': False, 'error': f'{label} item must be an object.'}), 400
+            missing = required - item.keys()
+            if missing:
+                return jsonify({'success': False, 'error': f"{label} item {index + 1} is missing required field(s): {', '.join(sorted(missing))}."}), 400
+            if type(item['qty']) is not int or item['qty'] <= 0:
+                return jsonify({'success': False, 'error': 'Quantity must be a positive integer.'}), 400
+            if item['finish'] not in ('nonfoil', 'foil', 'etched', 'etched foil', 'rainbow foil', 'surge foil', 'galaxy foil', 'textured foil', 'double rainbow foil'):
+                return jsonify({'success': False, 'error': 'Invalid finish.'}), 400
+            if any(not isinstance(item[key], str) or not item[key].strip() for key in required - {'qty'}):
+                return jsonify({'success': False, 'error': 'Card identifiers must be nonempty strings.'}), 400
 
-    for index, item in enumerate(inbound_items):
-        missing_fields = required_inbound_fields - item.keys()
-        if missing_fields:
-            return jsonify({
-                "success": False,
-                "error": f"Inbound item {index + 1} is missing required field(s): {', '.join(sorted(missing_fields))}."
-            }), 400
-    
-    # Generate a unique alphanumeric trade ID (e.g., "TRD-8A3B9C")
-    trade_id = f"TRD-{uuid.uuid4().hex[:6].upper()}"
-    
-    user_id = current_user.id
-
+    trade_id = f"TRD-{uuid.uuid4().hex[:12].upper()}"
     manager = get_db()
-    
-    fetcher = ScryfallFetcher.ScryfallFetcher(manager)
-    
     try:
-        # 1. Create the main trade record
-        manager.cursor.execute('''
-            INSERT INTO trades (trade_id, user_id, status)
-            VALUES (?, ?, 'Pending')
-        ''', (trade_id, user_id))
-        
-        # 2. Insert all the individual requested cards into the outbound table
-        for item in outbound_items:
-            manager.cursor.execute('''
-                INSERT INTO trade_outbound_items (trade_id, scryfall_id, finish, quantity)
-                VALUES (?, ?, ?, ?)
-            ''', (
-                trade_id, 
-                item['scryfall_id'], 
-                item['finish'], 
-                item['qty']
-            ))
+        # Resolve metadata first. ScryfallFetcher commits internally and must not
+        # commit a half-written trade if an incoming lookup fails.
+        fetcher = None
         for item in inbound_items:
-            fetcher.fetch_and_add(item['set_code'], item['cn'])
-            manager.cursor.execute('''
-                INSERT INTO trade_inbound_items (trade_id, scryfall_id, finish, quantity)
-                VALUES (?, ?, ?, ?)
-            ''', (trade_id, item['scryfall_id'], item['finish'], item['qty']))
-            
-        manager.conn.commit()
+            row = manager.cursor.execute(
+                'SELECT set_code, collector_number FROM card_printings WHERE scryfall_id = ?',
+                (item['scryfall_id'],),
+            ).fetchone()
+            if row is None:
+                if fetcher is None:
+                    fetcher = ScryfallFetcher.ScryfallFetcher(manager, setting=1)
+                resolved = fetcher.fetch_and_add(item['set_code'], item['cn'])
+                if resolved != item['scryfall_id']:
+                    return jsonify({'success': False, 'error': 'Incoming card could not be verified.'}), 400
+            elif (row['set_code'].lower(), str(row['collector_number'])) != (item['set_code'].lower(), item['cn']):
+                return jsonify({'success': False, 'error': 'Incoming printing does not match its identifiers.'}), 400
+
+        for item in outbound_items:
+            if manager.cursor.execute('SELECT 1 FROM card_printings WHERE scryfall_id = ?', (item['scryfall_id'],)).fetchone() is None:
+                return jsonify({'success': False, 'error': 'Unknown outgoing card.'}), 400
+
+        manager.cursor.execute("INSERT INTO trades (trade_id, user_id, status) VALUES (?, ?, 'Pending')", (trade_id, current_user.id))
+        for table, items in (('trade_outbound_items', outbound_items), ('trade_inbound_items', inbound_items)):
+            manager.cursor.executemany(
+                f'INSERT INTO {table} (trade_id, scryfall_id, finish, quantity) VALUES (?, ?, ?, ?)',
+                [(trade_id, item['scryfall_id'], item['finish'], item['qty']) for item in items],
+            )
+        manager.commit()
         return jsonify({'success': True, 'trade_id': trade_id})
-        
     except Exception as e:
         manager.conn.rollback()
-        print(f"Database Error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         manager.close()
@@ -220,7 +214,7 @@ def wishlist():
 
     manager = get_db()
 
-    params, filter_sql, having_sql, having_params, sort_sql = search(search_query)
+    params, filter_sql, having_sql, having_params, sort_sql = search(search_query, source='wishlist')
 
     count_query = f"""
         SELECT COUNT(*) FROM (
@@ -313,6 +307,9 @@ def wishlist():
 @trade_bp.route('/api/wishlist/update/<int:wish_id>', methods=['POST'])
 @login_required
 def update_wishlist_item(wish_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
     data = request.get_json() or {}
 
     finish = data.get('finish', 'nonfoil')

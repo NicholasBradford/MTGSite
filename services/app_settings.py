@@ -87,9 +87,19 @@ class SettingsManager:
                 with self.path.open("r", encoding="utf-8") as f:
                     user_settings = json.load(f)
 
+                if not isinstance(user_settings, dict):
+                    raise ValueError('Settings must be a JSON object.')
+                for section, defaults in DEFAULT_SETTINGS.items():
+                    if isinstance(defaults, dict) and section in user_settings:
+                        values = user_settings[section]
+                        if not isinstance(values, dict):
+                            raise ValueError(f'{section} must be an object.')
+                        for key, default in defaults.items():
+                            if key in values and type(values[key]) is not type(default):
+                                raise ValueError(f'{section}.{key} has an invalid type.')
                 merged = deep_merge(DEFAULT_SETTINGS, user_settings)
 
-            except json.JSONDecodeError as exc:
+            except (ValueError, OSError) as exc:
                 print(f"[settings] Invalid JSON in {self.path}: {exc}")
                 print("[settings] Keeping previous valid settings.")
                 return False

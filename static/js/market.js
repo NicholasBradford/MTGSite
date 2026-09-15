@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressStatus = document.getElementById('market-progress-status');
     const filterButtons = document.querySelectorAll('[data-market-filter]');
     const sortSelect = document.getElementById('market-sort');
+    const deferredSectionsContainer = document.getElementById('market-deferred-sections');
 
     function setQueryParam(key, value) {
         const url = new URL(window.location.href);
@@ -106,6 +107,49 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    async function loadDeferredSections() {
+        if (!deferredSectionsContainer) {
+            return;
+        }
+
+        const deferredUrl = deferredSectionsContainer.dataset.deferredUrl;
+
+        if (!deferredUrl) {
+            return;
+        }
+
+        try {
+            const requestUrl = new URL(deferredUrl, window.location.origin);
+            const currentParams = new URLSearchParams(window.location.search);
+
+            currentParams.delete('defer_sections');
+            requestUrl.search = currentParams.toString();
+
+            const response = await fetch(requestUrl.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load deferred sections (${response.status}).`);
+            }
+
+            deferredSectionsContainer.innerHTML = await response.text();
+        } catch (error) {
+            console.error('Deferred market sections failed to load:', error);
+            deferredSectionsContainer.innerHTML = `
+                <section class="site-card site-card--left-accent site-accent-red site-market-section">
+                    <div class="site-empty-state">
+                        <strong>Could not load additional sections.</strong>
+                        <span>Refresh the page or open the full dashboard with defer_sections=0.</span>
+                    </div>
+                </section>
+            `;
+        }
+    }
+
     syncButton?.addEventListener('click', startPriceUpdate);
 
     filterButtons.forEach(button => {
@@ -120,4 +164,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     markActiveFilterFromUrl();
     markActiveSortFromUrl();
+    loadDeferredSections();
 });
