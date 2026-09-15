@@ -49,6 +49,7 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
 
     if (triggerElement) {
         activeCardElement =
+            triggerElement.closest(".site-card-tile") ||
             triggerElement.closest(".card-container") ||
             triggerElement.closest("tr") ||
             triggerElement.closest(".card-item");
@@ -128,6 +129,7 @@ function openEditModal(instanceId, locId, isTradeable, scryfallId, finish, trigg
                             class="inventory-select"
                             onchange="updateCard('${inst.instance_id}', this.value, null, this)"
                         >
+                            <option value="" ${inst.location_id == null ? "selected" : ""}>Unassigned</option>
                             ${locationOptions}
                         </select>
                     </div>

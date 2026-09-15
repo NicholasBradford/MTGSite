@@ -23,6 +23,7 @@ class CardDB:
 
         self.conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
         self.cursor = self.conn.cursor()
         
     def log_update(self, task_name, cards_updated=0, status="Success", message=""):
@@ -493,6 +494,15 @@ class CardDB:
             );
         ''')
         
+        # CREATE TABLE IF NOT EXISTS does not upgrade existing databases.
+        for table, column, definition in (
+            ("wishlist", "non_specific", "INTEGER DEFAULT 0"),
+            ("planeswalker_tracker", "sort_index", "INTEGER"),
+        ):
+            columns = {row[1] for row in self.cursor.execute(f"PRAGMA table_info({table})")}
+            if column not in columns:
+                self.cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
         self.cursor.executescript("""
             CREATE INDEX IF NOT EXISTS idx_type_line 
                 ON card_definitions(type_line);                      
@@ -565,6 +575,7 @@ class CardDB:
         # Now that the file is gone, re-establish the connection and tables
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
         self.cursor = self.conn.cursor()
         
         self.create_tables()

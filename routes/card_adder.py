@@ -1,5 +1,5 @@
 import sqlite3, ScryfallFetcher, db.db_manager, datetime, csv, os, math
-from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, session, current_app
+from flask import Blueprint, request, redirect, url_for, render_template, send_from_directory, session, current_app, flash
 from db.db_manager import get_db
 from flask_login import login_required, current_user
 from io import TextIOWrapper
@@ -30,7 +30,7 @@ def admin_required(f):
 def adder():
     manager = get_db()
     importer = CardImporterService(manager)    
-    page = int(request.args.get('page', 1))
+    page = max(1, request.args.get('page', 1, type=int))
     per_page = 25  # Number of cards to load per batch
     offset = (page - 1) * per_page
     
@@ -108,7 +108,7 @@ def adder():
                 is_tradeable=trade,
             )
         except Exception as e:
-            print(f"Invalid Card Entry: {e}")
+            flash(f"Could not add card: {e}", "error")
         finally:
             # Always ensure the connection is closed before leaving the POST block
             manager.close()
@@ -201,7 +201,7 @@ def bulk_import_action():
     default_loc_id = request.form.get("location_id") or DEFAULT_LOCATION_ID
     
     if file and file.filename.endswith('.csv'):
-        csv_file = TextIOWrapper(file.stream, encoding='utf-8')
+        csv_file = TextIOWrapper(file.stream, encoding='utf-8-sig')
         reader = csv.DictReader(csv_file)
         
         manager = get_db()
@@ -212,13 +212,13 @@ def bulk_import_action():
 
         try:
             result = importer.import_bulk_rows(reader, default_location_id=default_loc_id)
-            print(f"Bulk import: {result.imported}/{result.requested} imported, {result.failed} failed")
+            flash(f"Bulk import: {result.imported}/{result.requested} rows imported, {result.failed} failed", "warning" if result.failed else "success")
 
             for failed in result.failed_cards:
                 print(f"Failed {failed.request.set_code} #{failed.request.collector_number}: {failed.reason}")
                         
         except Exception as e:
-            print(f"Bulk Import Error: {e}")
+            flash(f"Bulk import failed: {e}", "error")
         finally:
             manager.close()
             
