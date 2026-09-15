@@ -5,9 +5,17 @@ def test_inventory_requires_login(client, seed_cards):
     assert "/login" in response.headers.get("Location", "")
 
 
-def test_trade_binder_requires_login(client, seed_cards):
+def test_trade_binder_allows_guest_viewing(client, seed_cards):
+    # Guests can browse the owner's tradeable cards; submitting requires login.
     response = client.get("/binder/trades", follow_redirects=False)
 
+    assert response.status_code == 200
+    assert b"Sol Ring" in response.data
+    assert b"Command Tower" not in response.data
+
+    response = client.post("/api/submit_trade", json={"outbound": [
+        {"scryfall_id": seed_cards["sol_ring"], "finish": "nonfoil", "qty": 1}
+    ]}, follow_redirects=False)
     assert response.status_code in (302, 401)
     assert "/login" in response.headers.get("Location", "")
 

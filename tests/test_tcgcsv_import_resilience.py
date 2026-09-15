@@ -8,6 +8,9 @@ Policy:
 - market sync route returns a warning SSE event and exits cleanly
 """
 
+import json
+from unittest.mock import Mock
+
 import pytest
 
 
@@ -134,126 +137,125 @@ def test_bulk_import_post_succeeds_without_snapshot(admin_client_fixture, monkey
 # Test 3: Market price-sync route downloads snapshot then syncs prices
 # ---------------------------------------------------------------------------
 
-def test_run_price_update_downloads_snapshot_then_syncs(
-    admin_client_fixture, monkeypatch
-):
-    """
-    GET /run-price-update for an admin should:
-    - Drive stream_refresh_daily_price_snapshot_if_needed to download the snapshot
-    - Report the download status in the SSE stream
-    - Continue to read local prices (mocked to empty groups → no prices, clean exit)
-    """
-    import routes.markets as markets_module
+@pytest.fixture()
+def local_price_sync(monkeypatch, tmp_path, admin_client_fixture, seed_cards, db):
+    """Exercise the real CSV reader and database writes without remote I/O."""
+    import requests
+    import routes.markets as markets
+    import services.tcgcsv_prices as prices
 
-    def _fake_stream_refresh(**kw):
-        yield (0, 3, 0, "2026-06-12T00:00:00Z", "downloading")
-        yield (1, 3, 0, "2026-06-12T00:00:00Z", "downloading")
-        yield (2, 3, 0, "2026-06-12T00:00:00Z", "downloading")
-        yield (3, 3, 0, "2026-06-12T00:00:00Z", "downloading")
-        yield (0, 0, 0, "2026-06-12T00:00:00Z", "complete")
-
-    monkeypatch.setattr(
-        markets_module,
-        "stream_refresh_daily_price_snapshot_if_needed",
-        _fake_stream_refresh,
+    card_id = seed_cards["sol_ring"]
+    db.execute(
+        "UPDATE card_printings SET tcgplayer_id = 123, tcgcsv_group_id = 456 WHERE scryfall_id = ?",
+        (card_id,),
     )
-    monkeypatch.setattr(markets_module, "load_local_group_prices", lambda **kw: {})
+    db.execute("DELETE FROM price_history WHERE scryfall_id = ?", (card_id,))
+    db.commit()
 
-    response = admin_client_fixture.get("/run-price-update")
+    network = Mock(side_effect=AssertionError("Price-sync tests must not make network requests"))
+    monkeypatch.setattr(requests.sessions.Session, "request", network)
+    monkeypatch.setattr(markets, "TCGCSV_RATE_LIMIT_DELAY", 0)
+    monkeypatch.setattr(prices, "find_prior_tcgcsv_history_files", lambda *a, **kw: [])
 
+    def configure(price_date, message, updated):
+        snapshot = tmp_path / f"prices_category_1_{price_date}.csv"
+        snapshot.write_text(
+            "productId,groupId,subTypeName,marketPrice\n"
+            "123,456,Normal,9.75\n"
+            "123,456,Foil,12.50\n",
+            encoding="utf-8",
+        )
+        refresh = Mock(return_value={
+            "attempted": True, "updated": updated,
+            "message": message, "path": str(snapshot), "date": price_date,
+        })
+        resolver = Mock(return_value=str(snapshot))
+        monkeypatch.setattr(markets, "refresh_current_day_history_csv_if_due", refresh)
+        monkeypatch.setattr(markets, "resolve_local_price_snapshot_path", resolver)
+        return refresh, resolver
+
+    yield configure, card_id, network
+    network.assert_not_called()
+    # price_history isn't cleared by the shared clean_db fixture.
+    db.execute("DELETE FROM price_history WHERE scryfall_id = ?", (card_id,))
+    db.commit()
+
+
+def _price_sync_events(response):
     assert response.status_code == 200
-    assert "text/event-stream" in response.content_type
-
-    body = response.get_data(as_text=True)
-
-    assert "2026-06-12" in body, (
-        "Expected snapshot timestamp in SSE, got: " + body[:500]
-    )
+    assert response.mimetype == "text/event-stream"
+    return [json.loads(line[6:]) for line in response.get_data(as_text=True).splitlines()
+            if line.startswith("data: ")]
 
 
-# ---------------------------------------------------------------------------
-# Test 4 (updated): Market price-sync emits error SSE when download fails
-#                   and no local snapshot exists
-# ---------------------------------------------------------------------------
+def _assert_snapshot_prices_saved(db, card_id, price_date):
+    row = db.execute(
+        "SELECT current_price, current_price_foil FROM card_printings WHERE scryfall_id = ?",
+        (card_id,),
+    ).fetchone()
+    assert tuple(row) == (9.75, 12.50)
+    history = db.execute(
+        "SELECT price_usd, price_foil, scraped_at, source FROM price_history WHERE scryfall_id = ?",
+        (card_id,),
+    ).fetchall()
+    assert [tuple(row) for row in history] == [(9.75, 12.50, price_date, "tcgcsv")]
+
+
+def test_run_price_update_downloads_snapshot_then_syncs(
+    admin_client_fixture, local_price_sync, db
+):
+    configure, card_id, _ = local_price_sync
+    message = "Downloaded current-day local CSV: 2026-06-12"
+    refresh, resolver = configure("2026-06-12", message, updated=True)
+
+    events = _price_sync_events(admin_client_fixture.get("/run-price-update"))
+
+    refresh.assert_called_once_with()
+    resolver.assert_called_once_with()
+    assert any(event["status"] == message for event in events)
+    assert events[-1]["progress"] == 100
+    assert "TCGCSV sync complete. Updated 1 cards" in events[-1]["status"]
+    assert "2026-06-12" in events[-1]["status"]
+    _assert_snapshot_prices_saved(db, card_id, "2026-06-12")
+
 
 def test_run_price_update_emits_error_sse_when_download_fails_and_no_snapshot(
-    admin_client_fixture, monkeypatch
+    admin_client_fixture, monkeypatch, local_price_sync, db
 ):
-    """
-    GET /run-price-update when TCGCSV is unreachable AND there is no local
-    snapshot must:
-    - Return 200 text/event-stream
-    - Contain an error SSE payload
-    - NOT raise a 500
-    """
-    import services.tcgcsv_prices as tcgcsv_prices
-    import routes.markets as markets_module
+    """An unexpected refresh exception must produce an error, not fake success."""
+    import routes.markets as markets
 
-    def _raising_generator(**kw):
-        raise RuntimeError("TCGCSV unreachable (test)")
-        yield  # pragma: no cover
+    _, card_id, _ = local_price_sync
+    refresh = Mock(side_effect=RuntimeError("TCGCSV unreachable (test)"))
+    resolver = Mock(side_effect=AssertionError("No snapshot should be read after a refresh exception"))
+    monkeypatch.setattr(markets, "refresh_current_day_history_csv_if_due", refresh)
+    monkeypatch.setattr(markets, "resolve_local_price_snapshot_path", resolver)
 
-    monkeypatch.setattr(markets_module, "stream_refresh_daily_price_snapshot_if_needed", _raising_generator)
-    monkeypatch.setattr(markets_module, "local_snapshot_exists", lambda: False)
+    events = _price_sync_events(admin_client_fixture.get("/run-price-update"))
 
-    response = admin_client_fixture.get("/run-price-update")
+    refresh.assert_called_once_with()
+    resolver.assert_not_called()
+    assert events[-1] == {"progress": 100, "status": "TCGCSV sync failed: TCGCSV unreachable (test)"}
+    assert db.execute("SELECT COUNT(*) FROM price_history WHERE scryfall_id = ?", (card_id,)).fetchone()[0] == 0
+    assert db.execute("SELECT current_price FROM card_printings WHERE scryfall_id = ?", (card_id,)).fetchone()[0] == 1.25
 
-    assert response.status_code == 200
-    assert "text/event-stream" in response.content_type
-
-    body = response.get_data(as_text=True)
-
-    assert '"progress": 100' in body or "100" in body, (
-        "Expected final progress=100 SSE event, got: " + body[:400]
-    )
-    assert (
-        "unreachable" in body.lower()
-        or "no snapshot" in body.lower()
-        or "tcgcsv" in body.lower()
-    ), "Expected an error message about TCGCSV or snapshot in SSE, got: " + body[:400]
-
-
-# ---------------------------------------------------------------------------
-# Test 5: Market price-sync uses stale local snapshot when download fails
-# ---------------------------------------------------------------------------
 
 def test_run_price_update_falls_back_to_existing_snapshot_on_download_error(
-    admin_client_fixture, monkeypatch
+    admin_client_fixture, local_price_sync, db
 ):
-    """
-    When TCGCSV is unreachable but a local snapshot already exists, the sync
-    should continue with the stale snapshot rather than failing.
-    """
-    import services.tcgcsv_prices as tcgcsv_prices
-    import routes.markets as markets_module
+    configure, card_id, _ = local_price_sync
+    message = "Download failed; using existing local CSV for 2026-06-10."
+    refresh, resolver = configure("2026-06-10", message, updated=False)
 
-    def _raising_generator(**kw):
-        raise RuntimeError("TCGCSV unreachable (test)")
-        yield  # pragma: no cover
+    events = _price_sync_events(admin_client_fixture.get("/run-price-update"))
 
-    monkeypatch.setattr(markets_module, "stream_refresh_daily_price_snapshot_if_needed", _raising_generator)
-    monkeypatch.setattr(markets_module, "local_snapshot_exists", lambda: True)
-    monkeypatch.setattr(
-        tcgcsv_prices,
-        "get_local_snapshot_last_updated",
-        lambda **kw: "2026-06-10T00:00:00Z",
-    )
-    # Empty snapshot → no groups → sync exits cleanly
-    monkeypatch.setattr(markets_module, "load_local_group_prices", lambda **kw: {})
-
-    response = admin_client_fixture.get("/run-price-update")
-
-    assert response.status_code == 200
-    assert "text/event-stream" in response.content_type
-
-    body = response.get_data(as_text=True)
-
-    # Should warn about TCGCSV being unreachable but still proceed
-    assert (
-        "existing" in body.lower()
-        or "local snapshot" in body.lower()
-        or "proceeding" in body.lower()
-    ), "Expected fallback-to-local message in SSE, got: " + body[:400]
+    refresh.assert_called_once_with()
+    resolver.assert_called_once_with()
+    assert any(event["status"] == message for event in events)
+    assert events[-1]["progress"] == 100
+    assert "TCGCSV sync complete. Updated 1 cards" in events[-1]["status"]
+    assert "2026-06-10" in events[-1]["status"]
+    _assert_snapshot_prices_saved(db, card_id, "2026-06-10")
 
 
 # ---------------------------------------------------------------------------

@@ -50,8 +50,7 @@
 </div>
 
 <script>
-    let rawPath = "{{ config['IMAGE_PATH'] or '/static/images/' }}";
-    const IMAGE_BASE_PATH = rawPath.replace(/\/$/, '') + '/';
+    const IMAGE_BASE_PATH = {{ url_for('serve_card_image', filename='') | tojson }};
     let searchTimeout = null;
     const searchInput = document.getElementById('outgoing-search');
     const dropdown = document.getElementById('search-dropdown');
@@ -77,7 +76,7 @@
                             item.className = 'trade-dropdown-item';
                             // Build the dropdown row visually
                             item.innerHTML = `
-                                    <img src="${IMAGE_BASE_PATH}${card.image_url}" alt="${card.name}" loading="lazy">                                
+                                    <img src="${card.image_url && /^https?:\/\//i.test(card.image_url) ? card.image_url : IMAGE_BASE_PATH + card.image_url}" alt="${card.name}" loading="lazy">
                                 <div class="trade-dropdown-item__details">
                                     <span class="trade-dropdown-item__name">${card.name}</span>
                                     <span class="trade-dropdown-item__meta">${card.set_code.toUpperCase()} #${card.collector_number} - ${card.finish}</span>

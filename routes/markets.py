@@ -38,6 +38,7 @@ MIN_OWNED_IMPACT = 3.00
 FOIL_LIKE_FINISH_SQL = """
     LOWER(REPLACE(COALESCE({finish_column}, ''), '_', ' ')) IN (
         'foil',
+        'etched',
         'etched foil',
         'rainbow foil',
         'surge foil',

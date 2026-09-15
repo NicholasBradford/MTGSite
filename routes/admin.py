@@ -66,6 +66,8 @@ def manage_locations():
             new_name = request.form.get('new_name')
             
             try:
+                # Defer FK checks until both parent and child IDs have moved.
+                manager.cursor.execute("PRAGMA defer_foreign_keys = ON")
                 # 1. Update the location record first
                 manager.cursor.execute("UPDATE locations SET location_id=?, name=? WHERE location_id=?", (new_id, new_name, old_id))
 
@@ -564,64 +566,70 @@ def admin_dashboard():
 @login_required
 @admin_required
 def manage_trade():
-    data = request.json
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Expected a JSON object.'}), 400
     trade_id = data.get('trade_id')
-    action = data.get('action') # 'accept' or 'decline'
-
-    if not trade_id or action not in ['accept', 'decline']:
+    action = data.get('action')
+    if not isinstance(trade_id, str) or not trade_id or action not in ('accept', 'decline'):
         return jsonify({'success': False, 'error': 'Invalid request parameters.'}), 400
 
     manager = get_db()
-    
     try:
+        # Serialize stock validation and resolution, including concurrent accepts.
+        manager.cursor.execute('BEGIN IMMEDIATE')
+        trade = manager.cursor.execute('SELECT status FROM trades WHERE trade_id = ?', (trade_id,)).fetchone()
+        if trade is None:
+            return jsonify({'success': False, 'error': 'Trade not found.'}), 404
+        if trade['status'] != 'Pending':
+            return jsonify({'success': False, 'error': 'Trade has already been resolved.'}), 409
+
         if action == 'accept':
-            # 1. INBOUND: Add offered cards to your inventory
-            inbound_items = manager.cursor.execute('''
-                SELECT scryfall_id, finish, quantity 
-                FROM trade_inbound_items WHERE trade_id = ?
-            ''', (trade_id,)).fetchall()
-            
-            for item in inbound_items:
-                # Insert a new row for each individual copy of the card
-                for _ in range(item['quantity']):
-                    # Note: You can change location_id to whatever your "Main Binder" ID is.
-                    manager.cursor.execute('''
-                        INSERT INTO inventory (scryfall_id, finish, condition, location_id, is_tradeable, added)
-                        VALUES (?, ?, "NM", 5, 0, ?)
-                    ''', (item['scryfall_id'], item['finish'], datetime.datetime.now())),
+            inbound = manager.cursor.execute('SELECT scryfall_id, finish, quantity FROM trade_inbound_items WHERE trade_id = ?', (trade_id,)).fetchall()
+            outbound = manager.cursor.execute('SELECT scryfall_id, finish, quantity FROM trade_outbound_items WHERE trade_id = ?', (trade_id,)).fetchall()
+            if not inbound and not outbound:
+                return jsonify({'success': False, 'error': 'Trade has no items.'}), 409
+            for item in list(inbound) + list(outbound):
+                if type(item['quantity']) is not int or item['quantity'] <= 0 or item['finish'] not in ('nonfoil', 'foil', 'etched', 'etched foil', 'rainbow foil', 'surge foil', 'galaxy foil', 'textured foil', 'double rainbow foil'):
+                    return jsonify({'success': False, 'error': 'Trade contains invalid items.'}), 409
+                if manager.cursor.execute('SELECT 1 FROM card_printings WHERE scryfall_id = ?', (item['scryfall_id'],)).fetchone() is None:
+                    return jsonify({'success': False, 'error': 'Trade contains an unknown card.'}), 409
 
-            # 2. OUTBOUND: Remove requested cards from your inventory
-            outbound_items = manager.cursor.execute('''
-                SELECT scryfall_id, finish, quantity 
-                FROM trade_outbound_items WHERE trade_id = ?
-            ''', (trade_id,)).fetchall()
-            
-            for item in outbound_items:
-                # Safely delete exactly 'X' copies of the card that are marked as tradeable
-                manager.cursor.execute('''
-                    DELETE FROM inventory 
-                    WHERE instance_id IN (
-                        SELECT instance_id FROM inventory 
-                        WHERE scryfall_id = ? AND finish = ? AND is_tradeable = 1
-                        LIMIT ?
-                    )
-                ''', (item['scryfall_id'], item['finish'], item['quantity']))
+            # Aggregate duplicate lines before checking stock.
+            requested = {}
+            for item in outbound:
+                key = (item['scryfall_id'], item['finish'])
+                requested[key] = requested.get(key, 0) + item['quantity']
+            selected = []
+            for (card_id, finish), quantity in requested.items():
+                copies = manager.cursor.execute('''
+                    SELECT instance_id FROM inventory
+                    WHERE scryfall_id = ? AND finish = ? AND is_tradeable = 1
+                      AND COALESCE(in_deck, 0) = 0 AND deck_id IS NULL
+                    ORDER BY instance_id LIMIT ?
+                ''', (card_id, finish, quantity)).fetchall()
+                if len(copies) != quantity:
+                    return jsonify({'success': False, 'error': 'Not enough available outgoing copies.'}), 409
+                selected.extend((row['instance_id'],) for row in copies)
 
-            # 3. Update the trade status to Completed
-            manager.cursor.execute("UPDATE trades SET status = 'Completed' WHERE trade_id = ?", (trade_id,))
+            # Location 1 is the initialized Unsorted Box, including new installs.
+            manager.cursor.execute("INSERT OR IGNORE INTO locations (location_id, name, description) VALUES (1, 'Unsorted Box', 'Cards waiting to be filed')")
+            manager.cursor.executemany('DELETE FROM inventory WHERE instance_id = ?', selected)
+            for item in inbound:
+                manager.cursor.executemany(
+                    "INSERT INTO inventory (scryfall_id, finish, condition, location_id, is_tradeable, added) VALUES (?, ?, 'NM', 1, 0, ?)",
+                    [(item['scryfall_id'], item['finish'], datetime.datetime.now().isoformat()) for _ in range(item['quantity'])],
+                )
 
-        elif action == 'decline':
-            # Just update the status, don't move any inventory
-            manager.cursor.execute("UPDATE trades SET status = 'Declined' WHERE trade_id = ?", (trade_id,))
-
-        manager.conn.commit()
+        status = 'Completed' if action == 'accept' else 'Declined'
+        manager.cursor.execute('UPDATE trades SET status = ? WHERE trade_id = ?', (status, trade_id))
+        manager.commit()
         return jsonify({'success': True, 'action': action})
-
     except Exception as e:
-        manager.conn.rollback() # If anything fails, revert the entire transaction!
-        print(f"Trade Resolution Error: {e}")
+        manager.conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
+        # Closing rolls back every early return above and releases the write lock.
         manager.close()
 
 @admin_bp.route('/search_api', methods=['GET'])

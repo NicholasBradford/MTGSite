@@ -187,7 +187,7 @@ def test_bulk_import_caches_repeated_set_collector_lookups():
             {"set_code": "ktk", "collector_number": "5", "qty": "1", "finish": "foil"},
             {"set_code": "ktk", "collector_number": "6", "qty": "1", "finish": "nonfoil"},
         ],
-        default_location_id=1,
+        default_location_id=5,
     )
 
     assert result["rows_processed"] == 3

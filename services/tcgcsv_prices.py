@@ -31,7 +31,7 @@ TCGCSV_HISTORY_FILE_PREFIX = "prices_category_1_"
 TCGCSV_HISTORY_FILE_SUFFIX = ".csv"
 TCGCSV_LOCAL_TIMEZONE = os.environ.get("TCGCSV_LOCAL_TIMEZONE", "America/Chicago")
 TCGCSV_DAILY_RELEASE_HOUR_LOCAL = int(os.environ.get("TCGCSV_DAILY_RELEASE_HOUR_LOCAL", "15"))
-TCGCSV_FETCH_SCRIPT_PATH = os.environ.get("TCGCSV_FETCH_SCRIPT_PATH", "_get_tcgcsv.py")
+TCGCSV_FETCH_SCRIPT_PATH = os.environ.get("TCGCSV_FETCH_SCRIPT_PATH", os.path.join(os.path.dirname(__file__), "_get_tcgcsv.py"))
 TCGCSV_FETCH_TIMEOUT_SECONDS = int(os.environ.get("TCGCSV_FETCH_TIMEOUT_SECONDS", "600"))
 TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS = int(os.environ.get("TCGCSV_FETCH_RETRY_COOLDOWN_SECONDS", "900"))
 
